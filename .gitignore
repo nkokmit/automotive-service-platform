@@ -1,0 +1,7 @@
+# Common build/dependency artifacts
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
+*.pyc
