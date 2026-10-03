@@ -156,3 +156,67 @@ export const IconShoppingBag = ({ size, ...p }: IconProps) => (
     <path d="M16 10a4 4 0 0 1-8 0" />
   </svg>
 );
+
+export const IconCart = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="9" cy="21" r="1" />
+    <circle cx="20" cy="21" r="1" />
+    <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
+  </svg>
+);
+
+export const IconCartPlus = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="9" cy="21" r="1" />
+    <circle cx="20" cy="21" r="1" />
+    <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
+    <line x1="12" y1="10" x2="12" y2="16" />
+    <line x1="9" y1="13" x2="15" y2="13" />
+  </svg>
+);
+
+export const IconTag = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+    <line x1="7" y1="7" x2="7.01" y2="7" />
+  </svg>
+);
+
+export const IconPackage = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M16.5 9.4 7.55 4.24" />
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+    <line x1="12" y1="22.08" x2="12" y2="12" />
+  </svg>
+);
+
+export const IconPlus = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+export const IconMinus = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+export const IconTruck = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <rect x="1" y="3" width="15" height="13" rx="1" />
+    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+    <circle cx="5.5" cy="18.5" r="2.5" />
+    <circle cx="18.5" cy="18.5" r="2.5" />
+  </svg>
+);
+
+export const IconRefresh = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polyline points="1 4 1 10 7 10" />
+    <polyline points="23 20 23 14 17 14" />
+    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
+  </svg>
+);

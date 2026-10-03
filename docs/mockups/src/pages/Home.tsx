@@ -356,7 +356,7 @@ export default function Home() {
                   )
                 : 0;
               return (
-                <Link to="/parts" key={p.id} className="group">
+                <Link to={`/parts/${p.slug}`} key={p.id} className="group">
                   <Card>
                     <div className="aspect-square overflow-hidden rounded-t-2xl bg-white relative">
                       <img

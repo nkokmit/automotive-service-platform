@@ -12,6 +12,8 @@ import FoundationDemo from "./pages/FoundationDemo";
 import BoomDemo from "./pages/BoomDemo";
 import CarsList from "./pages/CarsList";
 import CarDetail from "./pages/CarDetail";
+import PartsList from "./pages/PartsList";
+import PartDetail from "./pages/PartDetail";
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
 import "./styles/globals.css";
 
@@ -33,6 +35,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="services/:slug" element={<ServiceDetail />} />
             <Route path="cars" element={<CarsList />} />
             <Route path="cars/:slug" element={<CarDetail />} />
+            <Route path="parts" element={<PartsList />} />
+            <Route path="parts/:slug" element={<PartDetail />} />
             <Route path="ai/damage" element={<DamageUpload />} />
             <Route path="ai/assistant" element={<ChatAssistant />} />
             <Route
