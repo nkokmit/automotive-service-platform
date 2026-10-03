@@ -493,8 +493,8 @@ export default function Home() {
           </Link>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {articles.map((a) => (
-            <Link to="/news" key={a.id} className="group">
+          {articles.slice(0, 3).map((a) => (
+            <Link to={`/news/${a.slug}`} key={a.id} className="group">
               <Card>
                 <div className="aspect-[16/10] overflow-hidden rounded-t-2xl bg-bgsoft">
                   <img

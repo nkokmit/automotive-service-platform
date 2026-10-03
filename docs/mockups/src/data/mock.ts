@@ -45,10 +45,29 @@ export interface Article {
   title: string;
   excerpt: string;
   image: string;
-  category: string;
-  publishedAt: string;
+  category: "Bảo dưỡng" | "Kiến thức" | "An toàn" | "Mua bán xe" | "Kinh nghiệm";
+  author: {
+    name: string;
+    avatar: string;
+    role: string;
+  };
+  publishedAt: string; // ISO date hoặc DD/MM/YYYY
   readMinutes: number;
+  /** Nội dung bài viết dạng các section — render tuần tự. */
+  sections: ArticleSection[];
+  /** Từ khoá SEO/tags. */
+  tags?: string[];
+  /** Featured để hiển thị ở top. */
+  isFeatured?: boolean;
 }
+
+export type ArticleSection =
+  | { type: "paragraph"; text: string }
+  | { type: "heading"; level: 2 | 3; text: string; id: string }
+  | { type: "list"; items: string[]; ordered?: boolean }
+  | { type: "quote"; text: string; cite?: string }
+  | { type: "callout"; tone: "info" | "warning" | "success"; title: string; text: string }
+  | { type: "image"; src: string; caption?: string };
 
 const IMG = (seed: string) =>
   `https://images.unsplash.com/${seed}?auto=format&fit=crop&w=1200&q=70`;
@@ -885,31 +904,643 @@ export const articles: Article[] = [
     id: "a1",
     slug: "cach-chon-dau-nhot",
     title: "Cách chọn dầu nhớt phù hợp cho xe ô tô của bạn",
-    excerpt: "Hướng dẫn chi tiết giúp bạn chọn loại dầu nhớt phù hợp...",
+    excerpt:
+      "Hướng dẫn chi tiết giúp bạn chọn loại dầu nhớt phù hợp với dòng xe, điều kiện vận hành và khí hậu tại Việt Nam.",
     image: IMG("photo-1487754180451-c456f719a1fc"),
     category: "Bảo dưỡng",
+    author: {
+      name: "Nguyễn Minh Tuấn",
+      avatar: IMG("photo-1535713875002-d1d0cf377fde"),
+      role: "Kỹ thuật viên trưởng — Garage Minh Anh",
+    },
     publishedAt: "01/10/2026",
     readMinutes: 5,
+    isFeatured: true,
+    tags: ["dầu nhớt", "bảo dưỡng", "động cơ"],
+    sections: [
+      {
+        type: "paragraph",
+        text: "Dầu nhớt là \"máu\" của động cơ — bôi trơn, làm mát, làm sạch và bảo vệ các chi tiết kim loại khỏi mài mòn. Chọn sai loại dầu có thể khiến động cơ kêu to, tốn nhiên liệu, hoặc hỏng nặng sau vài nghìn km.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "1. Hiểu các thông số trên chai dầu",
+        id: "thong-so",
+      },
+      {
+        type: "paragraph",
+        text: "Mỗi chai dầu đều có dãy thông số theo chuẩn SAE (ví dụ 5W-30, 10W-40). Đây là độ nhớt — khả năng chảy của dầu ở nhiệt độ khác nhau.",
+      },
+      {
+        type: "list",
+        items: [
+          "W (Winter): độ nhớt khi lạnh — số càng nhỏ, dầu chảy càng dễ khi khởi động.",
+          "Số sau W: độ nhớt khi nóng (100°C) — số càng lớn, dầu càng đặc ở nhiệt độ cao.",
+          "VD: 5W-30 — chảy dễ khi lạnh, độ đặc vừa khi nóng.",
+        ],
+      },
+      {
+        type: "callout",
+        tone: "info",
+        title: "Mẹo nhanh",
+        text: "Tại Việt Nam (khí hậu nóng ẩm), đa số xe phổ thông dùng 5W-30 hoặc 10W-30 là phù hợp.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "2. Chọn theo khuyến cáo của nhà sản xuất xe",
+        id: "khuyen-cao",
+      },
+      {
+        type: "paragraph",
+        text: "Luôn ưu tiên thông số dầu ghi trong sách hướng dẫn sử dụng xe (Owner Manual). Ví dụ: Toyota Vios 2023 yêu cầu 0W-20 hoặc 5W-30 theo tiêu chuẩn API SP.",
+      },
+      {
+        type: "quote",
+        text: "Dùng dầu đặc hơn khuyến cáo sẽ không bảo vệ động cơ tốt hơn — ngược lại còn gây tốn nhiên liệu và mài mòn nhanh hơn.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "3. Loại dầu: bán tổng hợp, tổng hợp hay khoáng?",
+        id: "loai-dau",
+      },
+      {
+        type: "list",
+        ordered: true,
+        items: [
+          "Dầu khoáng (Mineral): rẻ nhất, phù hợp xe cũ, thay dầu mỗi 3.000–5.000 km.",
+          "Dầu bán tổng hợp (Semi-synthetic): phổ thông nhất, thay mỗi 5.000–7.000 km.",
+          "Dầu tổng hợp (Full synthetic): đắt nhất, thay mỗi 10.000–15.000 km, bảo vệ tốt nhất.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "4. Khi nào cần thay dầu?",
+        id: "khi-nao-thay",
+      },
+      {
+        type: "paragraph",
+        text: "Quy tắc phổ biến: mỗi 5.000 km HOẶC 6 tháng (tuỳ điều kiện nào đến trước). Nếu xe chạy trong thành phố nhiều, kẹt xe thường xuyên, nên rút ngắn còn 3.000–4.000 km.",
+      },
+      {
+        type: "callout",
+        tone: "warning",
+        title: "Lưu ý",
+        text: "Không nên trộn lẫn 2 loại dầu khác thông số. Nếu buộc phải châm thêm, hãy chọn cùng thương hiệu + cùng thông số SAE.",
+      },
+    ],
   },
   {
     id: "a2",
     slug: "bao-lau-bao-duong",
     title: "Bao lâu nên bảo dưỡng định kỳ một lần?",
-    excerpt: "Tần suất bảo dưỡng định kỳ theo khuyến cáo của nhà sản xuất...",
-    image: IMG("photo-1492144534655-ae79c964c9d7"),
+    excerpt:
+      "Tần suất bảo dưỡng định kỳ theo khuyến cáo của nhà sản xuất — và 4 dấu hiệu xe cần đưa đi kiểm tra ngay.",
+    image: IMG("photo-1492144534655-ae79c964c9d"),
     category: "Kiến thức",
+    author: {
+      name: "Trần Quốc Đạt",
+      avatar: IMG("photo-1438761681033-6461ffad8d80"),
+      role: "Chuyên gia tư vấn — AutoCare",
+    },
     publishedAt: "28/09/2026",
     readMinutes: 4,
+    isFeatured: true,
+    tags: ["bảo dưỡng", "định kỳ", "ô tô"],
+    sections: [
+      {
+        type: "paragraph",
+        text: "Bảo dưỡng định kỳ giúp xe vận hành ổn định, tiết kiệm nhiên liệu và kéo dài tuổi thọ động cơ. Tuy nhiên, nhiều chủ xe vẫn bỏ qua vì nghĩ \"xe còn chạy tốt\".",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Các mốc bảo dưỡng phổ biến",
+        id: "cac-moc",
+      },
+      {
+        type: "list",
+        items: [
+          "5.000 km: thay dầu + lọc dầu.",
+          "10.000 km: thay dầu + lọc dầu + lọc gió động cơ.",
+          "20.000 km: thay dầu + kiểm tra phanh + lọc gió điều hòa.",
+          "40.000 km: thay dầu + bảo dưỡng hệ thống phanh + dầu phanh.",
+          "80.000 km: thay dầu + kiểm tra hệ thống treo, truyền động.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "4 dấu hiệu cần đưa xe đi kiểm tra ngay",
+        id: "dau-hieu",
+      },
+      {
+        type: "list",
+        ordered: true,
+        items: [
+          "Đèn báo động cơ sáng (Check Engine).",
+          "Tiếng kêu lạ từ động cơ, phanh, hoặc hệ thống treo.",
+          "Xe hao xăng hơn bình thường >10%.",
+          "Rung giật khi chạy ở tốc độ cao hoặc khi phanh.",
+        ],
+      },
+      {
+        type: "callout",
+        tone: "success",
+        title: "Tiết kiệm chi phí lâu dài",
+        text: "Một lần bảo dưỡng 1,2 triệu mỗi 10.000 km rẻ hơn rất nhiều so với thay động cơ 80-150 triệu khi hỏng nặng.",
+      },
+    ],
   },
   {
     id: "a3",
     slug: "dau-hieu-can-thay-phanh",
     title: "5 dấu hiệu cảnh báo cần thay má phanh",
-    excerpt: "Đừng bỏ qua những dấu hiệu này để đảm bảo an toàn...",
+    excerpt:
+      "Đừng bỏ qua những dấu hiệu này — phanh hỏng có thể gây nguy hiểm nghiêm trọng cho bạn và người xung quanh.",
     image: IMG("photo-1632823471565-1ecdf5c6da77"),
     category: "An toàn",
+    author: {
+      name: "Lê Hoàng Phúc",
+      avatar: IMG("photo-1535713875002-d1d0cf377fde"),
+      role: "Thợ sửa chữa cao cấp — Garage Phú Long",
+    },
     publishedAt: "25/09/2026",
     readMinutes: 6,
+    isFeatured: true,
+    tags: ["phanh", "an toàn", "má phanh"],
+    sections: [
+      {
+        type: "paragraph",
+        text: "Má phanh là bộ phận chịu mài mòn nhiều nhất — chúng \"hy sinh\" để bảo vệ đĩa phanh và an toàn cho bạn. Vì vậy, cần kiểm tra định kỳ và thay thế khi đến giới hạn.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "1. Tiếng rít khi phanh",
+        id: "tieng-rit",
+      },
+      {
+        type: "paragraph",
+        text: "Hầu hết má phanh có \"còi cảnh báo\" — miếng kim loại nhỏ cọ vào đĩa khi má mòn tới giới hạn. Khi nghe tiếng rít chói tai, bạn nên đặt lịch thay phanh trong vòng 1-2 tuần.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "2. Phanh \"đá\" hoặc rung tay lái",
+        id: "phanh-da",
+      },
+      {
+        type: "paragraph",
+        text: "Nếu vô-lang rung khi phanh, có thể đĩa phanh đã bị mòn không đều, cong vênh do nhiệt. Cần kiểm tra đĩa phanh và thay nếu vượt quá dung sai.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "3. Phải đạp sâu hơn bình thường",
+        id: "dap-sau",
+      },
+      {
+        type: "paragraph",
+        text: "Phanh \"mềm\" hoặc phải đạp gần sàn xe là dấu hiệu dầu phanh bị rò rỉ, hoặc má phanh đã mòn gần hết.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "4. Xe bị kéo sang một bên khi phanh",
+        id: "keo-lech",
+      },
+      {
+        type: "paragraph",
+        text: "Đây là dấu hiệu nguy hiểm — xy-lanh phanh hoặc má phanh bên đó đang bị kẹt. Cần đưa xe đi kiểm tra ngay lập tức.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "5. Đèn báo phanh sáng trên bảng đồng hồ",
+        id: "den-bao",
+      },
+      {
+        type: "paragraph",
+        text: "Nhiều xe hiện đại có cảm biến độ dày má phanh — khi đèn báo sáng, nghĩa là đã đến lúc thay.",
+      },
+      {
+        type: "callout",
+        tone: "warning",
+        title: "Khoảng cách thay má phanh",
+        text: "Trung bình mỗi 30.000-70.000 km tuỳ loại xe và điều kiện vận hành. Nếu chạy trong thành phố nhiều, nên kiểm tra mỗi 10.000 km.",
+      },
+    ],
+  },
+  {
+    id: "a4",
+    slug: "kinh-nghiem-mua-xe-cu",
+    title: "Kinh nghiệm mua xe cũ: 7 điều cần kiểm tra trước khi xuống tiền",
+    excerpt:
+      "Mua xe cũ tiềm ẩn nhiều rủi ro nếu không kiểm tra kỹ. Đây là checklist từ chuyên gia để bạn tránh \"hố\".",
+    image: IMG("photo-1494976388531-d1058494cdd8"),
+    category: "Mua bán xe",
+    author: {
+      name: "Phạm Văn Sỹ",
+      avatar: IMG("photo-1500648767791-00dcc994a43e"),
+      role: "Chuyên gia thẩm định xe — AutoCare Pro",
+    },
+    publishedAt: "20/09/2026",
+    readMinutes: 8,
+    tags: ["xe cũ", "mua bán", "checklist"],
+    sections: [
+      {
+        type: "paragraph",
+        text: "Mua xe cũ giúp tiết kiệm chi phí, nhưng cũng tiềm ẩn rủi ro nếu không kiểm tra kỹ. Dưới đây là 7 điều bạn cần kiểm tra trước khi quyết định mua.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "1. Kiểm tra giấy tờ xe",
+        id: "giay-to",
+      },
+      {
+        type: "list",
+        items: [
+          "Đăng ký xe (cavet) chính chủ.",
+          "Sổ bảo hành + sổ bảo dưỡng (nếu có).",
+          "Đối chiếu số khung, số máy trên xe với giấy tờ.",
+          "Kiểm tra xe có bị thế chấp ngân hàng không (tra cứu trên Cục Đăng kiểm).",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "2. Kiểm tra thân vỏ",
+        id: "than-vo",
+      },
+      {
+        type: "paragraph",
+        text: "Đứng cách xe 3-5m, quan sát dưới ánh sáng tự nhiên. Nếu thấy khoảng cách giữa các khe cửa, nắp capo không đều → xe có thể đã sơn lại do tai nạn.",
+      },
+      {
+        type: "callout",
+        tone: "info",
+        title: "Mẹo",
+        text: "Dùng nam châm nhỏ để kiểm tra các vị trí sơn lại — nếu nam châm không hút, có thể đã bả sơn.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "3. Kiểm tra động cơ",
+        id: "dong-co",
+      },
+      {
+        type: "list",
+        items: [
+          "Khởi động nguội — động cơ phải nổ trong vòng 2-3 giây.",
+          "Quan sát khói xả: trắng (nước), đen (xăng), xanh (dầu cháy) đều là dấu hiệu xấu.",
+          "Nghe tiếng kêu lạ từ động cơ.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "4. Chạy thử trên 30km",
+        id: "chay-thu",
+      },
+      {
+        type: "paragraph",
+        text: "Chạy thử đủ các điều kiện: đường nhựa, đường xấu, leo dốc, phanh gấp. Lưu ý cảm giác vô-lang, hộp số, hệ thống treo.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "5. Kiểm tra hệ thống điện",
+        id: "dien",
+      },
+      {
+        type: "list",
+        items: [
+          "Bật hết các thiết bị: đèn, còi, điều hòa, camera, màn hình.",
+          "Kiểm tra ắc quy: nếu yếu, đề nghị giảm giá hoặc thay mới.",
+          "Kiểm tra cổng OBD bằng máy chuyên dụng (nếu có).",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "6. Lịch sử tai nạn / thuỷ kích",
+        id: "tai-nan",
+      },
+      {
+        type: "paragraph",
+        text: "Tra cứu trên các trang như AutoCheck.vn hoặc đăng kiểm để biết xe có từng tai nạn, ngập nước hay không.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "7. Đàm phán giá và công chứng",
+        id: "dam-phan",
+      },
+      {
+        type: "paragraph",
+        text: "Sau khi kiểm tra, bạn đã có cơ sở để đàm phán. Lưu ý: giao dịch phải công chứng sang tên tại phòng công chứng — tuyệt đối không đặt cọc trước khi công chứng.",
+      },
+      {
+        type: "callout",
+        tone: "warning",
+        title: "Cảnh báo",
+        text: "Không mua xe nếu chủ xe từ chối cho kiểm tra, chạy thử, hoặc không xuất trình đủ giấy tờ.",
+      },
+    ],
+  },
+  {
+    id: "a5",
+    slug: "loi-thuong-gap-mua-he",
+    title: "7 lỗi thường gặp trên xe ô tô vào mùa hè",
+    excerpt:
+      "Nắng nóng khiến nhiều bộ phận trên xe chịu áp lực lớn. Đây là các lỗi phổ biến và cách phòng tránh.",
+    image: IMG("photo-1493238792000-8113da705763"),
+    category: "Bảo dưỡng",
+    author: {
+      name: "Nguyễn Minh Tuấn",
+      avatar: IMG("photo-1535713875002-d1d0cf377fde"),
+      role: "Kỹ thuật viên trưởng — Garage Minh Anh",
+    },
+    publishedAt: "15/09/2026",
+    readMinutes: 5,
+    tags: ["mùa hè", "bảo dưỡng", "nắng nóng"],
+    sections: [
+      {
+        type: "paragraph",
+        text: "Mùa hè với nhiệt độ 35-40°C là thử thách lớn cho xe ô tô. Dưới đây là 7 lỗi thường gặp và cách phòng tránh.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "1. Nổ lốp do áp suất tăng",
+        id: "no-lop",
+      },
+      {
+        type: "paragraph",
+        text: "Áp suất lốp tăng 0.2 bar mỗi khi nhiệt độ môi trường tăng 10°C. Lốp quá căng dễ nổ khi chạy tốc độ cao.",
+      },
+      {
+        type: "callout",
+        tone: "info",
+        title: "Mẹo",
+        text: "Kiểm tra áp suất lốp vào sáng sớm (khi lốp còn nguội) theo khuyến cáo của nhà sản xuất — thường 2.2-2.5 bar cho xe phổ thông.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "2. Điều hòa không mát",
+        id: "dieu-hoa",
+      },
+      {
+        type: "paragraph",
+        text: "Nguyên nhân phổ biến: thiếu gas, lọc gió bẩn, quạt gió yếu. Nên vệ sinh + nạp gas điều hòa mỗi 1-2 năm.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "3. Bình ắc quy yếu",
+        id: "ac-quy",
+      },
+      {
+        type: "paragraph",
+        text: "Nhiệt độ cao đẩy nhanh quá trình bay hơi nước trong ắc quy. Bình ắc quy trên 3 năm tuổi nên thay mới.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "4. Động cơ quá nhiệt",
+        id: "qua-nhiet",
+      },
+      {
+        type: "paragraph",
+        text: "Két nước bẩn, quạt tản nhiệt yếu, hoặc rò rỉ nước làm mát đều có thể khiến động cơ quá nhiệt. Nếu đồng hồ nhiệt độ vượt 100°C, dừng xe ngay.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "5. Sơn xe bị phai màu",
+        id: "son-phai",
+      },
+      {
+        type: "paragraph",
+        text: "Tia UV phá huỷ lớp sơn dần theo thời gian. Nên đỗ xe trong bóng râm hoặc dùng bạt phủ — đánh bóng sơn mỗi 6 tháng.",
+      },
+    ],
+  },
+  {
+    id: "a6",
+    slug: "so-sanh-lop-michelin-bridgestone",
+    title: "So sánh lốp Michelin vs Bridgestone: Nên chọn loại nào?",
+    excerpt:
+      "Hai thương hiệu lốp hàng đầu thế giới — điểm mạnh, điểm yếu và đối tượng phù hợp của từng loại.",
+    image: IMG("photo-1568844293986-8d0400bd4745"),
+    category: "Kinh nghiệm",
+    author: {
+      name: "Phạm Văn Sỹ",
+      avatar: IMG("photo-1500648767791-00dcc994a43e"),
+      role: "Chuyên gia tư vấn phụ tùng",
+    },
+    publishedAt: "10/09/2026",
+    readMinutes: 7,
+    tags: ["lốp xe", "Michelin", "Bridgestone"],
+    sections: [
+      {
+        type: "paragraph",
+        text: "Michelin và Bridgestone là hai thương hiệu lốp hàng đầu thế giới. Cả hai đều có chất lượng tốt, nhưng có những đặc điểm khác nhau tuỳ điều kiện sử dụng.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Michelin — Tập trung độ bền và an toàn",
+        id: "michelin",
+      },
+      {
+        type: "list",
+        items: [
+          "Độ bám đường ướt tốt nhất trong phân khúc.",
+          "Tuổi thọ trung bình 50.000-70.000 km.",
+          "Tiếng ồn thấp, êm ái.",
+          "Giá cao hơn 10-20% so với Bridgestone.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Bridgestone — Cân bằng giữa giá và chất lượng",
+        id: "bridgestone",
+      },
+      {
+        type: "list",
+        items: [
+          "Độ bám khá tốt (không bằng Michelin nhưng trên trung bình).",
+          "Tuổi thọ 40.000-60.000 km.",
+          "Phù hợp đa dạng điều kiện: phố, cao tốc, đường xấu.",
+          "Giá mềm hơn.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Nên chọn loại nào?",
+        id: "chon-loai",
+      },
+      {
+        type: "list",
+        ordered: true,
+        items: [
+          "Chạy nhiều trong thành phố, đường ướt nhiều → Michelin.",
+          "Chạy đa dạng địa hình, muốn tiết kiệm → Bridgestone.",
+          "Xe gia đình, ưu tiên êm ái → Michelin.",
+          "Xe dịch vụ, chạy nhiều km → Bridgestone.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "a7",
+    slug: "tu-van-chon-xe-cho-nu-lai",
+    title: "Tư vấn: Chọn xe ô tô nào phù hợp cho nữ lái mới?",
+    excerpt:
+      "Những dòng xe nhỏ gọn, dễ lái, an toàn và tiết kiệm nhiên liệu — phù hợp cho nữ mới học lái.",
+    image: IMG("photo-1471444928139-48c5bf5173e"),
+    category: "Mua bán xe",
+    author: {
+      name: "Trần Quốc Đạt",
+      avatar: IMG("photo-1438761681033-6461ffad8d80"),
+      role: "Chuyên gia tư vấn — AutoCare",
+    },
+    publishedAt: "05/09/2026",
+    readMinutes: 6,
+    tags: ["xe cho nữ", "xe nhỏ", "xe mới"],
+    sections: [
+      {
+        type: "paragraph",
+        text: "Nữ mới lái thường ưu tiên xe nhỏ gọn, dễ đỗ, tầm nhìn tốt. Dưới đây là 3 dòng xe phù hợp với tiêu chí đó.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Kia Morning — \"Huyền thoại\" xe nhỏ",
+        id: "morning",
+      },
+      {
+        type: "list",
+        items: [
+          "Kích thước nhỏ gọn — dễ len lỏi trong phố.",
+          "Chi phí thấp: giá xe mới từ 350 triệu.",
+          "Tiết kiệm xăng: ~5L/100km.",
+          "Đầy đủ option: cảm biến lùi, camera 360.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Hyundai i10 — Cao hơn, tầm nhìn tốt hơn",
+        id: "i10",
+      },
+      {
+        type: "list",
+        items: [
+          "Khoảng sáng gầm cao — dễ quan sát.",
+          "Thiết kế trẻ trung, nhiều màu.",
+          "Động cơ 1.2L đủ dùng trong phố.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Honda City — Nếu cần sedan",
+        id: "city",
+      },
+      {
+        type: "paragraph",
+        text: "City là lựa chọn an toàn với Honda Sensing (phanh tự động, giữ làn) — rất phù hợp cho người mới lái trên cao tốc.",
+      },
+    ],
+  },
+  {
+    id: "a8",
+    slug: "cac-loai-den-led-o-to",
+    title: "Các loại đèn LED ô tô phổ biến: Halogen, LED, Xenon, Laser",
+    excerpt:
+      "So sánh 4 công nghệ đèn pha ô tô — ưu nhược điểm và loại nào phù hợp với bạn.",
+    image: IMG("photo-1493238792000-8113da705763"),
+    category: "Kiến thức",
+    author: {
+      name: "Lê Hoàng Phúc",
+      avatar: IMG("photo-1535713875002-d1d0cf377fde"),
+      role: "Thợ sửa chữa cao cấp — Garage Phú Long",
+    },
+    publishedAt: "01/09/2026",
+    readMinutes: 5,
+    tags: ["đèn LED", "pha", "ánh sáng"],
+    sections: [
+      {
+        type: "paragraph",
+        text: "Đèn pha là một trong những yếu tố an toàn quan trọng nhất. Hiện nay có 4 công nghệ phổ biến: Halogen, LED, Xenon (HID), và Laser.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Halogen — Giá rẻ, dễ thay thế",
+        id: "halogen",
+      },
+      {
+        type: "list",
+        items: [
+          "Giá chỉ từ 100-200k/bóng.",
+          "Ánh sáng vàng ấm, độ bám đường tốt.",
+          "Tuổi thọ thấp: ~1.000-2.000 giờ.",
+          "Tiêu hao nhiều điện năng.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "LED — Sáng, tiết kiệm, bền",
+        id: "led",
+      },
+      {
+        type: "list",
+        items: [
+          "Ánh sáng trắng 5000-6500K — gần giống ánh sáng ban ngày.",
+          "Tiết kiệm điện 50-70% so với halogen.",
+          "Tuổi thọ 15.000-30.000 giờ.",
+          "Giá 800k-3 triệu/cặp.",
+        ],
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Xenon (HID) — Ánh sáng cực mạnh",
+        id: "xenon",
+      },
+      {
+        type: "paragraph",
+        text: "Xenon cho ánh sáng mạnh nhất nhưng cần ballast và thời gian khởi động lâu hơn. Hiện đang dần bị LED thay thế.",
+      },
+      {
+        type: "heading",
+        level: 2,
+        text: "Laser — Công nghệ cao cấp nhất",
+        id: "laser",
+      },
+      {
+        type: "paragraph",
+        text: "Laser cho tầm chiếu xa 600m (gấp đôi LED), nhưng giá rất cao và chỉ có trên xe sang như BMW, Audi.",
+      },
+      {
+        type: "callout",
+        tone: "success",
+        title: "Khuyến nghị",
+        text: "Với xe phổ thông tại Việt Nam, LED là lựa chọn tốt nhất — cân bằng giữa giá, hiệu năng và độ bền.",
+      },
+    ],
   },
 ];
 

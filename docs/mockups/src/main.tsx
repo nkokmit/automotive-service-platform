@@ -16,6 +16,8 @@ import PartsList from "./pages/PartsList";
 import PartDetail from "./pages/PartDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
+import NewsList from "./pages/NewsList";
+import ArticleDetail from "./pages/ArticleDetail";
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
 import "./styles/globals.css";
 
@@ -41,6 +43,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="parts/:slug" element={<PartDetail />} />
             <Route path="cart" element={<Cart />} />
             <Route path="checkout" element={<Checkout />} />
+            <Route path="news" element={<NewsList />} />
+            <Route path="news/:slug" element={<ArticleDetail />} />
             <Route path="ai/damage" element={<DamageUpload />} />
             <Route path="ai/assistant" element={<ChatAssistant />} />
             <Route
