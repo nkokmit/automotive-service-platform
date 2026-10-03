@@ -231,6 +231,12 @@ export interface Service {
   warrantyMonths: number;
   isPopular?: boolean;
   isFeatured?: boolean;
+  // Lịch trống theo ngày (mock cho booking)
+  slotsByDate: Record<string, string[]>; // dateISO -> ['09:00', '10:30', ...]
+  // Hạng mục công việc (cho tab "Dịch vụ bao gồm")
+  includes: string[];
+  // Yêu cầu / lưu ý
+  requirements?: string[];
 }
 
 export const services: Service[] = [
@@ -259,6 +265,22 @@ export const services: Service[] = [
     warrantyMonths: 1,
     isPopular: true,
     isFeatured: true,
+    slotsByDate: {
+      "2026-10-03": ["09:00", "10:30", "14:00", "15:30"],
+      "2026-10-04": ["08:30", "11:00", "13:30", "16:00"],
+      "2026-10-05": ["09:30", "14:30", "17:00"],
+      "2026-10-06": ["08:00", "10:00", "15:00"],
+    },
+    includes: [
+      "Thay dầu nhớt chính hãng theo chỉ định",
+      "Thay lọc dầu mới",
+      "Kiểm tra mức dầu sau khi thay",
+      "Vệ sinh khoang máy cơ bản",
+    ],
+    requirements: [
+      "Mang theo sổ bảo hành (nếu có)",
+      "Xe còn ít nhất 1/4 bình xăng để chạy thử",
+    ],
   },
   {
     id: "sv2",
@@ -285,6 +307,22 @@ export const services: Service[] = [
     warrantyMonths: 3,
     isPopular: true,
     isFeatured: true,
+    slotsByDate: {
+      "2026-10-03": ["08:00", "13:00"],
+      "2026-10-04": ["09:00", "14:00"],
+      "2026-10-05": ["08:30", "15:00"],
+    },
+    includes: [
+      "Thay dầu động cơ + lọc dầu",
+      "Thay lọc gió động cơ + lọc gió điều hòa",
+      "Kiểm tra 27 hạng mục: phanh, lốp, ắc quy, đèn, kính, gạt mưa...",
+      "Vệ sinh buồng đốt (nếu cần)",
+      "Cập nhật sổ bảo dưỡng định kỳ",
+    ],
+    requirements: [
+      "Nên đặt lịch trước 1-2 ngày",
+      "Xe không nên chở hàng cồng kềnh",
+    ],
   },
   {
     id: "sv3",
@@ -310,6 +348,21 @@ export const services: Service[] = [
     availableSlots: 6,
     warrantyMonths: 12,
     isFeatured: true,
+    slotsByDate: {
+      "2026-10-04": ["08:00", "13:00"],
+      "2026-10-05": ["09:00", "14:00"],
+      "2026-10-06": ["08:30", "13:30"],
+    },
+    includes: [
+      "Sơn chính hãng theo mã màu xe",
+      "Đánh bóng bề mặt sau sơn",
+      "Sấy khô trong phòng sơn kín",
+      "Bảo hành 12 tháng không bong tróc",
+    ],
+    requirements: [
+      "Mang theo giấy tờ xe (để tra mã màu)",
+      "Nên để xe 1 ngày để sơn khô hoàn toàn",
+    ],
   },
   {
     id: "sv4",
@@ -334,6 +387,16 @@ export const services: Service[] = [
     bookingsCount: 198,
     availableSlots: 9,
     warrantyMonths: 2,
+    slotsByDate: {
+      "2026-10-03": ["10:00", "14:00"],
+      "2026-10-04": ["09:30", "15:30"],
+    },
+    includes: [
+      "Vệ sinh kim phun bằng máy siêu âm chuyên dụng",
+      "Làm sạch muội than buồng đốt",
+      "Kiểm tra và reset hệ thống",
+      "Chạy thử, đánh giá hiệu quả",
+    ],
   },
   {
     id: "sv5",
@@ -359,6 +422,17 @@ export const services: Service[] = [
     availableSlots: 14,
     warrantyMonths: 6,
     isPopular: true,
+    slotsByDate: {
+      "2026-10-03": ["08:30", "11:00", "15:00"],
+      "2026-10-04": ["09:00", "13:30"],
+      "2026-10-05": ["10:00", "14:00", "16:00"],
+    },
+    includes: [
+      "Thay má phanh chính hãng (trước hoặc sau)",
+      "Kiểm tra đĩa phanh, cảnh báo mòn",
+      "Xảy dầu phanh cũ, thay dầu phanh mới",
+      "Chạy thử, kiểm tra lực phanh",
+    ],
   },
   {
     id: "sv6",
@@ -384,6 +458,17 @@ export const services: Service[] = [
     availableSlots: 22,
     warrantyMonths: 3,
     isPopular: true,
+    slotsByDate: {
+      "2026-10-03": ["08:00", "10:00", "13:00", "15:00", "17:00"],
+      "2026-10-04": ["08:30", "11:00", "14:00", "16:00"],
+      "2026-10-05": ["09:00", "13:30", "15:30"],
+    },
+    includes: [
+      "Nạp gas R134a hoặc R1234yf theo xe",
+      "Vệ sinh dàn lạnh, lọc gió điều hòa",
+      "Kiểm tra áp suất gas, rò rỉ",
+      "Vệ sinh quạt gió nếu cần",
+    ],
   },
   {
     id: "sv7",
@@ -408,6 +493,16 @@ export const services: Service[] = [
     bookingsCount: 198,
     availableSlots: 30,
     warrantyMonths: 18,
+    slotsByDate: {
+      "2026-10-03": ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"],
+      "2026-10-04": ["08:00", "09:30", "11:00", "13:30", "15:00", "16:30"],
+    },
+    includes: [
+      "Ắc quy chính hãng theo dung lượng yêu cầu",
+      "Lắp đặt, kiểm tra hệ thống sạc",
+      "Cài đặt lại các thiết bị điện tử (radio, đồng hồ...)",
+      "Bảo hành 18 tháng theo nhà sản xuất",
+    ],
   },
   {
     id: "sv8",
@@ -432,6 +527,16 @@ export const services: Service[] = [
     bookingsCount: 145,
     availableSlots: 8,
     warrantyMonths: 6,
+    slotsByDate: {
+      "2026-10-04": ["08:00", "13:00"],
+      "2026-10-05": ["09:00", "14:00"],
+    },
+    includes: [
+      "4 lốp chính hãng theo kích thước xe",
+      "Tháo lắp, cân chỉnh độ chụm",
+      "Cân bằng lốp, kiểm tra áp suất",
+      "Bảo hành theo nhà sản xuất lốp",
+    ],
   },
 ];
 

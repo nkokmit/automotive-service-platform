@@ -5,7 +5,7 @@ import App from "./App";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import ServicesList from "./pages/ServicesList";
-import GarageDetail from "./pages/GarageDetail";
+import ServiceDetail from "./pages/ServiceDetail";
 import DamageUpload from "./pages/DamageUpload";
 import ChatAssistant from "./pages/ChatAssistant";
 import "./styles/globals.css";
@@ -18,7 +18,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route index element={<Home />} />
           <Route path="login" element={<Login />} />
           <Route path="services" element={<ServicesList />} />
-          <Route path="services/:slug" element={<GarageDetail />} />
+          <Route path="services/:slug" element={<ServiceDetail />} />
           <Route path="ai/damage" element={<DamageUpload />} />
           <Route path="ai/assistant" element={<ChatAssistant />} />
           <Route path="*" element={<Navigate to="/" replace />} />
