@@ -12,7 +12,7 @@ import {
 import Button from "./Button";
 
 const navItems = [
-  { to: "/garages", label: "Garage" },
+  { to: "/services", label: "Dịch vụ" },
   { to: "/ai/damage", label: "Phân tích hư hỏng" },
   { to: "/ai/assistant", label: "Trợ lý AI" },
 ];

@@ -54,7 +54,7 @@ export default function Home() {
                   className="flex-1 outline-none text-sm bg-transparent sm:w-28"
                 />
               </div>
-              <Link to="/garages" className="sm:self-stretch">
+              <Link to="/services" className="sm:self-stretch">
                 <Button size="md">
                   Tìm garage
                   <IconArrowRight size={16} />
@@ -119,7 +119,7 @@ export default function Home() {
             <p className="text-ink-light mt-1">Khám phá nhanh các dịch vụ cần thiết</p>
           </div>
           <Link
-            to="/garages"
+            to="/services"
             className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
           >
             Xem tất cả <IconArrowRight size={14} />
@@ -128,7 +128,7 @@ export default function Home() {
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           {popularServices.map((s) => (
             <Link
-              to="/garages"
+              to={`/services?category=${encodeURIComponent(s.name)}`}
               key={s.id}
               className="group bg-white border border-ink/8 rounded-2xl p-4 text-center hover:bg-bgsoft transition-colors"
             >
@@ -149,7 +149,7 @@ export default function Home() {
             </p>
           </div>
           <Link
-            to="/garages"
+            to="/services"
             className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
           >
             Xem tất cả <IconArrowRight size={14} />
@@ -158,7 +158,7 @@ export default function Home() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {featuredGarages.map((g) => (
-            <Link to={`/garages/${g.slug}`} key={g.id} className="group">
+            <Link to={`/services`} key={g.id} className="group">
               <Card>
                 <div className="aspect-[4/3] overflow-hidden rounded-t-2xl bg-bgsoft">
                   <img

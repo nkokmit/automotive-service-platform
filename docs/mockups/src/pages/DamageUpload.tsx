@@ -278,7 +278,7 @@ export default function DamageUpload() {
                     </p>
                   </div>
                 </div>
-                <Link to="/garages?service=S%E1%BB%ADa%20ch%E1%BB%AFa">
+                <Link to="/services?category=S%E1%BB%ADa%20ch%E1%BB%AFa">
                   <Button fullWidth size="lg" className="mt-4">
                     Tìm garage sửa chữa gần bạn
                     <IconArrowRight size={16} />

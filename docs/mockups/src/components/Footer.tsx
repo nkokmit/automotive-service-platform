@@ -22,8 +22,8 @@ export default function Footer() {
           <h4 className="font-semibold mb-3">Dịch vụ</h4>
           <ul className="space-y-2 text-sm text-ink-light">
             <li>
-              <Link to="/garages" className="hover:text-primary">
-                Tìm garage
+              <Link to="/services" className="hover:text-primary">
+                Tìm dịch vụ
               </Link>
             </li>
             <li>

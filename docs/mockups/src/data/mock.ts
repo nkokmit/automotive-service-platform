@@ -207,6 +207,234 @@ export const featuredGarages: Garage[] = [
   },
 ];
 
+export interface Service {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  category: "Bảo dưỡng" | "Sửa chữa" | "Sơn & thân vỏ" | "Điện - Điều hòa" | "Lốp & phanh" | "Khác";
+  provider: {
+    name: string;
+    garageId: string;
+    city: string;
+    address: string;
+    rating: number;
+    reviewsCount: number;
+  };
+  durationMin: number;
+  priceFrom: number;
+  priceTo: number;
+  image: string;
+  rating: number;
+  bookingsCount: number;
+  availableSlots: number; // số slot trống trong tuần tới
+  warrantyMonths: number;
+  isPopular?: boolean;
+  isFeatured?: boolean;
+}
+
+export const services: Service[] = [
+  {
+    id: "sv1",
+    slug: "thay-dau-dong-co",
+    name: "Thay dầu động cơ",
+    description:
+      "Thay dầu nhớt chính hãng các loại, kèm lọc dầu. Áp dụng cho xe xăng và diesel, động cơ 1.5L - 3.5L.",
+    category: "Bảo dưỡng",
+    provider: {
+      name: "Garage Minh Anh",
+      garageId: "g1",
+      city: "Hà Nội",
+      address: "123 Nguyễn Văn Cừ, Ngọc Lâm",
+      rating: 4.8,
+      reviewsCount: 234,
+    },
+    durationMin: 30,
+    priceFrom: 350000,
+    priceTo: 800000,
+    image: IMG("photo-1487754180451-c456f719a1fc"),
+    rating: 4.9,
+    bookingsCount: 1205,
+    availableSlots: 18,
+    warrantyMonths: 1,
+    isPopular: true,
+    isFeatured: true,
+  },
+  {
+    id: "sv2",
+    slug: "bao-duong-10k",
+    name: "Bảo dưỡng định kỳ 10.000 km",
+    description:
+      "Kiểm tra tổng quát 27 hạng mục, thay dầu, lọc dầu, lọc gió, kiểm tra phanh, lốp, ắc quy, đèn chiếu sáng.",
+    category: "Bảo dưỡng",
+    provider: {
+      name: "Garage Minh Anh",
+      garageId: "g1",
+      city: "Hà Nội",
+      address: "123 Nguyễn Văn Cừ, Ngọc Lâm",
+      rating: 4.8,
+      reviewsCount: 234,
+    },
+    durationMin: 120,
+    priceFrom: 1200000,
+    priceTo: 2500000,
+    image: IMG("photo-1492144534655-ae79c964c9d7"),
+    rating: 4.8,
+    bookingsCount: 845,
+    availableSlots: 12,
+    warrantyMonths: 3,
+    isPopular: true,
+    isFeatured: true,
+  },
+  {
+    id: "sv3",
+    slug: "son-xe-1-chi-tiet",
+    name: "Sơn xe 1 chi tiết (cánh cửa, nắp capo...)",
+    description:
+      "Sơn, đánh bóng 1 chi tiết thân vỏ bằng sơn chính hãng, phòng sơn kín đảm bảo chất lượng.",
+    category: "Sơn & thân vỏ",
+    provider: {
+      name: "Garage Thanh Bình",
+      garageId: "g2",
+      city: "TP.HCM",
+      address: "456 Lê Hồng Phong, Q.10",
+      rating: 4.6,
+      reviewsCount: 189,
+    },
+    durationMin: 240,
+    priceFrom: 2500000,
+    priceTo: 4500000,
+    image: IMG("photo-1632823471565-1ecdf5c6da77"),
+    rating: 4.7,
+    bookingsCount: 312,
+    availableSlots: 6,
+    warrantyMonths: 12,
+    isFeatured: true,
+  },
+  {
+    id: "sv4",
+    slug: "ve-sinh-kim-phun",
+    name: "Vệ sinh kim phun, buồng đốt",
+    description:
+      "Vệ sinh kim phun bằng máy siêu âm chuyên dụng, làm sạch muội than buồng đốt, giúp xe vận hành mượt mà.",
+    category: "Bảo dưỡng",
+    provider: {
+      name: "Garage Minh Anh",
+      garageId: "g1",
+      city: "Hà Nội",
+      address: "123 Nguyễn Văn Cừ, Ngọc Lâm",
+      rating: 4.8,
+      reviewsCount: 234,
+    },
+    durationMin: 90,
+    priceFrom: 800000,
+    priceTo: 1500000,
+    image: IMG("photo-1486006920555-c77dcf18193c"),
+    rating: 4.6,
+    bookingsCount: 198,
+    availableSlots: 9,
+    warrantyMonths: 2,
+  },
+  {
+    id: "sv5",
+    slug: "thay-ma-phanh",
+    name: "Thay má phanh trước/sau",
+    description:
+      "Thay má phanh chính hãng, kiểm tra đĩa phanh, xảy dầu phanh. Áp dụng cho các dòng xe phổ thông.",
+    category: "Lốp & phanh",
+    provider: {
+      name: "Garage An Khang",
+      garageId: "g4",
+      city: "TP.HCM",
+      address: "321 Phan Đăng Lưu, Bình Thạnh",
+      rating: 4.7,
+      reviewsCount: 156,
+    },
+    durationMin: 60,
+    priceFrom: 1500000,
+    priceTo: 3500000,
+    image: IMG("photo-1486006920555-c77dcf18193c"),
+    rating: 4.7,
+    bookingsCount: 276,
+    availableSlots: 14,
+    warrantyMonths: 6,
+    isPopular: true,
+  },
+  {
+    id: "sv6",
+    slug: "nap-may-dieu-hoa",
+    name: "Nạp gas điều hòa + vệ sinh",
+    description:
+      "Nạp gas R134a/R1234yf, vệ sinh dàn lạnh, lọc gió điều hòa, kiểm tra áp suất gas. Phù hợp mọi dòng xe.",
+    category: "Điện - Điều hòa",
+    provider: {
+      name: "Garage Phú Long",
+      garageId: "g3",
+      city: "Đà Nẵng",
+      address: "789 Trần Phú, Hải Châu",
+      rating: 4.9,
+      reviewsCount: 312,
+    },
+    durationMin: 45,
+    priceFrom: 400000,
+    priceTo: 800000,
+    image: IMG("photo-1492144534655-ae79c964c9d7"),
+    rating: 4.8,
+    bookingsCount: 423,
+    availableSlots: 22,
+    warrantyMonths: 3,
+    isPopular: true,
+  },
+  {
+    id: "sv7",
+    slug: "thay-ac-quy",
+    name: "Thay ắc quy ô tô",
+    description:
+      "Thay ắc quy chính hãng GS, Đồng Nai, Varta. Kiểm tra hệ thống sạc, cài đặt lại các thiết bị điện tử.",
+    category: "Điện - Điều hòa",
+    provider: {
+      name: "Garage Phú Long",
+      garageId: "g3",
+      city: "Đà Nẵng",
+      address: "789 Trần Phú, Hải Châu",
+      rating: 4.9,
+      reviewsCount: 312,
+    },
+    durationMin: 20,
+    priceFrom: 1200000,
+    priceTo: 3500000,
+    image: IMG("photo-1486006920555-c77dcf18193c"),
+    rating: 4.7,
+    bookingsCount: 198,
+    availableSlots: 30,
+    warrantyMonths: 18,
+  },
+  {
+    id: "sv8",
+    slug: "thay-lop-o-to",
+    name: "Thay lốp ô tô (4 lốp)",
+    description:
+      "Cung cấp các thương hiệu Michelin, Bridgestone, Continental, Kumho. Cân chỉnh độ chụm sau khi thay.",
+    category: "Lốp & phanh",
+    provider: {
+      name: "Garage An Khang",
+      garageId: "g4",
+      city: "TP.HCM",
+      address: "321 Phan Đăng Lưu, Bình Thạnh",
+      rating: 4.7,
+      reviewsCount: 156,
+    },
+    durationMin: 90,
+    priceFrom: 4000000,
+    priceTo: 12000000,
+    image: IMG("photo-1487754180451-c456f719a1fc"),
+    rating: 4.6,
+    bookingsCount: 145,
+    availableSlots: 8,
+    warrantyMonths: 6,
+  },
+];
+
 export const popularServices = [
   { id: "p1", name: "Thay dầu", icon: "🛢️" },
   { id: "p2", name: "Bảo dưỡng định kỳ", icon: "🔧" },

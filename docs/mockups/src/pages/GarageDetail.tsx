@@ -39,7 +39,7 @@ export default function GarageDetail() {
       <nav className="text-xs text-ink-muted mb-4 flex items-center gap-2">
         <Link to="/" className="hover:text-primary">Trang chủ</Link>
         <span>/</span>
-        <Link to="/garages" className="hover:text-primary">Garage</Link>
+        <Link to="/services" className="hover:text-primary">Dịch vụ</Link>
         <span>/</span>
         <span className="text-ink">{garage.name}</span>
       </nav>
