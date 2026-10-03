@@ -1550,3 +1550,219 @@ export const chatSuggestions = [
   "Dấu hiệu cần thay má phanh?",
   "Chi phí sơn xe 4 chỗ khoảng bao nhiêu?",
 ];
+
+// =========================
+// USERS / ORDERS / ADDRESSES / VEHICLES
+// (dùng cho trang /profile — F11)
+// =========================
+
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "shipping"
+  | "completed"
+  | "cancelled";
+
+export interface OrderItem {
+  /** id (id) trong parts/orders/services */
+  itemId: string;
+  kind: "parts" | "services";
+  name: string;
+  image: string;
+  priceVND: number;
+  qty: number;
+}
+
+export interface Order {
+  id: string; // VD: "ORD-2026-001"
+  date: string; // ISO date hoặc DD/MM/YYYY
+  status: OrderStatus;
+  items: OrderItem[];
+  totalVND: number;
+  shippingVND: number;
+  paymentMethod: "COD" | "Thẻ tín dụng" | "Chuyển khoản" | "Ví điện tử";
+  address: string;
+  trackingNote?: string;
+}
+
+export interface Address {
+  id: string;
+  label: string; // VD: "Nhà riêng", "Công ty"
+  recipient: string;
+  phone: string;
+  fullAddress: string;
+  isDefault?: boolean;
+}
+
+export interface Vehicle {
+  id: string;
+  nickname: string; // VD: "Vios gia đình"
+  brand: string;
+  model: string;
+  year: number;
+  plate: string; // Biển số
+  odoKm: number;
+  image: string;
+  color?: string;
+  lastServiceAt?: string;
+}
+
+export interface MockUser {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  avatar: string;
+  memberSince: string;
+  loyaltyPoints: number;
+  tier: "Thành viên" | "Bạc" | "Vàng" | "Bạch kim";
+  orders: Order[];
+  addresses: Address[];
+  vehicles: Vehicle[];
+}
+
+export const mockUsers: MockUser[] = [
+  {
+    id: "u1",
+    name: "Nguyễn Văn A",
+    email: "nguyenvana@example.com",
+    phone: "0901 234 567",
+    avatar: IMG("photo-1535713875002-d1d0cf377fde"),
+    memberSince: "15/03/2024",
+    loyaltyPoints: 1240,
+    tier: "Vàng",
+    orders: [
+      {
+        id: "ORD-2026-018",
+        date: "02/10/2026",
+        status: "shipping",
+        paymentMethod: "COD",
+        totalVND: 2_890_000,
+        shippingVND: 30_000,
+        address: "123 Nguyễn Văn Cừ, P. Ngọc Lâm, Q. Long Biên, Hà Nội",
+        trackingNote: "Đang giao — dự kiến 03/10",
+        items: [
+          {
+            itemId: "pt8",
+            kind: "parts",
+            name: "Bộ má phanh Brembo trước (Ceramic)",
+            image: IMG("photo-1486006920555-c77dcf18193c"),
+            priceVND: 2_890_000,
+            qty: 1,
+          },
+        ],
+      },
+      {
+        id: "ORD-2026-015",
+        date: "25/09/2026",
+        status: "completed",
+        paymentMethod: "Thẻ tín dụng",
+        totalVND: 4_400_000,
+        shippingVND: 0,
+        address: "123 Nguyễn Văn Cừ, P. Ngọc Lâm, Q. Long Biên, Hà Nội",
+        trackingNote: "Đã giao thành công",
+        items: [
+          {
+            itemId: "pt1",
+            kind: "parts",
+            name: "Lốp Michelin Primacy 4 205/55R16",
+            image: IMG("photo-1568844293986-8d0400bd4745"),
+            priceVND: 2_450_000,
+            qty: 1,
+          },
+          {
+            itemId: "pt3",
+            kind: "parts",
+            name: "Dầu nhớt Castrol Magnatec 10W-30 (4L)",
+            image: IMG("photo-1632823471565-1ecdf5c6da77"),
+            priceVND: 520_000,
+            qty: 2,
+          },
+        ],
+      },
+      {
+        id: "ORD-2026-012",
+        date: "10/09/2026",
+        status: "completed",
+        paymentMethod: "Ví điện tử",
+        totalVND: 1_450_000,
+        shippingVND: 30_000,
+        address: "123 Nguyễn Văn Cừ, P. Ngọc Lâm, Q. Long Biên, Hà Nội",
+        items: [
+          {
+            itemId: "pt2",
+            kind: "parts",
+            name: "Ắc quy GS 12V 65Ah (MF)",
+            image: IMG("photo-1620714223084-8fcacc6dfd75"),
+            priceVND: 1_450_000,
+            qty: 1,
+          },
+        ],
+      },
+      {
+        id: "ORD-2026-009",
+        date: "20/08/2026",
+        status: "completed",
+        paymentMethod: "COD",
+        totalVND: 350_000,
+        shippingVND: 0,
+        address: "123 Nguyễn Văn Cừ, P. Ngọc Lâm, Q. Long Biên, Hà Nội",
+        items: [
+          {
+            itemId: "pt4",
+            kind: "parts",
+            name: "Bộ lọc dầu Mahle OC195 (tương thích Toyota/Honda)",
+            image: IMG("photo-1487754180451-c456f719a1fc"),
+            priceVND: 95_000,
+            qty: 3,
+          },
+        ],
+      },
+    ],
+    addresses: [
+      {
+        id: "a1",
+        label: "Nhà riêng",
+        recipient: "Nguyễn Văn A",
+        phone: "0901 234 567",
+        fullAddress:
+          "123 Nguyễn Văn Cừ, P. Ngọc Lâm, Q. Long Biên, Hà Nội",
+        isDefault: true,
+      },
+      {
+        id: "a2",
+        label: "Công ty",
+        recipient: "Nguyễn Văn A",
+        phone: "0901 234 567",
+        fullAddress:
+          "Tầng 8, Tòa nhà Viettel, 285 Cách Mạng Tháng 8, P. Bùi Hồng Phúc, Q. Hai Bà Trưng, Hà Nội",
+      },
+    ],
+    vehicles: [
+      {
+        id: "v1",
+        nickname: "Vios gia đình",
+        brand: "Toyota",
+        model: "Vios 1.5G",
+        year: 2023,
+        plate: "30H-123.45",
+        odoKm: 18_500,
+        image: IMG("photo-1494976388531-d1058494cdd8"),
+        color: "Trắng",
+        lastServiceAt: "15/09/2026",
+      },
+      {
+        id: "v2",
+        nickname: "Morning đi phố",
+        brand: "Kia",
+        model: "Morning 1.25 AT",
+        year: 2021,
+        plate: "30H-678.90",
+        odoKm: 55_000,
+        image: IMG("photo-1471444928139-48c5bf5173e"),
+        color: "Đỏ",
+        lastServiceAt: "02/07/2026",
+      },
+    ],
+  },
+];

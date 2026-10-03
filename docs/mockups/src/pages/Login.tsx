@@ -1,19 +1,36 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../components/Button";
 import Input from "../components/Input";
+import { useToast } from "../components/Toast";
 import { IconCar, IconCheck } from "../components/icons";
+import { useAuth } from "../data/authStore";
 
 export default function Login() {
   const [params] = useSearchParams();
   const initialMode = params.get("mode") === "register" ? "register" : "login";
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    email: "nguyenvana@example.com",
+    phone: "",
+    password: "",
+  });
+  const navigate = useNavigate();
+  const t = useToast();
+  const { login } = useAuth();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => setLoading(false), 800);
+    setTimeout(() => {
+      // Mock: login bằng email bất kỳ
+      const session = login(form.email || "demo@example.com");
+      setLoading(false);
+      t.success(`Chào mừng ${session.user.name} quay lại!`);
+      navigate("/profile");
+    }, 800);
   };
 
   return (
@@ -58,6 +75,10 @@ export default function Login() {
               <Input
                 label="Họ và tên"
                 placeholder="Nguyễn Văn A"
+                value={form.name}
+                onChange={(e) =>
+                  setForm({ ...form, name: e.target.value })
+                }
                 autoComplete="name"
               />
             )}
@@ -65,12 +86,21 @@ export default function Login() {
               type="email"
               label="Email"
               placeholder="you@example.com"
+              value={form.email}
+              onChange={(e) =>
+                setForm({ ...form, email: e.target.value })
+              }
               autoComplete="email"
+              required
             />
             {mode === "register" && (
               <Input
                 label="Số điện thoại"
                 placeholder="0901 234 567"
+                value={form.phone}
+                onChange={(e) =>
+                  setForm({ ...form, phone: e.target.value })
+                }
                 autoComplete="tel"
               />
             )}
@@ -78,6 +108,10 @@ export default function Login() {
               type="password"
               label="Mật khẩu"
               placeholder="••••••••"
+              value={form.password}
+              onChange={(e) =>
+                setForm({ ...form, password: e.target.value })
+              }
               autoComplete={
                 mode === "login" ? "current-password" : "new-password"
               }

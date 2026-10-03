@@ -18,6 +18,7 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import NewsList from "./pages/NewsList";
 import ArticleDetail from "./pages/ArticleDetail";
+import Profile from "./pages/Profile";
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
 import "./styles/globals.css";
 
@@ -45,6 +46,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="checkout" element={<Checkout />} />
             <Route path="news" element={<NewsList />} />
             <Route path="news/:slug" element={<ArticleDetail />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="ai/damage" element={<DamageUpload />} />
             <Route path="ai/assistant" element={<ChatAssistant />} />
             <Route
