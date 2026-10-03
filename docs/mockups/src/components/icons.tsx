@@ -142,3 +142,17 @@ export const IconArrowRight = ({ size, ...p }: IconProps) => (
     <polyline points="12 5 19 12 12 19" />
   </svg>
 );
+
+export const IconBolt = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
+export const IconShoppingBag = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <path d="M16 10a4 4 0 0 1-8 0" />
+  </svg>
+);

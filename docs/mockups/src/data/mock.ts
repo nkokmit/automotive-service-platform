@@ -551,6 +551,335 @@ export const popularServices = [
   { id: "p8", name: "Ắc quy", icon: "🔋" },
 ];
 
+// =========================
+// CAR LISTINGS (mock — dùng cho Commerce Service ở production)
+// =========================
+export interface Car {
+  id: string;
+  slug: string;
+  title: string; // VD: "Toyota Vios 1.5G 2023"
+  brand: string; // Toyota, Honda, Mazda, Hyundai, Kia, VinFast, BMW, Mercedes
+  model: string; // Vios, City, CX-5, Accent, Morning, Fadil, 320i, C200
+  year: number;
+  bodyType: "Sedan" | "SUV" | "Hatchback" | "MPV" | "Bán tải" | "Coupe";
+  fuelType: "Xăng" | "Diesel" | "Hybrid" | "Điện";
+  transmission: "Số sàn" | "Số tự động" | "CVT";
+  odoKm: number;
+  priceVND: number;
+  city: string;
+  seller: { name: string; type: "Cá nhân" | "Salon" };
+  image: string;
+  gallery: string[];
+  description: string;
+  features: string[]; // option nổi bật
+  isFeatured?: boolean;
+  isNew?: boolean;
+  rating: number;
+  reviewsCount: number;
+}
+
+export const cars: Car[] = [
+  {
+    id: "c1",
+    slug: "toyota-vios-1-5g-2023",
+    title: "Toyota Vios 1.5G 2023",
+    brand: "Toyota",
+    model: "Vios",
+    year: 2023,
+    bodyType: "Sedan",
+    fuelType: "Xăng",
+    transmission: "CVT",
+    odoKm: 18500,
+    priceVND: 489000000,
+    city: "TP.HCM",
+    seller: { name: "Salon Auto Hùng Phát", type: "Salon" },
+    image: IMG("photo-1494976388531-d1058494cdd8"),
+    gallery: [
+      IMG("photo-1494976388531-d1058494cdd8"),
+      IMG("photo-1503376780353-7e6692767b70"),
+    ],
+    description:
+      "Vios 1.5G 2023 mới 95%, lốp còn dày, nội thất nguyên bản, bảo dưỡng định kỳ đầy đủ tại hãng.",
+    features: ["Camera lùi", "Cảm biến áp suất lốp", "Màn hình 7 inch", "Apple CarPlay"],
+    isFeatured: true,
+    isNew: true,
+    rating: 4.7,
+    reviewsCount: 23,
+  },
+  {
+    id: "c2",
+    slug: "honda-city-rs-2022",
+    title: "Honda City RS 2022",
+    brand: "Honda",
+    model: "City",
+    year: 2022,
+    bodyType: "Sedan",
+    fuelType: "Xăng",
+    transmission: "CVT",
+    odoKm: 32000,
+    priceVND: 519000000,
+    city: "Hà Nội",
+    seller: { name: "Nguyễn Văn A", type: "Cá nhân" },
+    image: IMG("photo-1606664515524-ed2f786a0bd6"),
+    gallery: [IMG("photo-1606664515524-ed2f786a0bd6")],
+    description:
+      "Honda City RS bản thể thao, đã thay dầu định kỳ, còn bảo hành chính hãng 1 năm.",
+    features: ["Honda Sensing", "Cruise Control thích ứng", "Đèn LED", "Mâm 16 inch"],
+    isFeatured: true,
+    rating: 4.6,
+    reviewsCount: 18,
+  },
+  {
+    id: "c3",
+    slug: "mazda-cx-5-2022",
+    title: "Mazda CX-5 2.0 Premium 2022",
+    brand: "Mazda",
+    model: "CX-5",
+    year: 2022,
+    bodyType: "SUV",
+    fuelType: "Xăng",
+    transmission: "Số tự động",
+    odoKm: 45000,
+    priceVND: 779000000,
+    city: "TP.HCM",
+    seller: { name: "Salon Auto Premium", type: "Salon" },
+    image: IMG("photo-1519440432185-1e8478d971d4"),
+    gallery: [IMG("photo-1519440432185-1e8478d971d4")],
+    description:
+      "CX-5 Premium đầy đủ option: ghế da, cửa sổ trời, BOSE 10 loa, camera 360.",
+    features: ["Ghế da Nappa", "Cửa sổ trời", "BOSE 10 loa", "Camera 360"],
+    isFeatured: true,
+    rating: 4.8,
+    reviewsCount: 41,
+  },
+  {
+    id: "c4",
+    slug: "hyundai-accent-1-4at-2023",
+    title: "Hyundai Accent 1.4AT 2023",
+    brand: "Hyundai",
+    model: "Accent",
+    year: 2023,
+    bodyType: "Sedan",
+    fuelType: "Xăng",
+    transmission: "Số tự động",
+    odoKm: 12000,
+    priceVND: 439000000,
+    city: "Đà Nẵng",
+    seller: { name: "Hyundai Đà Nẵng", type: "Salon" },
+    image: IMG("photo-1502877338535-766e1452684a"),
+    gallery: [IMG("photo-1502877338535-766e1452684a")],
+    description:
+      "Accent 2023 bản đặc biệt, mới 99%, đi rất ít, full option chính hãng.",
+    features: ["Apple CarPlay/Android Auto", "Cảm biến đỗ xe", "Đèn LED", "Mâm đúc"],
+    rating: 4.5,
+    reviewsCount: 12,
+  },
+  {
+    id: "c5",
+    slug: "vinfast-vf8-plus-2024",
+    title: "VinFast VF8 Plus 2024",
+    brand: "VinFast",
+    model: "VF8",
+    year: 2024,
+    bodyType: "SUV",
+    fuelType: "Điện",
+    transmission: "Số tự động",
+    odoKm: 8200,
+    priceVND: 1099000000,
+    city: "Hà Nội",
+    seller: { name: "VinFast Trần Duy Hưng", type: "Salon" },
+    image: IMG("photo-1593941707882-a5bba14938c7"),
+    gallery: [IMG("photo-1593941707882-a5bba14938c7")],
+    description:
+      "VF8 Plus bản cao cấp, đi 8.200 km, còn bảo hành pin 8 năm từ VinFast.",
+    features: ["Pin 87.7 kWh", "Tự lái cấp 2", "Màn hình 15.6 inch", "Sạc nhanh DC"],
+    isFeatured: true,
+    rating: 4.4,
+    reviewsCount: 8,
+  },
+  {
+    id: "c6",
+    slug: "kia-morning-2021",
+    title: "Kia Morning 1.25 AT 2021",
+    brand: "Kia",
+    model: "Morning",
+    year: 2021,
+    bodyType: "Hatchback",
+    fuelType: "Xăng",
+    transmission: "Số tự động",
+    odoKm: 55000,
+    priceVND: 299000000,
+    city: "TP.HCM",
+    seller: { name: "Trần Thị B", type: "Cá nhân" },
+    image: IMG("photo-1471444928139-48c5bf5173e"),
+    gallery: [IMG("photo-1471444928139-48c5bf5173e")],
+    description:
+      "Morning 2021 đi gia đình, còn mới, bảo dưỡng định kỳ đầy đủ, phù hợp đi phố.",
+    features: ["Màn hình 8 inch", "Apple CarPlay", "Camera lùi"],
+    rating: 4.3,
+    reviewsCount: 6,
+  },
+];
+
+// =========================
+// PARTS / ACCESSORIES (mock — dùng cho Commerce Service ở production)
+// =========================
+export interface Part {
+  id: string;
+  slug: string;
+  name: string;
+  category:
+    | "Lốp xe"
+    | "Ắc quy"
+    | "Lọc dầu / Lọc gió"
+    | "Đèn / Pha"
+    | "Nội thất"
+    | "Phụ kiện ngoại thất"
+    | "Dầu nhớt"
+    | "Phanh";
+  brand: string;
+  priceVND: number;
+  originalPriceVND?: number;
+  image: string;
+  shortDescription: string;
+  compatibleCars?: string[];
+  stockQty: number;
+  rating: number;
+  reviewsCount: number;
+  isFeatured?: boolean;
+  isBestSeller?: boolean;
+}
+
+export const parts: Part[] = [
+  {
+    id: "pt1",
+    slug: "lop-michelin-primacy-4-205-55r16",
+    name: "Lốp Michelin Primacy 4 205/55R16",
+    category: "Lốp xe",
+    brand: "Michelin",
+    priceVND: 2450000,
+    originalPriceVND: 2750000,
+    image: IMG("photo-1568844293986-8d0400bd4745"),
+    shortDescription:
+      "Lốp du lịch cao cấp, độ bám đường ướt tốt, tuổi thọ 50.000 km.",
+    compatibleCars: ["Toyota Vios", "Honda City", "Mazda 3"],
+    stockQty: 84,
+    rating: 4.9,
+    reviewsCount: 124,
+    isFeatured: true,
+    isBestSeller: true,
+  },
+  {
+    id: "pt2",
+    slug: "ac-quy-gs-12v-65ah",
+    name: "Ắc quy GS 12V 65Ah (MF)",
+    category: "Ắc quy",
+    brand: "GS",
+    priceVND: 1450000,
+    image: IMG("photo-1620714223084-8fcacc6dfd75"),
+    shortDescription:
+      "Ắc quy khô miễn bảo dưỡng, phù hợp sedan/hatchback phổ thông.",
+    compatibleCars: ["Toyota Vios", "Honda City", "Hyundai Accent", "Kia Morning"],
+    stockQty: 56,
+    rating: 4.7,
+    reviewsCount: 89,
+    isFeatured: true,
+    isBestSeller: true,
+  },
+  {
+    id: "pt3",
+    slug: "dau-nhot-castrol-magnatec-10w30",
+    name: "Dầu nhớt Castrol Magnatec 10W-30 (4L)",
+    category: "Dầu nhớt",
+    brand: "Castrol",
+    priceVND: 520000,
+    originalPriceVND: 580000,
+    image: IMG("photo-1632823471565-1ecdf5c6da77"),
+    shortDescription:
+      "Dầu bán tổng hợp, bảo vệ động cơ ngay từ lúc khởi động.",
+    compatibleCars: ["Toyota Vios", "Honda City", "Mazda 3", "Hyundai Accent"],
+    stockQty: 120,
+    rating: 4.8,
+    reviewsCount: 156,
+    isBestSeller: true,
+  },
+  {
+    id: "pt4",
+    slug: "bo-loc-dau-mahle-oc195",
+    name: "Bộ lọc dầu Mahle OC195 (tương thích Toyota/Honda)",
+    category: "Lọc dầu / Lọc gió",
+    brand: "Mahle",
+    priceVND: 95000,
+    image: IMG("photo-1487754180451-c456f719a1fc"),
+    shortDescription: "Lọc dầu chính hãng Mahle, chất lượng OE.",
+    compatibleCars: ["Toyota", "Honda", "Mazda"],
+    stockQty: 240,
+    rating: 4.7,
+    reviewsCount: 78,
+    isFeatured: true,
+  },
+  {
+    id: "pt5",
+    slug: "den-led-philips-ultinon-h7",
+    name: "Bóng đèn LED Philips Ultinon H7",
+    category: "Đèn / Pha",
+    brand: "Philips",
+    priceVND: 890000,
+    originalPriceVND: 1100000,
+    image: IMG("photo-1493238792000-8113da705763"),
+    shortDescription: "Ánh sáng trắng 6500K, sáng hơn 200% so với halogen thường.",
+    stockQty: 65,
+    rating: 4.6,
+    reviewsCount: 47,
+  },
+  {
+    id: "pt6",
+    slug: "tham-san-3d-kia-morning",
+    name: "Thảm sàn 3D cao cấp Kia Morning",
+    category: "Nội thất",
+    brand: "OEM",
+    priceVND: 850000,
+    image: IMG("photo-1549399542-7e3f8b79c341"),
+    shortDescription: "Thảm sàn 3D chống trượt, ôm sàn chuẩn xe, dễ vệ sinh.",
+    compatibleCars: ["Kia Morning"],
+    stockQty: 38,
+    rating: 4.4,
+    reviewsCount: 22,
+  },
+  {
+    id: "pt7",
+    slug: "camera-hanh-trinh-viofo-a119-v3",
+    name: "Camera hành trình Viofo A119 V3",
+    category: "Phụ kiện ngoại thất",
+    brand: "Viofo",
+    priceVND: 2350000,
+    image: IMG("photo-1593941707882-a5bba14938c7"),
+    shortDescription:
+      "Camera hành trình 2K, GPS tích hợp, ghi hình trước sau.",
+    stockQty: 28,
+    rating: 4.8,
+    reviewsCount: 64,
+    isFeatured: true,
+  },
+  {
+    id: "pt8",
+    slug: "bo-ma-phanh-brembo-truoc",
+    name: "Bộ má phanh Brembo trước (Ceramic)",
+    category: "Phanh",
+    brand: "Brembo",
+    priceVND: 2890000,
+    originalPriceVND: 3200000,
+    image: IMG("photo-1486006920555-c77dcf18193c"),
+    shortDescription:
+      "Má phanh Brembo ceramic, phanh nhạy, bền, không bám bụi.",
+    stockQty: 32,
+    rating: 4.9,
+    reviewsCount: 91,
+    isFeatured: true,
+    isBestSeller: true,
+  },
+];
+
 export const articles: Article[] = [
   {
     id: "a1",

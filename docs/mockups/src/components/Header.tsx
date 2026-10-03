@@ -12,8 +12,10 @@ import {
 import Button from "./Button";
 
 const navItems = [
-  { to: "/services", label: "Dịch vụ" },
-  { to: "/ai/damage", label: "Phân tích hư hỏng" },
+  { to: "/cars", label: "Mua xe" },
+  { to: "/parts", label: "Phụ kiện" },
+  { to: "/services", label: "Đặt lịch sửa chữa" },
+  { to: "/news", label: "Tin tức" },
   { to: "/ai/assistant", label: "Trợ lý AI" },
 ];
 
