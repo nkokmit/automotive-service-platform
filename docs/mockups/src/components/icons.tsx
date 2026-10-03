@@ -317,3 +317,139 @@ export const IconShare = ({ size, ...p }: IconProps) => (
     <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
   </svg>
 );
+
+export const IconDashboard = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <rect x="3" y="3" width="7" height="9" />
+    <rect x="14" y="3" width="7" height="5" />
+    <rect x="14" y="12" width="7" height="9" />
+    <rect x="3" y="16" width="7" height="5" />
+  </svg>
+);
+
+export const IconBuilding = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <rect x="4" y="2" width="16" height="20" rx="2" />
+    <line x1="9" y1="6" x2="9" y2="6.01" />
+    <line x1="15" y1="6" x2="15" y2="6.01" />
+    <line x1="9" y1="10" x2="9" y2="10.01" />
+    <line x1="15" y1="10" x2="15" y2="10.01" />
+    <line x1="9" y1="14" x2="9" y2="14.01" />
+    <line x1="15" y1="14" x2="15" y2="14.01" />
+    <path d="M10 22v-4h4v4" />
+  </svg>
+);
+
+export const IconChart = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="12" y1="20" x2="12" y2="4" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+    <line x1="3" y1="20" x2="21" y2="20" />
+  </svg>
+);
+
+export const IconSettings = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
+export const IconBell = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+);
+
+export const IconEye = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+export const IconEdit = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+
+export const IconFilter = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </svg>
+);
+
+export const IconMore = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
+    <circle cx="5" cy="12" r="1" />
+  </svg>
+);
+
+export const IconSort = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M3 6h18M6 12h12M10 18h4" />
+  </svg>
+);
+
+export const IconLogout = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
+export const IconTrendUp = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+    <polyline points="17 6 23 6 23 12" />
+  </svg>
+);
+
+export const IconTrendDown = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+    <polyline points="17 18 23 18 23 12" />
+  </svg>
+);
+
+export const IconUsers = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
+export const IconArrowUpRight = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <line x1="7" y1="17" x2="17" y2="7" />
+    <polyline points="7 7 17 7 17 17" />
+  </svg>
+);
+
+export const IconArrowDownRight = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <line x1="7" y1="7" x2="17" y2="17" />
+    <polyline points="17 7 17 17 7 17" />
+  </svg>
+);
+
+export const IconWarning = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p} fill="currentColor">
+    <path d="M12 2 1 21h22zM12 16a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm-1-6a1 1 0 0 1 2 0v4a1 1 0 1 1-2 0z" />
+  </svg>
+);
+
+export const IconActivity = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);

@@ -46,9 +46,23 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
   if (!ctx) {
-    throw new Error(
-      "useToast() phải được dùng bên trong <ToastProvider>. Hãy wrap App với provider.",
-    );
+    // Fallback an toàn khi component được dùng ngoài <ToastProvider>
+    // (ví dụ: trong admin module không wrap). Tránh throw để không vỡ cả cây.
+    if (typeof console !== "undefined") {
+      console.warn(
+        "useToast() được dùng ngoài <ToastProvider>. Trả về no-op fallback.",
+      );
+    }
+    const noop = () => "";
+    return {
+      toast: noop,
+      success: noop,
+      error: noop,
+      info: noop,
+      warning: noop,
+      dismiss: noop,
+      clear: noop,
+    };
   }
   return ctx;
 }

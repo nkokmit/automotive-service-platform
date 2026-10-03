@@ -130,6 +130,31 @@ export default function Header() {
                       Tài khoản của tôi
                     </Link>
                     <Link
+                      to="/admin"
+                      onClick={() => setUserMenu(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-primary hover:bg-primary/5 font-medium"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="3" y="3" width="7" height="9" />
+                        <rect x="14" y="3" width="7" height="5" />
+                        <rect x="14" y="12" width="7" height="9" />
+                        <rect x="3" y="16" width="7" height="5" />
+                      </svg>
+                      Admin Panel
+                      <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary text-white">
+                        DEMO
+                      </span>
+                    </Link>
+                    <Link
                       to="/profile?tab=orders"
                       onClick={() => setUserMenu(false)}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-ink hover:bg-bgsoft"
