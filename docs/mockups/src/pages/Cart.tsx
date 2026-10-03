@@ -20,7 +20,8 @@ import Badge from "../components/Badge";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import { useToast } from "../components/Toast";
-import { parts, type Part } from "../data/mock";
+import RecommendationWidget from "../components/RecommendationWidget";
+import { type Part } from "../data/mock";
 import {
   useCartLines,
   setCartQty,
@@ -30,6 +31,7 @@ import {
   formatFullVND as fullVND,
   getPartDiscountPercent,
 } from "../data/cartStore";
+import { recommendForCart } from "../data/recommend";
 
 // =========================
 // Promotions
@@ -317,7 +319,7 @@ export default function Cart() {
             </ul>
           </Card>
 
-          {/* Recommended */}
+          {/* Recommended (smart widget) */}
           <RecommendedParts lines={lines} />
         </div>
 
@@ -694,62 +696,45 @@ function RecommendedParts({
 }: {
   lines: { part: Part; qty: number; lineTotal: number }[];
 }) {
-  const inCartIds = new Set(lines.map((l) => l.part.id));
+  const cartPartIds = useMemo(
+    () => new Set(lines.map((l) => l.part.id)),
+    [lines],
+  );
+
+  // Smart recommendations dựa trên:
+  // - Category giống parts trong giỏ
+  // - Compatible cars overlap
+  // - BestSeller / Featured / Rating
   const recommended = useMemo(
-    () =>
-      parts
-        .filter((p) => !inCartIds.has(p.id))
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 4),
-    [inCartIds],
+    () => recommendForCart(cartPartIds, 4),
+    [cartPartIds],
   );
 
   if (recommended.length === 0) return null;
 
+  // Lấy category phổ biến nhất trong giỏ → gợi ý subtitle
+  const topCategory = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const l of lines) {
+      counts.set(l.part.category, (counts.get(l.part.category) ?? 0) + 1);
+    }
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0];
+  }, [lines]);
+
   return (
     <div className="mt-8">
-      <h2 className="text-lg md:text-xl font-bold mb-4 flex items-center gap-2">
-        <IconShoppingBag size={18} className="text-primary" />
-        Có thể bạn cũng thích
-      </h2>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {recommended.map((p) => (
-          <PartCardMini key={p.id} part={p} />
-        ))}
-      </div>
+      <RecommendationWidget
+        items={recommended}
+        title="Có thể bạn cũng thích"
+        subtitle={
+          topCategory
+            ? `Phụ tùng liên quan đến "${topCategory}" trong giỏ của bạn`
+            : "Gợi ý dựa trên lịch sử và sản phẩm phổ biến"
+        }
+        viewAllHref="/parts"
+        viewAllLabel="Khám phá thêm"
+      />
     </div>
-  );
-}
-
-function PartCardMini({ part }: { part: Part }) {
-  const discount = getPartDiscountPercent(part);
-  return (
-    <Link to={`/parts/${part.slug}`} className="group block">
-      <Card className="h-full">
-        <div className="relative aspect-square overflow-hidden rounded-t-2xl bg-white">
-          <img
-            src={part.image}
-            alt={part.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-          {discount > 0 && (
-            <Badge tone="primary" className="absolute top-1.5 left-1.5 text-[10px]">
-              -{discount}%
-            </Badge>
-          )}
-        </div>
-        <div className="p-2.5">
-          <div className="text-[10px] uppercase tracking-wide text-ink-muted mb-0.5">
-            {part.brand}
-          </div>
-          <h4 className="font-semibold text-xs sm:text-sm leading-tight mb-1.5 line-clamp-2 min-h-[2.4rem] group-hover:text-primary">
-            {part.name}
-          </h4>
-          <div className="text-primary font-bold text-sm">
-            {compactVND(part.priceVND)}
-          </div>
-        </div>
-      </Card>
-    </Link>
   );
 }

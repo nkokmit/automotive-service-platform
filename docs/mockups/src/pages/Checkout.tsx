@@ -20,12 +20,15 @@ import Badge from "../components/Badge";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import { useToast } from "../components/Toast";
+import RecommendationWidget from "../components/RecommendationWidget";
+import { type Part } from "../data/mock";
 import {
   useCartLines,
   clearCart,
   formatCompactVND as compactVND,
   formatFullVND as fullVND,
 } from "../data/cartStore";
+import { recommendForCheckout } from "../data/recommend";
 
 // =========================
 // Mock Vietnam provinces + districts
@@ -297,6 +300,9 @@ export default function Checkout() {
               total={total}
             />
           )}
+
+          {/* ============= Upsell: gợi ý thêm phụ tùng ============= */}
+          {step < 2 && <CheckoutUpsell cartLines={lines} />}
 
           {step < 2 && (
             <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3 justify-between">
@@ -879,3 +885,40 @@ function SummaryRow({
 
 // Suppress unused icon warning
 void IconStar;
+
+// =========================
+// Upsell widget cho Checkout
+// =========================
+
+function CheckoutUpsell({
+  cartLines,
+}: {
+  cartLines: { part: Part; qty: number; lineTotal: number }[];
+}) {
+  const cartPartIds = useMemo(
+    () => new Set(cartLines.map((l) => l.part.id)),
+    [cartLines],
+  );
+
+  const recommendations = useMemo(
+    () => recommendForCheckout(cartPartIds, 4),
+    [cartPartIds],
+  );
+
+  // Tránh re-render trùng khi giỏ trống (đang guard ở parent)
+  if (recommendations.length === 0) return null;
+
+  return (
+    <div className="mt-8">
+      <RecommendationWidget
+        items={recommendations}
+        title="Thêm phụ tùng trước khi thanh toán"
+        subtitle="Gợi ý phù hợp với các sản phẩm trong giỏ của bạn"
+        variant="compact"
+        showAddToCart
+        viewAllHref="/parts"
+        viewAllLabel="Xem tất cả phụ tùng"
+      />
+    </div>
+  );
+}

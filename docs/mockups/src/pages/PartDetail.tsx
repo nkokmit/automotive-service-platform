@@ -21,7 +21,9 @@ import Badge from "../components/Badge";
 import Button from "../components/Button";
 import { Skeleton } from "../components/Loading";
 import { useToast } from "../components/Toast";
+import RecommendationWidget from "../components/RecommendationWidget";
 import { parts, type Part } from "../data/mock";
+import { recommendForPart } from "../data/recommend";
 import {
   addToCart,
   setCartQty,
@@ -278,10 +280,11 @@ export default function PartDetail() {
   const discount = getPartDiscountPercent(part);
   const inStock = part.stockQty > 0;
 
-  // Similar: cùng category, loại trừ chính nó, max 4
-  const similar = parts
-    .filter((p) => p.category === part.category && p.id !== part.id)
-    .slice(0, 4);
+  // Similar: dùng RecommendationWidget (smart engine)
+  const similarRecommendations = useMemo(
+    () => recommendForPart(part.id, 4),
+    [part.id],
+  );
 
   const handleAddToCart = (showModal: boolean = false) => {
     addToCart(part.id, qty);
@@ -565,30 +568,16 @@ export default function PartDetail() {
             </div>
           </div>
 
-          {/* Similar parts */}
-          {similar.length > 0 && (
+          {/* Related parts — smart engine */}
+          {similarRecommendations.length > 0 && (
             <div className="mt-8">
-              <div className="flex items-end justify-between mb-4">
-                <div>
-                  <h2 className="text-xl md:text-2xl font-bold">
-                    Sản phẩm cùng danh mục
-                  </h2>
-                  <p className="text-sm text-ink-light mt-1">
-                    Phụ kiện {part.category} khác
-                  </p>
-                </div>
-                <Link
-                  to={`/parts?category=${encodeURIComponent(part.category)}`}
-                  className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-                >
-                  Xem tất cả <IconArrowRight size={14} />
-                </Link>
-              </div>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {similar.map((p) => (
-                  <PartCardSmall key={p.id} part={p} />
-                ))}
-              </div>
+              <RecommendationWidget
+                items={similarRecommendations}
+                title="Sản phẩm liên quan"
+                subtitle={`Phụ kiện tương thích với "${part.name}" — cùng danh mục, cùng dòng xe`}
+                viewAllHref={`/parts?category=${encodeURIComponent(part.category)}`}
+                viewAllLabel={`Xem tất cả ${part.category}`}
+              />
             </div>
           )}
         </div>

@@ -14,7 +14,9 @@ import {
 import Card from "../components/Card";
 import Badge from "../components/Badge";
 import Button from "../components/Button";
+import RecommendationWidget from "../components/RecommendationWidget";
 import { services } from "../data/mock";
+import { recommendForService } from "../data/recommend";
 
 const formatVND = (n: number) =>
   new Intl.NumberFormat("vi-VN").format(n) + "đ";
@@ -319,6 +321,12 @@ export default function ServiceDetail() {
               ))}
             </div>
           )}
+
+          {/* Related parts — gợi ý phụ tùng phù hợp với dịch vụ */}
+          <ServiceRelatedParts
+            serviceCategory={service.category}
+            serviceName={service.name}
+          />
         </div>
 
         {/* RIGHT: booking widget sticky */}
@@ -520,5 +528,34 @@ export default function ServiceDetail() {
         </div>
       )}
     </div>
+  );
+}
+
+// =========================
+// Related parts cho ServiceDetail
+// =========================
+
+function ServiceRelatedParts({
+  serviceCategory,
+  serviceName,
+}: {
+  serviceCategory: string;
+  serviceName: string;
+}) {
+  const recommendations = useMemo(
+    () => recommendForService(serviceCategory, 4),
+    [serviceCategory],
+  );
+
+  if (recommendations.length === 0) return null;
+
+  return (
+    <RecommendationWidget
+      items={recommendations}
+      title="Phụ tùng liên quan"
+      subtitle={`Phụ tùng phù hợp với dịch vụ "${serviceName}"`}
+      viewAllHref="/parts"
+      viewAllLabel="Xem thêm phụ tùng"
+    />
   );
 }
