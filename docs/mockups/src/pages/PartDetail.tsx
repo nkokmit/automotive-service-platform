@@ -22,69 +22,14 @@ import Button from "../components/Button";
 import { Skeleton } from "../components/Loading";
 import { useToast } from "../components/Toast";
 import { parts, type Part } from "../data/mock";
-
-// =========================
-// Helpers
-// =========================
-const compactVND = (n: number) => {
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + " tỷ";
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "tr";
-  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
-};
-
-const fullVND = (n: number) =>
-  new Intl.NumberFormat("vi-VN").format(n) + " đ";
-
-function getDiscountPercent(p: Part): number {
-  if (!p.originalPriceVND || p.originalPriceVND <= p.priceVND) return 0;
-  return Math.round(
-    ((p.originalPriceVND - p.priceVND) / p.originalPriceVND) * 100,
-  );
-}
-
-// =========================
-// Local cart helpers
-// =========================
-const CART_KEY = "autocare:cart";
-
-type CartItem = { partId: string; qty: number };
-
-function readCart(): CartItem[] {
-  try {
-    const raw = localStorage.getItem(CART_KEY);
-    return raw ? (JSON.parse(raw) as CartItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCart(list: CartItem[]) {
-  localStorage.setItem(CART_KEY, JSON.stringify(list));
-}
-
-function setCartQty(partId: string, qty: number) {
-  const list = readCart();
-  const existing = list.find((i) => i.partId === partId);
-  const clamped = Math.max(1, Math.min(qty, 99));
-  if (existing) {
-    existing.qty = clamped;
-  } else {
-    list.push({ partId, qty: clamped });
-  }
-  writeCart(list);
-}
-
-function addToCart(partId: string, qty: number = 1) {
-  const list = readCart();
-  const existing = list.find((i) => i.partId === partId);
-  const clamped = Math.max(1, Math.min(qty, 99));
-  if (existing) {
-    existing.qty = Math.min(existing.qty + clamped, 99);
-  } else {
-    list.push({ partId, qty: clamped });
-  }
-  writeCart(list);
-}
+import {
+  addToCart,
+  setCartQty,
+  formatCompactVND as compactVND,
+  formatFullVND as fullVND,
+  getPartDiscountPercent,
+  useCartCount,
+} from "../data/cartStore";
 
 // =========================
 // Mock reviews (dùng chung cho mọi part — sẽ wrap useReviews(partId))
@@ -203,7 +148,7 @@ function QtySelector({
 // Sub-component: PartCard (dùng cho similar)
 // =========================
 function PartCardSmall({ part }: { part: Part }) {
-  const discount = getDiscountPercent(part);
+  const discount = getPartDiscountPercent(part);
   return (
     <Link to={`/parts/${part.slug}`} className="group block h-full">
       <Card className="h-full flex flex-col">
@@ -330,7 +275,7 @@ export default function PartDetail() {
   }
 
   // Từ đây part chắc chắn !== null
-  const discount = getDiscountPercent(part);
+  const discount = getPartDiscountPercent(part);
   const inStock = part.stockQty > 0;
 
   // Similar: cùng category, loại trừ chính nó, max 4

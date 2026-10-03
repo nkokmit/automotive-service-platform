@@ -15,55 +15,13 @@ import Input from "../components/Input";
 import { SkeletonGrid } from "../components/Loading";
 import { useToast } from "../components/Toast";
 import { parts, type Part } from "../data/mock";
-
-// =========================
-// Helpers
-// =========================
-const compactVND = (n: number) => {
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + " tỷ";
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "tr";
-  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
-};
-
-const fullVND = (n: number) =>
-  new Intl.NumberFormat("vi-VN").format(n) + " đ";
-
-// =========================
-// Local cart helpers (sẽ thay bằng CartProvider khi backend sẵn sàng)
-// =========================
-const CART_KEY = "autocare:cart";
-
-type CartItem = {
-  partId: string;
-  qty: number;
-};
-
-function readCart(): CartItem[] {
-  try {
-    const raw = localStorage.getItem(CART_KEY);
-    return raw ? (JSON.parse(raw) as CartItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function addToCart(partId: string, qty: number = 1) {
-  const list = readCart();
-  const existing = list.find((i) => i.partId === partId);
-  if (existing) {
-    existing.qty = Math.min(existing.qty + qty, 99);
-  } else {
-    list.push({ partId, qty: Math.min(qty, 99) });
-  }
-  localStorage.setItem(CART_KEY, JSON.stringify(list));
-}
-
-function getDiscountPercent(p: Part): number {
-  if (!p.originalPriceVND || p.originalPriceVND <= p.priceVND) return 0;
-  return Math.round(
-    ((p.originalPriceVND - p.priceVND) / p.originalPriceVND) * 100,
-  );
-}
+import {
+  addToCart,
+  formatCompactVND as compactVND,
+  formatFullVND as fullVND,
+  getPartDiscountPercent,
+  useCartCount,
+} from "../data/cartStore";
 
 // =========================
 // Filter options (derived từ mock data)
@@ -137,12 +95,8 @@ export default function PartsList() {
     }
   }, [params, setParams]);
 
-  // Cart state — force re-render khi addToCart
-  const [cartVersion, setCartVersion] = useState(0);
-  const cartCount = useMemo(() => {
-    void cartVersion; // phụ thuộc để re-render
-    return readCart().reduce((sum, i) => sum + i.qty, 0);
-  }, [cartVersion]);
+  // Cart state — tự động re-render khi cart thay đổi
+  const cartCount = useCartCount();
 
   const filtered = useMemo(() => {
     let result = parts.filter((p) => {
@@ -151,7 +105,7 @@ export default function PartsList() {
       if (filters.brand !== "Tất cả" && p.brand !== filters.brand) return false;
       if (p.priceVND > filters.maxPrice) return false;
       if (filters.status === "inStock" && p.stockQty <= 0) return false;
-      if (filters.status === "discount" && getDiscountPercent(p) <= 0)
+      if (filters.status === "discount" && getPartDiscountPercent(p) <= 0)
         return false;
       if (filters.status === "bestSeller" && !p.isBestSeller) return false;
       if (
@@ -176,7 +130,7 @@ export default function PartsList() {
         break;
       case "discount":
         result = [...result].sort(
-          (a, b) => getDiscountPercent(b) - getDiscountPercent(a),
+          (a, b) => getPartDiscountPercent(b) - getPartDiscountPercent(a),
         );
         break;
       default:
@@ -221,7 +175,6 @@ export default function PartsList() {
     e.preventDefault();
     e.stopPropagation();
     addToCart(p.id, 1);
-    setCartVersion((v) => v + 1);
     t.success(`Đã thêm "${p.name}" vào giỏ hàng`);
   };
 
@@ -455,7 +408,7 @@ function PartCard({
   part: Part;
   onAddToCart: (p: Part, e: React.MouseEvent) => void;
 }) {
-  const discount = getDiscountPercent(part);
+  const discount = getPartDiscountPercent(part);
   const inStock = part.stockQty > 0;
 
   return (

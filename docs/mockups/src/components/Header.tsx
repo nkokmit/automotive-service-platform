@@ -8,8 +8,10 @@ import {
   IconCar,
   IconCamera,
   IconChat,
+  IconCart,
 } from "./icons";
 import Button from "./Button";
+import { useCartCount } from "../data/cartStore";
 
 const navItems = [
   { to: "/cars", label: "Mua xe" },
@@ -21,6 +23,7 @@ const navItems = [
 
 export default function Header() {
   const [open, setOpen] = useState(false);
+  const cartCount = useCartCount();
 
   return (
     <header className="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-ink/8">
@@ -66,6 +69,18 @@ export default function Header() {
 
         {/* Actions */}
         <div className="hidden md:flex items-center gap-2 ml-auto lg:ml-2">
+          <Link
+            to="/cart"
+            className="relative p-2 rounded-lg hover:bg-bgsoft"
+            aria-label={`Giỏ hàng (${cartCount})`}
+          >
+            <IconCart size={22} />
+            {cartCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
           <Link to="/login">
             <Button variant="ghost" size="sm">
               Đăng nhập
@@ -79,10 +94,15 @@ export default function Header() {
         {/* Mobile menu trigger */}
         <button
           onClick={() => setOpen((v) => !v)}
-          className="md:hidden ml-auto p-2 rounded-lg hover:bg-bgsoft"
+          className="md:hidden ml-auto p-2 rounded-lg hover:bg-bgsoft relative"
           aria-label="Mở menu"
         >
           {open ? <IconClose /> : <IconMenu />}
+          {cartCount > 0 && (
+            <span className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center">
+              {cartCount > 99 ? "99+" : cartCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -112,6 +132,19 @@ export default function Header() {
                 {it.label}
               </NavLink>
             ))}
+            <Link
+              to="/cart"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink hover:bg-bgsoft"
+            >
+              <IconCart size={18} />
+              <span>Giỏ hàng</span>
+              {cartCount > 0 && (
+                <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-white text-[11px] font-bold flex items-center justify-center">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </Link>
             <div className="flex gap-2 pt-2 border-t border-ink/8 mt-2">
               <Link to="/login" className="flex-1" onClick={() => setOpen(false)}>
                 <Button variant="outline" fullWidth size="sm">

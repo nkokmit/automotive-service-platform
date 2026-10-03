@@ -220,3 +220,90 @@ export const IconRefresh = ({ size, ...p }: IconProps) => (
     <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
   </svg>
 );
+
+export const IconTrash = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6 17.6 20.4A2 2 0 0 1 15.62 22H8.38a2 2 0 0 1-1.98-1.6L5 6" />
+    <path d="M10 11v6m4-6v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+);
+
+export const IconArrowLeft = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <line x1="19" y1="12" x2="5" y2="12" />
+    <polyline points="12 19 5 12 12 5" />
+  </svg>
+);
+
+export const IconCreditCard = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+    <line x1="1" y1="10" x2="23" y2="10" />
+  </svg>
+);
+
+export const IconCash = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <rect x="2" y="6" width="20" height="12" rx="2" />
+    <circle cx="12" cy="12" r="3" />
+    <line x1="6" y1="12" x2="6" y2="12.01" />
+    <line x1="18" y1="12" x2="18" y2="12.01" />
+  </svg>
+);
+
+export const IconBank = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polygon points="12 2 2 7 22 7 12 2" />
+    <polyline points="2 17 22 17" />
+    <line x1="5" y1="17" x2="5" y2="11" />
+    <line x1="10" y1="17" x2="10" y2="11" />
+    <line x1="14" y1="17" x2="14" y2="11" />
+    <line x1="19" y1="17" x2="19" y2="11" />
+    <line x1="2" y1="21" x2="22" y2="21" />
+  </svg>
+);
+
+export const IconWallet = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+    <path d="M18 12a2 2 0 0 0 0 4h4v-4z" />
+  </svg>
+);
+
+export const IconCheckCircle = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p} fill="currentColor">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+  </svg>
+);
+
+export const IconNote = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+  </svg>
+);
+
+export const IconSale = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+    <line x1="7" y1="7" x2="7.01" y2="7" />
+    <line x1="9.5" y1="9.5" x2="13.5" y2="13.5" />
+    <line x1="13.5" y1="9.5" x2="9.5" y2="13.5" />
+  </svg>
+);
+
+export const IconList = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <line x1="8" y1="6" x2="21" y2="6" />
+    <line x1="8" y1="12" x2="21" y2="12" />
+    <line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" />
+    <line x1="3" y1="12" x2="3.01" y2="12" />
+    <line x1="3" y1="18" x2="3.01" y2="18" />
+  </svg>
+);
