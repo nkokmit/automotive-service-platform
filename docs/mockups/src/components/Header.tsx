@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   IconSearch,
@@ -10,6 +10,7 @@ import {
   IconChat,
   IconCart,
   IconArrowRight,
+  IconSparkles,
 } from "./icons";
 import Button from "./Button";
 import { useCartCount } from "../data/cartStore";
@@ -20,15 +21,44 @@ const navItems = [
   { to: "/parts", label: "Phụ kiện" },
   { to: "/services", label: "Đặt lịch sửa chữa" },
   { to: "/news", label: "Tin tức" },
-  { to: "/ai/assistant", label: "Trợ lý AI" },
+];
+
+/** Nhóm "AI" — gộp 2 trang vào dropdown cho gọn nav. */
+const aiMenuItems = [
+  {
+    to: "/ai/damage",
+    label: "Phân tích hư hỏng",
+    desc: "Upload ảnh, phát hiện trầy/móp/vỡ",
+    icon: "camera" as const,
+  },
+  {
+    to: "/ai/assistant",
+    label: "Trợ lý AI chat",
+    desc: "Hỏi đáp về bảo dưỡng, sửa chữa",
+    icon: "chat" as const,
+  },
 ];
 
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
+  const [aiMenu, setAiMenu] = useState(false);
+  const aiMenuRef = useRef<HTMLDivElement>(null);
   const cartCount = useCartCount();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Đóng AI menu khi click-outside
+  useEffect(() => {
+    if (!aiMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (aiMenuRef.current && !aiMenuRef.current.contains(e.target as Node)) {
+        setAiMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [aiMenu]);
 
   return (
     <header className="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-ink/8">
@@ -59,6 +89,92 @@ export default function Header() {
               {it.label}
             </NavLink>
           ))}
+
+          {/* AI dropdown — gộp 2 trang AI vào menu cho gọn */}
+          <div ref={aiMenuRef} className="relative">
+            <button
+              onClick={() => setAiMenu((v) => !v)}
+              aria-expanded={aiMenu}
+              aria-haspopup="menu"
+              className={[
+                "flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                aiMenu
+                  ? "bg-bgsoft text-primary"
+                  : "text-ink hover:bg-bgsoft",
+              ].join(" ")}
+            >
+              <IconSparkles size={16} />
+              <span>AI</span>
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={[
+                  "transition-transform",
+                  aiMenu ? "rotate-180" : "",
+                ].join(" ")}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {aiMenu && (
+              <div
+                role="menu"
+                className="absolute left-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-cardHover border border-ink/10 py-2 z-40"
+              >
+                <div className="px-4 py-2 border-b border-ink/8 mb-1">
+                  <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                    Công cụ AI
+                  </div>
+                  <p className="text-[11px] text-ink-muted mt-0.5">
+                    Hỗ trợ bảo dưỡng & sửa chữa xe
+                  </p>
+                </div>
+                {aiMenuItems.map((it) => (
+                  <Link
+                    key={it.to}
+                    to={it.to}
+                    role="menuitem"
+                    onClick={() => setAiMenu(false)}
+                    className="flex items-start gap-3 px-4 py-2.5 hover:bg-bgsoft transition-colors"
+                  >
+                    <div
+                      className={[
+                        "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+                        it.icon === "camera"
+                          ? "bg-primary text-white"
+                          : "bg-accent text-ink",
+                      ].join(" ")}
+                    >
+                      {it.icon === "camera" ? (
+                        <IconCamera size={18} />
+                      ) : (
+                        <IconChat size={18} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-ink">
+                        {it.label}
+                      </div>
+                      <div className="text-xs text-ink-muted line-clamp-1">
+                        {it.desc}
+                      </div>
+                    </div>
+                    <IconArrowRight
+                      size={14}
+                      className="text-ink-muted mt-2 shrink-0"
+                    />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* Search (desktop) */}
@@ -244,6 +360,51 @@ export default function Header() {
                 {it.label}
               </NavLink>
             ))}
+
+            {/* AI group trong mobile menu */}
+            <div className="mt-1 pt-2 border-t border-ink/8">
+              <div className="flex items-center gap-1.5 px-3 pt-1 pb-2 text-[11px] font-semibold text-ink-muted uppercase tracking-wide">
+                <IconSparkles size={12} />
+                <span>Công cụ AI</span>
+              </div>
+              {aiMenuItems.map((it) => (
+                <NavLink
+                  key={it.to}
+                  to={it.to}
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) =>
+                    [
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium",
+                      isActive
+                        ? "bg-bgsoft text-primary"
+                        : "text-ink hover:bg-bgsoft",
+                    ].join(" ")
+                  }
+                >
+                  <div
+                    className={[
+                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                      it.icon === "camera"
+                        ? "bg-primary text-white"
+                        : "bg-accent text-ink",
+                    ].join(" ")}
+                  >
+                    {it.icon === "camera" ? (
+                      <IconCamera size={16} />
+                    ) : (
+                      <IconChat size={16} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium">{it.label}</div>
+                    <div className="text-[11px] text-ink-muted line-clamp-1">
+                      {it.desc}
+                    </div>
+                  </div>
+                </NavLink>
+              ))}
+            </div>
+
             <Link
               to="/cart"
               onClick={() => setOpen(false)}
