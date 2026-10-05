@@ -1,0 +1,71 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: user-service
+              uri: lb://user-service
+              predicates:
+                - Path=/api/users/**
+
+            - id: user-service-role
+              uri: lb://user-service
+              predicates:
+                - Path=/api/roles/**
+
+            - id: user-service-role
+              uri: lb://user-service
+              predicates:
+                - Path=/api/permissions/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# Springdoc / Swagger UI - API Gateway aggregate OpenAPI từ các microservice
+# Mỗi microservice tự expose /v3/api-docs ở port nội bộ; gateway render danh sách
+# dropdown để client chọn service. Khi có service mới, chỉ cần thêm 1 entry ở
+# springdoc.swagger-ui.urls dưới đây.
+springdoc:
+  api-docs:
+    # Path OpenAPI JSON mặc định (đúng convention rule GLOBAL_RULES §19)
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    # Path hiển thị Swagger UI
+    path: /swagger-ui.html
+    # Danh sách các microservice đã được Eureka discovery sẵn (cấu hình tĩnh
+    # là an toàn nhất cho gateway vì gateway không scan package).
+    # Khi service được đăng ký với Eureka, client có thể chọn dropdown để xem
+    # OpenAPI spec tương ứng.
+    urls:
+      - url: /v3/api-docs/user-service
+        name: user-service
+      - url: /v3/api-docs/staff-service
+        name: staff-service
+      - url: /v3/api-docs/customer-vehicle-service
+        name: customer-vehicle-service
+      - url: /v3/api-docs/booking-service
+        name: booking-service
+      - url: /v3/api-docs/work-order-service
+        name: work-order-service
+      - url: /v3/api-docs/inventory-service
+        name: inventory-service
+      - url: /v3/api-docs/billing-service
+        name: billing-service
+      - url: /v3/api-docs/notification-service
+        name: notification-service
+    # Luôn render danh sách URL (không cố gắng tự fetch qua Eureka ở runtime)
+    urls-primary-name: user-service
+  # Không scan package nào vì gateway không có controller - tránh warning
+  packages-to-scan: ""
+  # Tắt default OpenAPI doc cho gateway (chỉ dùng aggregate)
+  default-produces-media-type: application/json
