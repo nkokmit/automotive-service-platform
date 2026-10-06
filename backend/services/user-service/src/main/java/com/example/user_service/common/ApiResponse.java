@@ -2,6 +2,7 @@ package com.example.user_service.common;
 
 import com.example.user_service.exception.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.Builder;
 
 /**
  * Response format chuẩn cho toàn bộ API của service.

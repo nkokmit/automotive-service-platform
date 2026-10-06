@@ -45,3 +45,11 @@ logging:
   level:
     root: INFO
     com.example.user_service: DEBUG
+
+    org.hibernate: DEBUG
+    org.springframework.orm.jpa: DEBUG
+
+jwt:
+  secret: "21808c7f2c761f078358d8589dff41d75078e8130e1c18c0760c70db29b6ab94"
+  expiration: 3600000
+  refresh-expiration: 604800000

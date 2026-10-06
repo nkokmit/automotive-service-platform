@@ -1,5 +1,6 @@
 package com.example.user_service.config;
 
+import com.example.user_service.security.SecurityConfig;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;

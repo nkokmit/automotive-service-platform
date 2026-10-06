@@ -23,7 +23,11 @@ public enum ErrorCode {
 
     // Permission (12xx)
     PERMISSION_NOT_FOUND(1201, "Không tìm thấy quyền"),
-    PERMISSION_ALREADY_EXISTS(1202, "Quyền đã tồn tại");
+    PERMISSION_ALREADY_EXISTS(1202, "Quyền đã tồn tại"),
+
+    // Authentication & Authorization (14xx)
+    UNAUTHENTICATED(1401, "Chưa đăng nhập hoặc token không hợp lệ"),
+    UNAUTHORIZED(1403, "Bạn không có quyền");
 
     private final int code;
     private final String message;
