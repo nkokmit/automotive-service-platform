@@ -32,12 +32,6 @@ import java.util.stream.Collectors;
 @Transactional
 public class RoleServiceImpl implements RoleService {
 
-    /**
-     * Prefix bắt buộc cho {@code roles.name} trong DB, theo convention của Spring Security
-     * ({@code hasRole("ADMIN")} tương ứng authority {@code ROLE_ADMIN}). Được thêm tự động
-     * bởi {@link #normalizeRoleName(String)} — client không cần (và sẽ bị reject nếu) gửi kèm.
-     */
-    static final String ROLE_PREFIX = "ROLE_";
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
@@ -60,12 +54,11 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public RoleResponse createRole(RoleCreateRequest request) {
-        String normalizedName = normalizeRoleName(request.name());
-        if (roleRepository.existsByName(normalizedName)) {
-            throw new RoleAlreadyExistsException("Role đã tồn tại: " + normalizedName);
+        if (roleRepository.existsByName(request.name())) {
+            throw new RoleAlreadyExistsException("Role đã tồn tại: " + request.name());
         }
         Role role = Role.builder()
-                .name(normalizedName)
+                .name(request.name())
                 .displayName(request.displayName())
                 .description(request.description())
                 .build();
@@ -80,11 +73,11 @@ public class RoleServiceImpl implements RoleService {
                 .orElseThrow(() -> new RoleNotFoundException("Không tìm thấy role với id: " + id));
 
         if (request.name() != null && !request.name().isBlank()) {
-            String normalizedName = normalizeRoleName(request.name());
-            if (!normalizedName.equals(role.getName()) && roleRepository.existsByName(normalizedName)) {
-                throw new RoleAlreadyExistsException("Role đã tồn tại: " + normalizedName);
+            String name = request.name();
+            if (!name.equals(role.getName()) && roleRepository.existsByName(name)) {
+                throw new RoleAlreadyExistsException("Role đã tồn tại: " + name);
             }
-            role.setName(normalizedName);
+            role.setName(name);
         }
         if (request.displayName() != null) {
             role.setDisplayName(request.displayName());
@@ -148,23 +141,6 @@ public class RoleServiceImpl implements RoleService {
             throw new PermissionNotFoundException("Không tìm thấy permission id: " + missing);
         }
         return new HashSet<>(permissions);
-    }
-
-    /**
-     * Chuẩn hoá role name: tự động thêm prefix {@code ROLE_} nếu client chưa gửi.
-     * Input hợp lệ đã được {@link RoleCreateRequest} / {@link RoleUpdateRequest} ràng buộc
-     * ở dạng UPPER_SNAKE_CASE; gọi hàm này từ service là nguồn sự thật duy nhất tạo tên
-     * cuối cùng trong DB — phù hợp với convention {@code hasRole(...)} của Spring Security.
-     */
-    private String normalizeRoleName(String raw) {
-        if (raw == null) {
-            throw new IllegalArgumentException("Role name không được null");
-        }
-        String trimmed = raw.trim();
-        if (trimmed.startsWith(ROLE_PREFIX)) {
-            return trimmed;
-        }
-        return ROLE_PREFIX + trimmed;
     }
 }
 

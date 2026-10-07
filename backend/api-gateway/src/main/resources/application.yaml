@@ -15,12 +15,17 @@ spring:
               predicates:
                 - Path=/api/users/**
 
+            - id: user-service-auth
+              uri: lb://user-service
+              predicates:
+                - Path=/api/auth/**
+
             - id: user-service-role
               uri: lb://user-service
               predicates:
                 - Path=/api/roles/**
 
-            - id: user-service-role
+            - id: user-service-permission
               uri: lb://user-service
               predicates:
                 - Path=/api/permissions/**
@@ -29,6 +34,9 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+jwt:
+  secret: "21808c7f2c761f078358d8589dff41d75078e8130e1c18c0760c70db29b6ab94"
+  expiration: 3600000
 
 # Springdoc / Swagger UI - API Gateway aggregate OpenAPI từ các microservice
 # Mỗi microservice tự expose /v3/api-docs ở port nội bộ; gateway render danh sách
