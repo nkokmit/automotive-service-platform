@@ -1,5 +1,5 @@
 server:
-  port: 8761
+  port: ${SERVER_PORT:8761}
 spring:
   application:
     name: discovery-server
@@ -7,3 +7,14 @@ eureka:
   client:
     register-with-eureka: false
     fetch-registry: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true

@@ -62,6 +62,8 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Only health is public; other Actuator endpoints stay protected.
+                        .requestMatchers("/actuator/health/**").permitAll()
                         // Swagger
                         .requestMatchers(
                                 "/swagger-ui.html",

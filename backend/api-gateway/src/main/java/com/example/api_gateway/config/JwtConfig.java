@@ -19,7 +19,15 @@ public class JwtConfig {
     @Bean
     public ReactiveJwtDecoder jwtDecoder() {
 
-        byte[] keyBytes = Base64.getDecoder().decode(secret);
+        byte[] keyBytes;
+        try {
+            keyBytes = Base64.getDecoder().decode(secret);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("JWT_SECRET must be valid Base64", ex);
+        }
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException("JWT_SECRET must decode to at least 32 bytes for HS256");
+        }
 
         SecretKeySpec key = new SecretKeySpec(
                 keyBytes,

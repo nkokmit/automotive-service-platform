@@ -5,3 +5,16 @@ build/
 .venv/
 __pycache__/
 *.pyc
+
+# Local secrets - KHÔNG BAO GIỜ commit
+.env
+.env.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Maven build output
+target/
+

@@ -25,8 +25,12 @@ public class SecurityConfig {
                                 "/api/auth/**"
                         ).permitAll()
 
+                        // Only health is public; other Actuator endpoints stay protected.
+                        .pathMatchers("/actuator/health/**").permitAll()
+
                         // Swagger
                         .pathMatchers(
+                                "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/webjars/**"

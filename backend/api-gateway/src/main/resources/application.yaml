@@ -1,5 +1,5 @@
 server:
-  port: 8000
+  port: ${SERVER_PORT:8000}
 
 spring:
   application:
@@ -33,10 +33,25 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    registry-fetch-interval-seconds: ${EUREKA_REGISTRY_FETCH_INTERVAL:10}
+  instance:
+    prefer-ip-address: true
+
 jwt:
-  secret: "21808c7f2c761f078358d8589dff41d75078e8130e1c18c0760c70db29b6ab94"
-  expiration: 3600000
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION_MS:3600000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
 
 # Springdoc / Swagger UI - API Gateway aggregate OpenAPI từ các microservice
 # Mỗi microservice tự expose /v3/api-docs ở port nội bộ; gateway render danh sách

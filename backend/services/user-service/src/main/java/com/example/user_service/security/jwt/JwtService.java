@@ -1,5 +1,6 @@
 package com.example.user_service.security.jwt;
 
+import jakarta.annotation.PostConstruct;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -55,9 +56,24 @@ public class JwtService {
                 .compact();
     }
 
+    private Key signingKey;
+
+    @PostConstruct
+    public void initializeSigningKey() {
+        byte[] keyBytes;
+        try {
+            keyBytes = Base64.getDecoder().decode(secret);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("JWT_SECRET must be valid Base64", ex);
+        }
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException("JWT_SECRET must decode to at least 32 bytes for HS256");
+        }
+        signingKey = Keys.hmacShaKeyFor(keyBytes);
+    }
+
     private Key getSigningKey() {
-        byte[] keyBytes = Base64.getDecoder().decode(secret);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return signingKey;
     }
 
     // Get username to token
