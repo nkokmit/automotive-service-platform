@@ -1,5 +1,390 @@
 openapi: 3.0.3
 info:
-  title: AI API
-  version: 0.1.0
-paths: {}
+  title: AI Services API
+  description: |
+    **SKELETON** — Bản nháp contract do Thành viên 1 (Gateway owner) đề xuất.
+    Thành viên 3 phụ trách 3 microservice AI:
+      - damage-detection-service  (:9001) - nhận diện hư hỏng từ ảnh
+      - recommendation-service    (:9002) - gợi ý sản phẩm/dịch vụ
+      - agent-service             (:9003) - chat AI + tra cứu dịch vụ
+  version: 0.1.0-draft
+  contact:
+    name: Thành viên 3 (owner)
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Qua API Gateway (Recommended)
+tags:
+  - name: Damage Detection
+  - name: Recommendation
+  - name: AI Agent (Chat)
+  - name: Admin
+
+paths:
+  # ===========================================================
+  # DAMAGE DETECTION
+  # ===========================================================
+  /ai/damage/detect:
+    post:
+      tags: [Damage Detection]
+      summary: Upload ảnh xe và nhận diện hư hỏng
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: 'Ảnh xe (JPEG/PNG, max 10MB)'
+                vehicleId:
+                  type: string
+                  description: 'ID xe của user (optional, để lưu lịch sử)'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DamageDetectionResult' }
+        '413':
+          description: Ảnh quá lớn
+        '415':
+          description: Format ảnh không hỗ trợ
+
+  /ai/damage/history:
+    get:
+      tags: [Damage Detection]
+      summary: Lịch sử các lần detect
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DamageDetectionPage' }
+
+  # ===========================================================
+  # RECOMMENDATION
+  # ===========================================================
+  /ai/recommend:
+    post:
+      tags: [Recommendation]
+      summary: Gợi ý dịch vụ / sản phẩm cho user
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecommendRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendResult' }
+    get:
+      tags: [Recommendation]
+      summary: Gợi ý mặc định (dựa trên lịch sử user)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [SERVICE, PART, CAR]
+            default: SERVICE
+        - in: query
+          name: limit
+          schema: { type: integer, default: 5 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendResult' }
+
+  # ===========================================================
+  # AI AGENT (CHAT)
+  # ===========================================================
+  /ai/assistant/message:
+    post:
+      tags: [AI Agent (Chat)]
+      summary: Gửi tin nhắn cho AI Agent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatMessageRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatMessageResponse' }
+
+  /ai/assistant/conversations:
+    get:
+      tags: [AI Agent (Chat)]
+      summary: Danh sách cuộc hội thoại của user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Conversation' }
+
+  /ai/assistant/conversations/{id}:
+    get:
+      tags: [AI Agent (Chat)]
+      summary: Lấy lịch sử 1 cuộc hội thoại
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConversationDetail' }
+    delete:
+      tags: [AI Agent (Chat)]
+      summary: Xoá cuộc hội thoại
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: OK }
+
+  /ai/assistant/booking-suggestion:
+    post:
+      tags: [AI Agent (Chat)]
+      summary: AI gợi ý khung giờ đặt lịch (proxy tới garage-service)
+      security: [{ bearerAuth: [] }]
+      description: |
+        Endpoint này cho phép AI Agent tra cứu dịch vụ + khung giờ trống từ
+        garage-service để tư vấn đặt lịch. Implementation có thể gọi trực tiếp
+        hoặc qua Gateway.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [garageId, serviceId, date]
+              properties:
+                garageId: { type: string }
+                serviceId: { type: string }
+                date: { type: string, format: date }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        slotStart: { type: string, format: date-time }
+                        slotEnd: { type: string, format: date-time }
+                        reason: { type: string, example: 'Ít người đặt, giá rẻ hơn' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    PageParam:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSizeParam:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  schemas:
+    # ----- Damage Detection -----
+    DamageDetectionResult:
+      type: object
+      required: [id, damages, severity]
+      properties:
+        id: { type: string }
+        imageUrl: { type: string, format: uri, description: 'URL ảnh đã upload' }
+        damages:
+          type: array
+          items:
+            type: object
+            properties:
+              part: { type: string, example: 'Cản trước' }
+              damageType: { type: string, example: 'Trầy xước' }
+              severity:
+                type: string
+                enum: [MINOR, MODERATE, SEVERE]
+              confidence: { type: number, format: float, minimum: 0, maximum: 1 }
+              boundingBox:
+                type: object
+                properties:
+                  x: { type: number }
+                  y: { type: number }
+                  width: { type: number }
+                  height: { type: number }
+              estimatedCostVND: { type: integer, nullable: true }
+        overallSeverity:
+          type: string
+          enum: [MINOR, MODERATE, SEVERE]
+        suggestions:
+          type: array
+          items: { type: string }
+          example: ['Nên thay cản trước', 'Kiểm tra đèn pha']
+        recommendedServices:
+          type: array
+          items: { $ref: '#/components/schemas/RecommendedService' }
+        createdAt: { type: string, format: date-time }
+
+    RecommendedService:
+      type: object
+      properties:
+        serviceId: { type: string }
+        serviceName: { type: string }
+        estimatedCostVND: { type: integer }
+        reason: { type: string }
+
+    DamageDetectionPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DamageDetectionResult' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    # ----- Recommendation -----
+    RecommendRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [SERVICE, PART, CAR]
+          default: SERVICE
+        context:
+          type: string
+          description: 'Mô tả ngữ cảnh (vd: "xe bị trầy cản trước")'
+        limit: { type: integer, default: 5, maximum: 20 }
+
+    RecommendResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              refType:
+                type: string
+                enum: [SERVICE, PART, CAR]
+              refId: { type: string }
+              refSlug: { type: string }
+              title: { type: string }
+              subtitle: { type: string, nullable: true }
+              priceVND: { type: integer, nullable: true }
+              imageUrl: { type: string, format: uri, nullable: true }
+              score: { type: number, format: float, minimum: 0, maximum: 1, description: 'Điểm relevance' }
+              reason: { type: string, nullable: true, description: 'Lý do gợi ý' }
+
+    # ----- AI Agent Chat -----
+    ChatMessageRequest:
+      type: object
+      required: [text]
+      properties:
+        conversationId:
+          type: string
+          nullable: true
+          description: 'null = tạo cuộc hội thoại mới'
+        text: { type: string, minLength: 1, maxLength: 4000 }
+
+    ChatMessageResponse:
+      type: object
+      required: [conversationId, reply]
+      properties:
+        conversationId: { type: string }
+        userMessageId: { type: string }
+        assistantMessageId: { type: string }
+        reply: { type: string, description: 'Câu trả lời từ AI' }
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              type: { type: string, enum: [SERVICE, GARAGE, ARTICLE, PART] }
+              refId: { type: string }
+              title: { type: string }
+              url: { type: string, nullable: true }
+          description: 'Các nguồn AI dùng để trả lời'
+        suggestedActions:
+          type: array
+          items:
+            type: object
+            properties:
+              type: { type: string, enum: [BOOK_SERVICE, VIEW_GARAGE, OPEN_ARTICLE] }
+              label: { type: string }
+              payload: { type: object, additionalProperties: true }
+
+    Conversation:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string, description: 'Auto-generated từ tin nhắn đầu tiên' }
+        lastMessageAt: { type: string, format: date-time }
+        messageCount: { type: integer }
+
+    ConversationDetail:
+      allOf:
+        - $ref: '#/components/schemas/Conversation'
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  role:
+                    type: string
+                    enum: [USER, ASSISTANT, SYSTEM]
+                  content: { type: string }
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                  createdAt: { type: string, format: date-time }
+
+    ErrorResponse:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        timestamp: { type: string, format: date-time }
