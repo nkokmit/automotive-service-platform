@@ -1,7 +1,9 @@
 package com.example.user_service.service;
 
+import com.example.user_service.dto.request.RegisterRequest;
 import com.example.user_service.dto.request.UserCreateRequest;
 import com.example.user_service.dto.request.UserUpdateRequest;
+import com.example.user_service.dto.response.AuthenticationResponse;
 import com.example.user_service.dto.response.PageResponse;
 import com.example.user_service.dto.response.UserResponse;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +21,16 @@ public interface UserService {
      * Lấy user theo ID. Trả exception nếu không tồn tại hoặc đã bị xoá.
      */
     UserResponse getUserById(UUID id);
+
+    /**
+     * Lấy thông tin chính user đang đăng nhập.
+     *
+     * <p>Username lấy từ access token ({@code sub}) qua SecurityContext, nên
+     * client không cần — cũng không được — tự truyền id/username lên.
+     *
+     * @throws com.example.user_service.exception.UserNotFoundException nếu user không tồn tại hoặc đã bị xoá
+     */
+    UserResponse getCurrentUser(String username);
 
     /**
      * Tạo user mới.
@@ -46,4 +58,16 @@ public interface UserService {
      * Gỡ một role khỏi user.
      */
     UserResponse removeRole(UUID userId, UUID roleId);
+
+    /**
+     * Đăng ký tài khoản mới từ phía client.
+     *
+     * <p>Role luôn được gán cứng là {@code CUSTOMER} — không nhận từ request để tránh
+     * privilege escalation. Sau khi tạo user, service phát luôn access + refresh token
+     * để client không cần gọi lại {@code /api/auth/login}.
+     *
+     * @throws com.example.user_service.exception.UserAlreadyExistsException nếu username/email đã tồn tại
+     * @throws com.example.user_service.exception.ApiException nếu role CUSTOMER chưa được seed
+     */
+    AuthenticationResponse registerUser(RegisterRequest request);
 }

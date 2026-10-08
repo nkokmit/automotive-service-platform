@@ -1,26 +1,35 @@
 package com.example.user_service.service;
 
+import com.example.user_service.dto.request.RegisterRequest;
 import com.example.user_service.dto.request.UserCreateRequest;
 import com.example.user_service.dto.request.UserUpdateRequest;
+import com.example.user_service.dto.response.AuthenticationResponse;
 import com.example.user_service.dto.response.PageResponse;
 import com.example.user_service.dto.response.UserResponse;
 import com.example.user_service.entity.Role;
 import com.example.user_service.entity.User;
+import com.example.user_service.exception.ApiException;
+import com.example.user_service.exception.ErrorCode;
 import com.example.user_service.exception.RoleNotFoundException;
 import com.example.user_service.exception.UserAlreadyExistsException;
 import com.example.user_service.exception.UserNotFoundException;
 import com.example.user_service.mapper.EntityMapper;
 import com.example.user_service.repository.RoleRepository;
 import com.example.user_service.repository.UserRepository;
+import com.example.user_service.security.jwt.JwtService;
+import com.example.user_service.security.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -37,6 +46,19 @@ public class UserServiceImpl implements UserService {
     private final RoleRepository roleRepository;
     private final EntityMapper entityMapper;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
+
+    /** Role cố định được gán cho mọi tài khoản tự đăng ký. */
+    private static final String DEFAULT_REGISTER_ROLE = "CUSTOMER";
+
+    /**
+     * Role đặc quyền: chỉ {@code ROLE_ADMIN} mới được gán cho user khác.
+     */
+    private static final String PRIVILEGED_ROLE = "ADMIN";
+
+    /** Authority tương ứng với {@link #PRIVILEGED_ROLE}, theo cách User#getAuthorities() dựng. */
+    private static final String ADMIN_AUTHORITY = "ROLE_" + PRIVILEGED_ROLE;
 
     @Override
     @Transactional(readOnly = true)
@@ -50,6 +72,15 @@ public class UserServiceImpl implements UserService {
     public UserResponse getUserById(UUID id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng với id: " + id));
+        return entityMapper.toUserResponse(user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getCurrentUser(String username) {
+        // findByUsername chịu @SQLRestriction nên user đã soft delete không lấy được.
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng với username: " + username));
         return entityMapper.toUserResponse(user);
     }
 
@@ -144,7 +175,43 @@ public class UserServiceImpl implements UserService {
         return entityMapper.toUserResponse(saved);
     }
 
+    @Override
+    public AuthenticationResponse registerUser(RegisterRequest request) {
+        validateUniqueUsernameAndEmail(request.username(), request.email(), null);
+
+        // Role gán cứng server-side: endpoint public, không tin role do client gửi lên.
+        Role defaultRole = roleRepository.findByName(DEFAULT_REGISTER_ROLE)
+                .orElseThrow(() -> new RoleNotFoundException(
+                        "Không tìm thấy role mặc định: " + DEFAULT_REGISTER_ROLE));
+
+        User user = User.builder()
+                .username(request.username())
+                .password(passwordEncoder.encode(request.password()))
+                .email(request.email())
+                .fullName(request.fullName())
+                .isActive(Boolean.TRUE)
+                .roles(Set.of(defaultRole))
+                .build();
+
+        User saved = userRepository.save(user);
+        log.info("Đã đăng ký user mới: {}", saved.getUsername());
+
+        return issueTokens(saved);
+    }
+
     // ===== Helpers =====
+
+    /**
+     * Phát access + refresh token cho user vừa xác thực (dùng chung cho login và register).
+     */
+    private AuthenticationResponse issueTokens(User user) {
+        String accessToken = jwtService.generateToken(user);
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId());
+        return AuthenticationResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .build();
+    }
 
     private void validateUniqueUsernameAndEmail(String username, String email, UUID excludeUserId) {
         if (username != null) {
@@ -179,7 +246,47 @@ public class UserServiceImpl implements UserService {
             List<UUID> missing = roleIds.stream().filter(rid -> !foundIds.contains(rid)).toList();
             throw new RoleNotFoundException("Không tìm thấy role id: " + missing);
         }
+        guardAgainstRoleEscalation(roles);
         return new HashSet<>(roles);
+    }
+
+    /**
+     * Chặn privilege escalation: chỉ {@code ROLE_ADMIN} mới được gán role đặc quyền.
+     *
+     * <p>{@code USER_CREATE} / {@code USER_UPDATE} đủ để tạo và sửa user thường, nhưng
+     * nếu caller gửi kèm {@code roleIds} chứa {@code ADMIN} thì sẽ tự nâng mình lên
+     * quản trị viên và từ đó mở khoá toàn bộ API. Vì vậy role ngoài danh sách
+     * {@link #PRIVILEGED_ROLE} phải có {@code ROLE_ADMIN} thì mới được gán.
+     *
+     * <p>Áp dụng chung trong {@link #resolveRoles(Set)} nên có hiệu lực cho cả
+     * {@code createUser}, {@code updateUser} và {@code assignRoles}.
+     *
+     * @param roles các role sắp được gán cho user đích
+     */
+    private void guardAgainstRoleEscalation(Collection<Role> roles) {
+        boolean hasAdminRole = roles.stream()
+                .anyMatch(role -> PRIVILEGED_ROLE.equals(role.getName()));
+        if (hasAdminRole && !currentUserIsAdmin()) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED,
+                    "Không có quyền gán role " + PRIVILEGED_ROLE);
+        }
+    }
+
+    /**
+     * Caller hiện tại có {@code ROLE_ADMIN} không.
+     *
+     * <p>Đọc từ SecurityContext do {@code JwtAuthenticationFilter} dựng. Trả về
+     * {@code false} thay vì ném lỗi khi SecurityContext rỗng — {@code @PreAuthorize}
+     * đã chặn request chưa đăng nhập trước khi tới đây, nên rỗng là bất thường và
+     * coi như không có quyền là an toàn hơn.
+     */
+    private boolean currentUserIsAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> ADMIN_AUTHORITY.equals(authority.getAuthority()));
     }
 }
 

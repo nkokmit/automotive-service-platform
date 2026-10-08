@@ -1,5 +1,6 @@
 package com.example.user_service.security;
 
+import com.example.user_service.exception.CustomAccessDeniedHandler;
 import com.example.user_service.exception.CustomAuthenticationEntryPoint;
 import com.example.user_service.security.custom.CustomUserDetailsService;
 import com.example.user_service.security.jwt.JwtAuthenticationFilter;
@@ -32,6 +33,9 @@ public class SecurityConfig {
 
     @Autowired
     private CustomAuthenticationEntryPoint authenticationEntryPoint;
+
+    @Autowired
+    private CustomAccessDeniedHandler accessDeniedHandler;
 
     @Bean
     public PasswordEncoder passwordEncoder(){
@@ -76,7 +80,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
 
