@@ -10,7 +10,13 @@ Gateway, Eureka và MySQL.
 | `api-gateway`       | Entry point, routing, xác thực JWT      | 8000        |
 | `discovery-server`  | Service registry (Eureka)             | 8761        |
 | `user-service`      | User / role / permission, đăng nhập    | 8081        |
-| `mysql`             | MySQL cho `user-service`               | 3306        |
+| `mysql`             | MySQL cho các microservice             | 3306        |
+| `customer-vehicle-service` | Customer / vehicle / lịch sử bảo dưỡng | 8082   |
+
+`customer-vehicle-service` mới ở mức khung cấu hình: đã có POM, `application.yaml`,
+các lớp hạ tầng dùng chung (`common`, `exception`, `config`, `security`) và đăng ký
+Eureka, nhưng **chưa** có migration, entity, repository hay controller - nên mọi
+endpoint `/api/customers/**`, `/api/vehicles/**`, `/api/service-history/**` chưa tồn tại.
 
 Các service còn lại trong `backend/automotive-ai-context/ARCHITECTURE.md` chưa được
 cài đặt trong Compose.
@@ -28,7 +34,7 @@ Mở `.env` và điền 3 giá trị bắt buộc:
 - `MYSQL_ROOT_PASSWORD`
 - `MYSQL_PASSWORD`
 - `JWT_SECRET` — chuỗi Base64 hợp lệ, giải mã ra **tối thiểu 32 byte**
-  (dùng chung cho `api-gateway` và `user-service`)
+  (dùng chung cho `api-gateway`, `user-service` và `customer-vehicle-service`)
 
 Sinh `JWT_SECRET`:
 
@@ -48,11 +54,25 @@ chạy với secret mặc định yếu.
 docker compose up --build
 ```
 
+MySQL tự tạo database `user_service` (qua `MYSQL_DATABASE`) và tạo database
+`customer_vehicle_service` kèm quyền cho `MYSQL_USER` qua script init. Có thể
+đổi database thứ hai bằng `CUSTOMER_VEHICLE_MYSQL_DATABASE` trong `.env`.
+
+**Volume đã tồn tại:** script init chỉ chạy khi volume còn trống. Không cần xóa
+volume để bổ sung database; chạy script một lần trên MySQL đang hoạt động:
+
+```bash
+docker compose exec mysql bash /docker-entrypoint-initdb.d/01-create-databases.sh
+```
+
+Không dùng `docker compose down -v` nếu cần giữ dữ liệu hiện có.
+
 Thứ tự khởi động được điều khiển bằng healthcheck:
 
 ``` text
 mysql (healthy)          ─┐
 discovery-server (healthy) ─┼─> user-service (healthy) ─> api-gateway
+                           └─> customer-vehicle-service (healthy) ─┘
 ```
 
 ### 3. Địa chỉ
@@ -64,7 +84,9 @@ discovery-server (healthy) ─┼─> user-service (healthy) ─> api-gateway
 | OpenAPI user-service  | http://localhost:8000/v3/api-docs/user-service   |
 | Eureka dashboard      | http://localhost:8761                            |
 | User service (nội bộ) | http://localhost:8081                            |
-| MySQL                 | localhost:3306 (db `user_service`)               |
+| Customer vehicle svc   | http://localhost:8082                            |
+| OpenAPI customer vehicle | http://localhost:8000/v3/api-docs/customer-vehicle-service |
+| MySQL                 | localhost:3306 (db `user_service`, `customer_vehicle_service`) |
 
 ### 4. Đăng nhập thử
 
@@ -108,7 +130,8 @@ Chỉ `health` được expose; `readiness` dùng cho healthcheck của Docker:
 /actuator/health/readiness
 ```
 
-Trong `api-gateway` và `user-service`, chỉ `/actuator/health/**` được permit —
+Trong `api-gateway`, `user-service` và `customer-vehicle-service`, chỉ
+`/actuator/health/**` được permit —
 các Actuator endpoint khác vẫn yêu cầu xác thực.
 
 Lưu ý: `readiness` phản ánh trạng thái ứng dụng, **không** tự chứng minh kết nối
@@ -127,10 +150,21 @@ JWT_SECRET=<JWT_SECRET>
 EUREKA_SERVER_URL=http://localhost:8761/eureka/
 ```
 
+Cho `customer-vehicle-service`, thay `DB_URL` bằng database của service:
+
+``` text
+DB_URL=jdbc:mysql://localhost:3306/customer_vehicle_service
+```
+
 Ngoài ra:
 
 - `user-service` **không** được khởi động nếu chưa có `JWT_SECRET`, `DB_USERNAME`,
-  `DB_PASSWORD` — ứng dụng sẽ fail fast.
+  `DB_PASSWORD` — ứng dụng sẽ fail fast. `customer-vehicle-service` yêu cầu
+  tương tự.
+- `customer-vehicle-service` chưa có entity hoặc migration nghiệp vụ. Khung cấu
+  hình có thể khởi động khi database, quyền truy cập và các biến bắt buộc đã sẵn
+  sàng; Hibernate chưa có bảng entity nào để validate. Khi bổ sung entity, cần
+  migration `V1` tương ứng trước khi khởi động với `ddl-auto: validate`.
 - Test `contextLoads` cần MySQL sẵn sàng; chạy MySQL qua
   `docker compose up mysql` rồi mới chạy test.
 - Warm-up: sau khi `user-service` healthy, gateway cần vài giây để registry đồng bộ.
@@ -142,8 +176,11 @@ backend/
 ├── Dockerfile              # Multi-stage, dùng chung, chọn module bằng ARG MODULE_PATH
 ├── discovery-server/
 ├── api-gateway/
+├── infra/
+│   └── mysql/init/         # Script entrypoint MySQL, chỉ chạy khi volume trống
 ├── services/
-│   └── user-service/
+│   ├── user-service/
+│   └── customer-vehicle-service/
 └── automotive-ai-context/  # Quy ước kiến trúc (GLOBAL_RULES, ARCHITECTURE)
 ```
 
@@ -165,7 +202,8 @@ docker compose down -v
 ## Lưu ý vận hành
 
 - Đổi `JWT_SECRET` sẽ làm mất hiệu lực các token đang chạy.
-- Actuator đã được giới hạn, nhưng `/swagger-ui.html` vẫn được permit ở gateway
-  và user-service để phục vụ tài liệu API.
-- `user-service` được expose ở host port chỉ để phục vụ dev/debug; gateway là
-  entry point theo kiến trúc.
+- Actuator đã được giới hạn, nhưng `/swagger-ui.html` vẫn được permit ở gateway,
+  user-service và customer-vehicle-service để phục vụ tài liệu API.
+- `user-service` và `customer-vehicle-service` được expose ở host port chỉ để phục
+  vụ dev/debug; gateway là entry point theo kiến trúc. Không expose port các
+  microservice ra ngoài trong production.

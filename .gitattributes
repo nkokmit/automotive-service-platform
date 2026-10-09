@@ -1,0 +1,6 @@
+# Shell scripts chạy trong container Linux (vd entrypoint MySQL) nên bắt buộc LF,
+# nếu không bash sẽ báo "$'\r': command not found" khi parse shebang.
+*.sh text eol=lf
+
+# Script tương thích Windows cần CRLF.
+*.cmd text eol=crlf

@@ -30,6 +30,21 @@ spring:
               predicates:
                 - Path=/api/permissions/**
 
+            - id: customer-vehicle-service-customers
+              uri: lb://customer-vehicle-service
+              predicates:
+                - Path=/api/customers/**
+
+            - id: customer-vehicle-service-vehicles
+              uri: lb://customer-vehicle-service
+              predicates:
+                - Path=/api/vehicles/**
+
+            - id: customer-vehicle-service-service-history
+              uri: lb://customer-vehicle-service
+              predicates:
+                - Path=/api/service-history/**
+
 eureka:
   client:
     service-url:
