@@ -212,6 +212,33 @@ transaction. Các truy vấn thông thường không trả khách hàng đã xó
 
 ### Bước 4 --- Vehicle API
 
+**Trạng thái (2026-10-13): đã triển khai; chờ xác minh đầy đủ với MySQL.**
+Chưa đánh dấu hoàn tất vì test application context chưa chạy thành công.
+
+- Đã thêm Vehicle DTO, MapStruct mapper, service, controller và exception.
+  CRUD dùng `/api/vehicles`; PUT cập nhật một phần và chuyển chủ qua `customerId`.
+- Tạo/chuyển xe chỉ nhận khách hàng tồn tại và đang hoạt động. VIN được kiểm tra
+  cả xe đã xóa mềm theo UNIQUE hiện có; biển số không bị áp dụng unique.
+- Search phân trang lọc `customerId`, biển số chính xác, keyword (biển số/VIN/
+  hãng/dòng xe) và `isActive`; chuẩn hóa biển số/VIN thành chữ hoa.
+- Validation: VIN tùy chọn đúng 17 ký tự không chứa khoảng trắng, năm 1900–2100,
+  số km không âm; field null trong update giữ nguyên. DELETE là soft delete
+  idempotent, giữ lịch sử; response chỉ trả `customerId`, không trả `deletedAt`.
+- Theo quyết định người dùng: dùng `VEHICLE_READ/CREATE/UPDATE/DELETE`;
+  **không seed permission và không sửa service khác**. JWT thiếu authority
+  tương ứng vẫn nhận 403; seed CUSTOMER/VEHICLE là phần ngoài phạm vi này.
+- Đã thêm 62 test cho service, DTO validation, mapper, HTTP contract và method
+  security; tất cả đã pass. IntelliJ không báo lỗi ở các file đã kiểm tra.
+- Chạy tại `E:/DoAn/automotive-service-platform/backend/services/customer-vehicle-service`:
+  - `.\mvnw.cmd test`: 88 test, 87 pass, 1 error ở test hiện có
+    `CustomerVehicleServiceApplicationTests.contextLoads` do MySQL connection
+    refused (`Communications link failure`). Không sửa/xóa test để che lỗi.
+  - `.\mvnw.cmd "-Dtest=!CustomerVehicleServiceApplicationTests" package`:
+    87 test pass, BUILD SUCCESS; chỉ loại test phụ thuộc DB trong lần chạy này.
+- Còn chờ: dựng MySQL theo quy trình hiện có, cung cấp env bắt buộc và chạy lại
+  toàn bộ test; xác minh Flyway/Hibernate và repository queries trên DB thật.
+  Không có thay đổi migration, gateway, SecurityConfig hoặc Kafka trong bước này.
+
 Triển khai: - Tạo xe cho khách hàng tồn tại và đang hoạt động. - Lấy chi
 tiết xe. - Danh sách/tìm kiếm xe, lọc theo khách hàng hoặc biển số và
 phân trang. - Cập nhật thông tin xe. - Đổi chủ hiện tại bằng cách cập

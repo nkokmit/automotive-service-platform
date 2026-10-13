@@ -25,6 +25,7 @@ public enum ErrorCode {
     CUSTOMER_PHONE_EXISTS(2004, "Số điện thoại khách hàng đã tồn tại"),
     CUSTOMER_USER_ID_EXISTS(2005, "Tài khoản đã liên kết với khách hàng khác"),
     CUSTOMER_HAS_ACTIVE_VEHICLES(2006, "Khách hàng còn xe đang hoạt động"),
+    CUSTOMER_INACTIVE(2007, "Khách hàng không còn hoạt động"),
 
     // Vehicle (21xx)
     VEHICLE_NOT_FOUND(2101, "Không tìm thấy xe"),
@@ -34,6 +35,7 @@ public enum ErrorCode {
 
     // ServiceHistory (22xx)
     SERVICE_HISTORY_NOT_FOUND(2201, "Không tìm thấy lịch sử bảo dưỡng"),
+    SERVICE_HISTORY_INVALID_TYPE(2202, "Loại bản ghi lịch sử bảo dưỡng không hợp lệ"),
 
     // Authentication & Authorization (14xx)
     UNAUTHENTICATED(1401, "Chưa đăng nhập hoặc token không hợp lệ"),
