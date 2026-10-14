@@ -279,6 +279,34 @@ chờ tích hợp.
 -   Cấu hình Swagger theo convention của dự án; chỉ thay đổi Gateway khi
     được yêu cầu hoặc thực sự cần thiết.
 
+**Trạng thái (2026-10-14): đã thêm tự phục vụ cho CUSTOMER.**
+
+Quyết định thiết kế: chặn ở tầng `@PreAuthorize` chứ không lọc theo chủ xe
+ở mọi đường đọc. CUSTOMER không được cấp `CUSTOMER_READ`/`VEHICLE_READ` nên
+GET danh sách và GET chi tiết đã chặn sẵn, không cần thêm điều kiện theo
+role.
+
+-   `GET /api/customers/me` và `GET /api/vehicles/me` (`isAuthenticated()`).
+    Không nhận tham số lọc vì bộ lọc toàn hệ thống thuộc về endpoint nhân viên.
+-   `CurrentCustomerService` ánh xạ claim `userId` sang hồ sơ khách hàng.
+    Thiếu claim, claim sai định dạng, không có hồ sơ hoặc hồ sơ đã xoá mềm →
+    403, không bao giờ trả dữ liệu.
+-   `ServiceHistoryServiceImpl.getServiceHistory` kiểm tra chủ xe: khách
+    hàng khác nhận `VehicleNotFoundException` (404) chứ không phải 403 để không
+    lộ ra id nào tồn tại. Chỉ đọc `vehicle.getCustomer().getId()` vì
+    `open-in-view` đang tắt.
+-   `user-service` thêm claim `userId` vào access token (UUID dạng String) và
+    migration `V6__grant_customer_self_service_reads.sql` cấp đúng
+    `SERVICE_HISTORY_READ` cho CUSTOMER. Token cũ không có claim nên bị từ
+    chối cho tới khi hết hạn — chấp nhận được.
+-   Gateway không cần đổi: route `/api/customers/**` và `/api/vehicles/**`
+    đã bao phủ `/me`.
+-   Đã thêm 10 test (thiếu claim, claim sai, `/me` chỉ trả dữ liệu của chính
+    mình, lịch sử xe người khác trả 404, nhân viên không bị lọc).
+    `.\mvnw.cmd test`: 134 test, 133 pass; 1 error vẫn là
+    `CustomerVehicleServiceApplicationTests.contextLoads` do MySQL connection
+    refused, có sẵn từ trước và không liên quan.
+
 ### Bước 8 --- Kiểm thử và bàn giao
 
 Kiểm thử tối thiểu: - Tạo/cập nhật/tìm khách hàng; `user_id` trùng;

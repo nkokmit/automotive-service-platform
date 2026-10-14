@@ -6,6 +6,7 @@ import com.example.customer_vehicle_service.dto.request.CustomerUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.service.CustomerService;
+import com.example.customer_vehicle_service.service.CurrentCustomerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -36,7 +37,28 @@ import java.util.UUID;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final CurrentCustomerService currentCustomerService;
 
+    /**
+     * Hồ sơ của chính người đang đăng nhập.
+     *
+     * <p>Endpoint tự phục vụ, không nhận id: caller chỉ xem được hồ sơ của mình
+     * nên không có tham số để đổi sang hồ sơ người khác. Chỉ yêu cầu đã đăng
+     * nhập — nhân viên gọi được và trả về hồ sơ đã liên kết với tài khoản của
+     * họ (nếu có), còn không có thì trả 403.
+     */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<CustomerResponse> getCurrentCustomer() {
+        return ApiResponse.success(customerService.getCustomerById(currentCustomerService.getRequiredCustomerId()));
+    }
+
+    /**
+     * <p>Danh sách vận hành của gara, trả về mọi khách hàng trong hệ thống.
+     * CUSTOMER không được cấp quyền này (xem V5 của user-service) nên điều kiện
+     * {@code hasAuthority} là đủ để chặn. Khách hàng dùng
+     * {@code GET /api/customers/me} để lấy hồ sơ của chính mình.
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('CUSTOMER_READ')")
     public ApiResponse<PageResponse<CustomerResponse>> getCustomers(
@@ -52,6 +74,10 @@ public class CustomerController {
         return ApiResponse.success(customerService.getCustomers(keyword, isActive, pageable));
     }
 
+    /**
+     * Chi tiết một khách hàng bất kỳ. CUSTOMER không được cấp quyền
+     * {@code CUSTOMER_READ} nên bị chặn, dùng {@code /me} để xem hồ sơ của mình.
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('CUSTOMER_READ')")
     public ApiResponse<CustomerResponse> getCustomerById(@PathVariable UUID id) {

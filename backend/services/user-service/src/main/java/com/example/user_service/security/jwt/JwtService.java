@@ -1,5 +1,6 @@
 package com.example.user_service.security.jwt;
 
+import com.example.user_service.entity.User;
 import jakarta.annotation.PostConstruct;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -38,6 +39,17 @@ public class JwtService {
                         .map(GrantedAuthority::getAuthority)
                         .toList()
         );
+
+        // userId: cầu nối danh tính sang customer-vehicle-service.
+        // JWT chỉ mang `sub` (username) trong khi customers.user_id là UUID của
+        // user-service, nên service kia không tự suy ra được hồ sơ khách hàng từ
+        // token. Claim này thay cho một lời gọi Feign mỗi request.
+        //
+        // Cố ý bỏ qua khi principal không phải User (ví dụ test dùng
+        // UserDetails khác) thay vì ép kiểu không an toàn.
+        if (userDetails instanceof User user && user.getId() != null) {
+            claims.put("userId", user.getId().toString());
+        }
 
         return createToken(
                 claims,

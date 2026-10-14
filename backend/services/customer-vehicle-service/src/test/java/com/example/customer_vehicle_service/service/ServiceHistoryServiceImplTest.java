@@ -11,6 +11,7 @@ import com.example.customer_vehicle_service.exception.VehicleNotFoundException;
 import com.example.customer_vehicle_service.mapper.ServiceHistoryMapper;
 import com.example.customer_vehicle_service.repository.VehicleRepository;
 import com.example.customer_vehicle_service.repository.VehicleServiceHistoryRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -20,12 +21,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,11 +47,19 @@ class ServiceHistoryServiceImplTest {
     private VehicleRepository vehicleRepository;
     @Mock
     private ServiceHistoryMapper historyMapper;
+    @Mock
+    private CurrentCustomerService currentCustomerService;
     @InjectMocks
     private ServiceHistoryServiceImpl serviceHistoryService;
 
     private static final UUID VEHICLE_ID = UUID.randomUUID();
+    private static final UUID OWNER_ID = UUID.randomUUID();
     private static final Instant SERVICE_DATE = Instant.parse("2026-01-15T08:30:00Z");
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
 
     // ===== Đọc lịch sử =====
 
@@ -153,7 +164,83 @@ class ServiceHistoryServiceImplTest {
         verifyNoInteractions(historyRepository);
     }
 
+    // ===== Lọc theo chủ xe =====
+
+    @Test
+    void getServiceHistory_customerReadsOwnVehicleHistory() {
+        authenticateAsCustomer();
+        var pageable = PageRequest.of(0, 20);
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicleOwnedBy(OWNER_ID)));
+        given(currentCustomerService.getRequiredCustomerId()).willReturn(OWNER_ID);
+        given(historyRepository.findByVehicleId(VEHICLE_ID, pageable))
+                .willReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        serviceHistoryService.getServiceHistory(VEHICLE_ID, pageable);
+
+        verify(historyRepository).findByVehicleId(VEHICLE_ID, pageable);
+    }
+
+    /**
+     * Xe của người khác phải trả 404 chứ không phải 403: trả 403 cho id có thật
+     * sẽ biến API thành công cụ dò xem id nào tồn tại.
+     */
+    @Test
+    void getServiceHistory_hidesForeignVehicleAsNotFound() {
+        authenticateAsCustomer();
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicleOwnedBy(UUID.randomUUID())));
+        given(currentCustomerService.getRequiredCustomerId()).willReturn(OWNER_ID);
+
+        assertThatThrownBy(() -> serviceHistoryService.getServiceHistory(VEHICLE_ID, PageRequest.of(0, 20)))
+                .isInstanceOf(VehicleNotFoundException.class);
+
+        verify(historyRepository, never()).findByVehicleId(any(), any());
+    }
+
+    @Test
+    void getServiceHistory_staffBypassesOwnershipCheck() {
+        authenticateAs("VEHICLE_READ");
+        var pageable = PageRequest.of(0, 20);
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicleOwnedBy(UUID.randomUUID())));
+        given(historyRepository.findByVehicleId(VEHICLE_ID, pageable))
+                .willReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        serviceHistoryService.getServiceHistory(VEHICLE_ID, pageable);
+
+        verify(historyRepository).findByVehicleId(VEHICLE_ID, pageable);
+        // Nhân viên không cần resolve hồ sơ khách hàng của chính mình.
+        verifyNoInteractions(currentCustomerService);
+    }
+
+    /** Không có authentication (vd. gọi nội bộ) thì không ai bị coi là khách hàng. */
+    @Test
+    void getServiceHistory_withoutAuthenticationSkipsOwnershipCheck() {
+        var pageable = PageRequest.of(0, 20);
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicleOwnedBy(UUID.randomUUID())));
+        given(historyRepository.findByVehicleId(VEHICLE_ID, pageable))
+                .willReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        serviceHistoryService.getServiceHistory(VEHICLE_ID, pageable);
+
+        verifyNoInteractions(currentCustomerService);
+    }
+
     // ===== Helpers =====
+
+    private void authenticateAsCustomer() {
+        authenticateAs("ROLE_CUSTOMER");
+    }
+
+    private void authenticateAs(String authority) {
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated("tester", null,
+                        List.of(new SimpleGrantedAuthority(authority))));
+    }
+
+    private Vehicle vehicleOwnedBy(UUID customerId) {
+        return Vehicle.builder().id(VEHICLE_ID)
+                .customer(Customer.builder().id(customerId).build())
+                .licensePlate("30A-12345").make("Honda").model("Accord").build();
+    }
 
     private Vehicle vehicle() {
         return Vehicle.builder().id(VEHICLE_ID)

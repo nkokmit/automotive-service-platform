@@ -92,5 +92,26 @@ The eight seeded permissions are currently granted to `ADMIN` only.
 Other roles (`MANAGER`, `MECHANIC`, `CUSTOMER`) therefore have no
 endpoint access beyond their own profile via `GET /api/users/me`.
 
+`V5__seed_customer_vehicle_permissions.sql` adds the ten
+customer-vehicle-service permissions for `ADMIN` (all ten), `MANAGER` and
+`MECHANIC` (vehicle and service-history ones), and deliberately grants
+`CUSTOMER` nothing.
+
+`V6__grant_customer_self_service_reads.sql` grants `CUSTOMER` exactly one
+of them: `SERVICE_HISTORY_READ`. That is enough for the customer
+self-service endpoints in customer-vehicle-service, which filter by owner.
+`CUSTOMER_READ` and `VEHICLE_READ` stay ungranted on purpose — they expose
+garage-wide listings.
+
 Granting more permissions is a schema/data decision: add a new Flyway
 migration. Do not edit `V4__seed_data.sql`.
+
+## Access token claims
+
+`JwtService.generateToken` writes `authorities` plus a `userId` claim
+holding the account UUID as a string. `customer-vehicle-service` needs it
+because `customers.user_id` stores a UUID while the token `sub` is a
+username; without the claim that service cannot tell whose records it is
+serving. The claim is omitted when the principal is not a `User` with an
+id. Tokens issued before this change lack the claim and are rejected by
+the consumer, so they must be allowed to expire.

@@ -1,5 +1,6 @@
 package com.example.customer_vehicle_service.controller;
 
+import com.example.customer_vehicle_service.service.CurrentCustomerService;
 import com.example.customer_vehicle_service.service.VehicleService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +10,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,6 +24,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -34,11 +40,14 @@ class VehicleControllerSecurityTest {
     private VehicleController controller;
     @Autowired
     private VehicleService service;
+    @Autowired
+    private CurrentCustomerService currentCustomerService;
     private static final UUID ID = UUID.randomUUID();
+    private static final UUID CUSTOMER_ID = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        reset(service);
+        reset(service, currentCustomerService);
         SecurityContextHolder.clearContext();
     }
 
@@ -89,6 +98,29 @@ class VehicleControllerSecurityTest {
         verifyNoInteractions(service);
     }
 
+    /**
+     * {@code /me} chỉ yêu cầu đã đăng nhập nên CUSTOMER gọi được, và danh sách
+     * được giới hạn theo customerId của chính họ chứ không nhận tham số lọc.
+     */
+    @Test
+    void permitsAuthenticatedCustomerToListOwnVehicles() {
+        authenticate("ROLE_CUSTOMER");
+        given(currentCustomerService.getRequiredCustomerId()).willReturn(CUSTOMER_ID);
+
+        controller.getCurrentCustomerVehicles(0, 20, "createdAt", "DESC");
+
+        verify(currentCustomerService).getRequiredCustomerId();
+        verify(service).getVehicles(eq(CUSTOMER_ID), isNull(), isNull(), isNull(),
+                eq(PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"))));
+    }
+
+    @Test
+    void rejectsMissingAuthenticationOnOwnVehicles() {
+        assertThatThrownBy(() -> controller.getCurrentCustomerVehicles(0, 20, "createdAt", "DESC"))
+                .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
+        verifyNoInteractions(service, currentCustomerService);
+    }
+
     private void authenticate(String authority) {
         SecurityContextHolder.getContext().setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated("tester", null,
@@ -115,8 +147,14 @@ class VehicleControllerSecurityTest {
         }
 
         @Bean
-        VehicleController vehicleController(VehicleService service) {
-            return new VehicleController(service);
+        CurrentCustomerService currentCustomerService() {
+            return mock(CurrentCustomerService.class);
+        }
+
+        @Bean
+        VehicleController vehicleController(VehicleService service,
+                                           CurrentCustomerService currentCustomerService) {
+            return new VehicleController(service, currentCustomerService);
         }
     }
 }

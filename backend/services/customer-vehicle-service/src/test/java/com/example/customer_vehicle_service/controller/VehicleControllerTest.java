@@ -6,6 +6,7 @@ import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
 import com.example.customer_vehicle_service.exception.GlobalExceptionHandler;
 import com.example.customer_vehicle_service.exception.VehicleNotFoundException;
+import com.example.customer_vehicle_service.service.CurrentCustomerService;
 import com.example.customer_vehicle_service.service.VehicleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,13 +40,15 @@ class VehicleControllerTest {
 
     @Mock
     private VehicleService vehicleService;
+    @Mock
+    private CurrentCustomerService currentCustomerService;
     private MockMvc mvc;
     private static final UUID ID = UUID.randomUUID();
     private static final UUID OWNER_ID = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new VehicleController(vehicleService))
+        mvc = MockMvcBuilders.standaloneSetup(new VehicleController(vehicleService, currentCustomerService))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 

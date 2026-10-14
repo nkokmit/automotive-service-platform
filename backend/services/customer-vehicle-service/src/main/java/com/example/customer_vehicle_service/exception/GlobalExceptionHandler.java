@@ -62,6 +62,28 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ErrorCode.INVALID_REQUEST, ex.getMessage()));
     }
 
+    /**
+     * Caller đã đăng nhập nhưng chưa có hồ sơ khách hàng để ánh xạ.
+     *
+     * <p>Handler riêng phải đứng trước {@link #handleAccessDenied} về độ đặc
+     * biệt của kiểu: Spring chọn handler khớp nhất, nên khai báo cả hai không
+     * gây xung đột. Giữ status 403 như handler kia — xem javadoc của
+     * {@link CustomerProfileUnresolvedException} về lý do không đổi sang 404.
+     *
+     * <p>Khác biệt duy nhất là message: handler chung cố tình bỏ qua
+     * {@code ex.getMessage()} vì message mặc định của {@code @PreAuthorize} là
+     * chi tiết nội bộ về cấu hình quyền. Ở đây message là thông điệp dành cho
+     * người dùng và nói đúng việc họ cần làm.
+     */
+    @ExceptionHandler(CustomerProfileUnresolvedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnresolvedCustomerProfile(
+            CustomerProfileUnresolvedException ex) {
+        log.warn("Customer profile unresolved: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ex.getMessage()));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
         log.warn("Access denied: {}", ex.getMessage());

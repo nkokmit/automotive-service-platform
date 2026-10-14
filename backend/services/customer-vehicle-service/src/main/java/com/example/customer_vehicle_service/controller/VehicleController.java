@@ -5,6 +5,7 @@ import com.example.customer_vehicle_service.dto.request.VehicleCreateRequest;
 import com.example.customer_vehicle_service.dto.request.VehicleUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
+import com.example.customer_vehicle_service.service.CurrentCustomerService;
 import com.example.customer_vehicle_service.service.VehicleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,11 +40,37 @@ import java.util.UUID;
 public class VehicleController {
 
     private final VehicleService vehicleService;
+    private final CurrentCustomerService currentCustomerService;
+
+    /**
+     * Danh sách xe của chính người đang đăng nhập.
+     *
+     * <p>Cố ý không nhận tham số lọc: bộ lọc {@code customerId}/{@code keyword}/
+     * {@code licensePlate} thuộc về danh sách vận hành của gara, còn đây là
+     * danh sách xe của riêng caller. Chỉ phân trang và sắp xếp để giữ cùng hợp
+     * đồng phân trang với {@link #getVehicles}.
+     */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<PageResponse<VehicleResponse>> getCurrentCustomerVehicles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection
+    ) {
+        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
+        Pageable pageable = PageRequest.of(page, size, sort);
+        UUID customerId = currentCustomerService.getRequiredCustomerId();
+        return ApiResponse.success(vehicleService.getVehicles(customerId, null, null, null, pageable));
+    }
 
     /**
      * @param customerId   lọc theo chủ sở hữu hiện tại
      * @param licensePlate lọc theo biển số (không phân biệt hoa thường)
      * @param keyword      tìm chuỗi con trong biển số / VIN / hãng / dòng xe
+     *
+     * <p>CUSTOMER không được cấp {@code VEHICLE_READ} nên bị chặn, dùng
+     * {@code /me} để xem xe của mình.
      */
     @GetMapping
     @PreAuthorize("hasAuthority('VEHICLE_READ')")
