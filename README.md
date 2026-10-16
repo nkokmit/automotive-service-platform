@@ -5,18 +5,15 @@ Gateway, Eureka và MySQL.
 
 ## Thành phần trong phạm vi hiện tại
 
-| Service             | Vai trò                                | Port (host) |
-| ------------------- | -------------------------------------- | ----------- |
-| `api-gateway`       | Entry point, routing, xác thực JWT      | 8000        |
-| `discovery-server`  | Service registry (Eureka)             | 8761        |
-| `user-service`      | User / role / permission, đăng nhập    | 8081        |
-| `mysql`             | MySQL cho các microservice             | 3306        |
-| `customer-vehicle-service` | Customer / vehicle / lịch sử bảo dưỡng | 8082   |
+| Service                    | Vai trò                          | Port (host) |
+|----------------------------|----------------------------------|-------------|
+| `api-gateway`              | Entry point, routing, xác thực JWT | 8000        |
+| `discovery-server`         | Service registry (Eureka)        | 8761        |
+| `user-service`             | User / role / permission, đăng nhập | 8081        |
+| `mysql`                    | MySQL cho các microservice       | 3306        |
+| `customer-vehicle-service` | Customer / vehicle / lịch sử bảo dưỡng | 8082        |
+| `kafka`                    | Kafka                            | 9092        |
 
-`customer-vehicle-service` mới ở mức khung cấu hình: đã có POM, `application.yaml`,
-các lớp hạ tầng dùng chung (`common`, `exception`, `config`, `security`) và đăng ký
-Eureka, nhưng **chưa** có migration, entity, repository hay controller - nên mọi
-endpoint `/api/customers/**`, `/api/vehicles/**`, `/api/service-history/**` chưa tồn tại.
 
 Các service còn lại trong `backend/automotive-ai-context/ARCHITECTURE.md` chưa được
 cài đặt trong Compose.
@@ -70,9 +67,10 @@ Không dùng `docker compose down -v` nếu cần giữ dữ liệu hiện có.
 Thứ tự khởi động được điều khiển bằng healthcheck:
 
 ``` text
-mysql (healthy)          ─┐
-discovery-server (healthy) ─┼─> user-service (healthy) ─> api-gateway
-                           └─> customer-vehicle-service (healthy) ─┘
+mysql (healthy)               ─┐
+kafka (healthy)               ─┼─┐
+discovery-server (healthy) ────┼─┴─> user-service (healthy) ─> api-gateway
+                              └───> customer-vehicle-service (healthy)
 ```
 
 ### 3. Địa chỉ
@@ -87,6 +85,7 @@ discovery-server (healthy) ─┼─> user-service (healthy) ─> api-gateway
 | Customer vehicle svc   | http://localhost:8082                            |
 | OpenAPI customer vehicle | http://localhost:8000/v3/api-docs/customer-vehicle-service |
 | MySQL                 | localhost:3306 (db `user_service`, `customer_vehicle_service`) |
+| Kafka broker          | localhost:9092 (PLAINTEXT, không auth)                |
 
 ### 4. Đăng nhập thử
 
@@ -155,6 +154,17 @@ Cho `customer-vehicle-service`, thay `DB_URL` bằng database của service:
 ``` text
 DB_URL=jdbc:mysql://localhost:3306/customer_vehicle_service
 ```
+
+Service đang dùng Kafka thì thêm:
+
+``` text
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+```
+
+Giá trị mặc định trong `application.yaml` đã là `localhost:9092`, nên khi chạy
+từ IDE thường không cần khai báo. Chỉ cần override nếu bạn đổi `KAFKA_PORT`.
+Lưu ý chỉ có **hạ tầng Kafka** (broker + producer/consumer config); chưa có
+service nào phát hoặc nhận event, nên topic sẽ không tự xuất hiện.
 
 Ngoài ra:
 

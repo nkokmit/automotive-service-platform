@@ -30,6 +30,32 @@ spring:
     baseline-on-migrate: false
     locations: classpath:db/migration
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      # Broker có thể chưa sẵn sàng lúc app khởi động; không fail startup.
+      fail-fast: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:customer-vehicle-service}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # ErrorHandlingDeserializer để payload hỏng/deserialize lỗi không làm chết
+      # consumer; lỗi được giao cho handler/DLT của listener.
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        # Chặn deserialization type ngoài allowlist. Khi có event thật từ service
+        # khác (vd work-order-service) cần thêm package của producer vào đây.
+        spring.json.trusted.packages: com.example.customer_vehicle_service
+        spring.json.use.type.headers: true
+    listener:
+      # Thiếu topic không được làm sập app (topic sẽ được tạo khi producer ghi).
+      missing-topics-fatal: false
+
 # Service discovery
 eureka:
   client:

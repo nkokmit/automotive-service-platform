@@ -80,6 +80,13 @@
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
 		</dependency>
 
+		<!-- Kafka: event-driven giữa các service (ARCHITECTURE.md §3). Version
+		     do spring-boot-starter-parent quản lý, không khai báo ở đây. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka</artifactId>
+		</dependency>
+
 		<!-- Swagger / OpenAPI 3 - tương thích Spring Boot 4 / Spring Framework 7 -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
@@ -123,6 +130,12 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- spring-kafka-test + spring-boot-starter-test cho @EmbeddedKafka. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
