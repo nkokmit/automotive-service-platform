@@ -5,12 +5,15 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-user_service}
+      CUSTOMER_VEHICLE_MYSQL_DATABASE: ${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}
       MYSQL_USER: ${MYSQL_USER:-app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      # Chỉ chạy khi volume trống: tạo database cho các service ngoài user_service.
+      - ./backend/infra/mysql/init:/docker-entrypoint-initdb.d:ro
     networks:
       - platform
     healthcheck:
@@ -20,6 +23,47 @@ services:
       timeout: 5s
       retries: 30
       start_period: 120s
+
+  # Kafka ở chế độ KRaft single-node (không cần ZooKeeper).
+  # Hai listener: 9092 cho host/IDE (localhost), 19092 cho container trong
+  # cùng network `platform`.
+  kafka:
+    image: apache/kafka:4.2.1
+    restart: unless-stopped
+    init: true
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: CONTROLLER://:29093,PLAINTEXT_HOST://:9092,PLAINTEXT://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:${KAFKA_PORT:-9092},PLAINTEXT://kafka:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Phải cố định và ổn định: đổi CLUSTER_ID khi volume đã có dữ liệu thì
+      # broker không khởi động lại được.
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-REd9mkeFMGNXMYId4xJDNA}
+      # Single-node không có replica nên các hệ số mặc định (>1) sẽ chặn tạo topic.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 40s
 
   discovery-server:
     build:
@@ -79,6 +123,47 @@ services:
       retries: 12
       start_period: 90s
 
+  customer-vehicle-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE_PATH: services/customer-vehicle-service
+    restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8082
+      DB_URL: jdbc:mysql://mysql:3306/${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}
+      DB_USERNAME: ${MYSQL_USER:-app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 JWT_SECRET (at least 32 decoded bytes) in .env}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
+      EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
+      # Trong compose dùng listener nội bộ; khi chạy service bằng IDE thì
+      # override thành localhost (xem README).
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS_CONTAINER:-kafka:19092}
+    ports:
+      - "${CUSTOMER_VEHICLE_SERVICE_PORT:-8082}:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8082/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
   api-gateway:
     build:
       context: ./backend
@@ -100,6 +185,8 @@ services:
         condition: service_healthy
       user-service:
         condition: service_healthy
+      customer-vehicle-service:
+        condition: service_healthy
     networks:
       - platform
     healthcheck:
@@ -115,4 +202,5 @@ networks:
 
 volumes:
   mysql-data:
+  kafka-data:
 

@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,6 +37,7 @@ public class PermissionController {
     private final PermissionService permissionService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PERMISSION_READ')")
     public ApiResponse<PageResponse<PermissionResponse>> getAllPermissions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -48,12 +50,14 @@ public class PermissionController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERMISSION_READ')")
     public ApiResponse<PermissionResponse> getPermissionById(@PathVariable UUID id) {
         return ApiResponse.success(permissionService.getPermissionById(id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PERMISSION_WRITE')")
     public ApiResponse<PermissionResponse> createPermission(
             @Valid @RequestBody PermissionCreateRequest request
     ) {
@@ -61,6 +65,7 @@ public class PermissionController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERMISSION_WRITE')")
     public ApiResponse<PermissionResponse> updatePermission(
             @PathVariable UUID id,
             @Valid @RequestBody PermissionUpdateRequest request
@@ -70,6 +75,7 @@ public class PermissionController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('PERMISSION_WRITE')")
     public void deletePermission(@PathVariable UUID id) {
         permissionService.deletePermission(id);
     }

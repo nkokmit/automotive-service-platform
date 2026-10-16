@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +38,7 @@ public class RoleController {
     private final RoleService roleService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_READ')")
     public ApiResponse<PageResponse<RoleResponse>> getAllRoles(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -49,17 +51,20 @@ public class RoleController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_READ')")
     public ApiResponse<RoleResponse> getRoleById(@PathVariable UUID id) {
         return ApiResponse.success(roleService.getRoleById(id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('ROLE_WRITE')")
     public ApiResponse<RoleResponse> createRole(@Valid @RequestBody RoleCreateRequest request) {
         return ApiResponse.success("Tạo role thành công", roleService.createRole(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_WRITE')")
     public ApiResponse<RoleResponse> updateRole(
             @PathVariable UUID id,
             @Valid @RequestBody RoleUpdateRequest request
@@ -69,11 +74,13 @@ public class RoleController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('ROLE_WRITE')")
     public void deleteRole(@PathVariable UUID id) {
         roleService.deleteRole(id);
     }
 
     @PostMapping("/{id}/permissions")
+    @PreAuthorize("hasAuthority('ROLE_WRITE')")
     public ApiResponse<RoleResponse> assignPermissions(
             @PathVariable UUID id,
             @RequestBody Set<UUID> permissionIds
@@ -82,6 +89,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{id}/permissions/{permissionId}")
+    @PreAuthorize("hasAuthority('ROLE_WRITE')")
     public ApiResponse<RoleResponse> removePermission(
             @PathVariable UUID id,
             @PathVariable UUID permissionId

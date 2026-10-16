@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,7 +39,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_READ')")
     public ApiResponse<PageResponse<UserResponse>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -51,17 +52,32 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER_READ')")
     public ApiResponse<UserResponse> getUserById(@PathVariable UUID id) {
         return ApiResponse.success(userService.getUserById(id));
     }
 
+    /**
+     * Thông tin chính user đang đăng nhập.
+     *
+     * <p>Principal do JwtAuthenticationFilter dựng từ {@code sub} của access token,
+     * nên không thể truyền id để xem thông tin người khác.
+     */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<UserResponse> getCurrentUser(Principal principal) {
+        return ApiResponse.success(userService.getCurrentUser(principal.getName()));
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('USER_CREATE')")
     public ApiResponse<UserResponse> createUser(@Valid @RequestBody UserCreateRequest request) {
         return ApiResponse.success("Tạo người dùng thành công", userService.createUser(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
     public ApiResponse<UserResponse> updateUser(
             @PathVariable UUID id,
             @Valid @RequestBody UserUpdateRequest request
@@ -71,16 +87,19 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('USER_DELETE')")
     public void deleteUser(@PathVariable UUID id) {
         userService.deleteUser(id);
     }
 
     @PostMapping("/{id}/roles")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
     public ApiResponse<UserResponse> assignRoles(@PathVariable UUID id, @RequestBody Set<UUID> roleIds) {
         return ApiResponse.success("Gán role thành công", userService.assignRoles(id, roleIds));
     }
 
     @DeleteMapping("/{id}/roles/{roleId}")
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
     public ApiResponse<UserResponse> removeRole(@PathVariable UUID id, @PathVariable UUID roleId) {
         return ApiResponse.success("Gỡ role thành công", userService.removeRole(id, roleId));
     }

@@ -7,6 +7,7 @@ set -uo pipefail
 
 GATEWAY_URL="${GATEWAY_URL:-http://localhost:8000}"
 USER_SERVICE_URL="${USER_SERVICE_URL:-http://localhost:8081}"
+CUSTOMER_VEHICLE_SERVICE_URL="${CUSTOMER_VEHICLE_SERVICE_URL:-http://localhost:8082}"
 DISCOVERY_URL="${DISCOVERY_URL:-http://localhost:8761}"
 SEED_USERNAME="${SEED_USERNAME:-admin}"
 SEED_PASSWORD="${SEED_PASSWORD:-Admin@123}"
@@ -40,10 +41,12 @@ check_public_health_only() {
 echo "== health =="
 check_health "discovery-server" "$DISCOVERY_URL"
 check_health "user-service" "$USER_SERVICE_URL"
+check_health "customer-vehicle-service" "$CUSTOMER_VEHICLE_SERVICE_URL"
 check_health "api-gateway" "$GATEWAY_URL"
 
 echo "== actuator exposure =="
 check_public_health_only "user-service" "$USER_SERVICE_URL"
+check_public_health_only "customer-vehicle-service" "$CUSTOMER_VEHICLE_SERVICE_URL"
 check_public_health_only "api-gateway" "$GATEWAY_URL"
 
 echo "== login through gateway =="
@@ -66,12 +69,21 @@ echo "== swagger aggregation =="
 status=$(http_status "$GATEWAY_URL/v3/api-docs/user-service")
 if [ "$status" = "200" ]; then pass "gateway serves user-service OpenAPI ($status)"; else fail "gateway OpenAPI aggregate ($status)"; fi
 
+status=$(http_status "$GATEWAY_URL/v3/api-docs/customer-vehicle-service")
+if [ "$status" = "200" ]; then pass "gateway serves customer-vehicle-service OpenAPI ($status)"; else fail "gateway customer-vehicle-service OpenAPI ($status)"; fi
+
 echo "== eureka registration =="
 registry=$(curl -s -H 'Accept: application/json' "$DISCOVERY_URL/eureka/apps")
 if printf '%s' "$registry" | grep -q '"name":"USER-SERVICE"'; then
   pass "user-service is registered with Eureka"
 else
   fail "user-service is not registered with Eureka"
+fi
+
+if printf '%s' "$registry" | grep -q '"name":"CUSTOMER-VEHICLE-SERVICE"'; then
+  pass "customer-vehicle-service is registered with Eureka"
+else
+  fail "customer-vehicle-service is not registered with Eureka"
 fi
 
 echo
