@@ -5,11 +5,9 @@ import com.example.customer_vehicle_service.dto.request.CustomerUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
 import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.exception.CustomerAlreadyExistsException;
-import com.example.customer_vehicle_service.exception.CustomerHasActiveVehiclesException;
 import com.example.customer_vehicle_service.exception.CustomerNotFoundException;
 import com.example.customer_vehicle_service.mapper.CustomerMapper;
 import com.example.customer_vehicle_service.repository.CustomerRepository;
-import com.example.customer_vehicle_service.repository.VehicleRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -43,9 +41,6 @@ class CustomerServiceImplTest {
 
     @Mock
     private CustomerRepository customerRepository;
-
-    @Mock
-    private VehicleRepository vehicleRepository;
 
     @Mock
     private CustomerMapper customerMapper;
@@ -214,32 +209,21 @@ class CustomerServiceImplTest {
 
     // ===== Xoá mềm =====
 
+    /**
+     * Xoá hồ sơ không còn bị chặn vì "còn xe hoạt động": xe không thuộc về khách
+     * hàng nữa nên không có xe nào của khách hàng này. Lịch sử bảo dưỡng vẫn
+     * được giữ nguyên để audit.
+     */
     @Test
-    void deleteCustomer_softDeletesWhenNoActiveVehicles() {
+    void deleteCustomer_softDeletesRegardlessOfVehicleHistory() {
         Customer customer = customer();
         given(customerRepository.findByIdRaw(CUSTOMER_ID)).willReturn(Optional.of(customer));
-        given(vehicleRepository.countByCustomerIdAndIsActiveTrue(CUSTOMER_ID)).willReturn(0L);
 
         customerService.deleteCustomer(CUSTOMER_ID);
 
         assertThat(customer.getDeletedAt()).isNotNull();
         assertThat(customer.getIsActive()).isFalse();
         verify(customerRepository).save(customer);
-    }
-
-    @Test
-    void deleteCustomer_throwsWhenActiveVehiclesRemain() {
-        Customer customer = customer();
-        given(customerRepository.findByIdRaw(CUSTOMER_ID)).willReturn(Optional.of(customer));
-        given(vehicleRepository.countByCustomerIdAndIsActiveTrue(CUSTOMER_ID)).willReturn(2L);
-
-        assertThatThrownBy(() -> customerService.deleteCustomer(CUSTOMER_ID))
-                .isInstanceOf(CustomerHasActiveVehiclesException.class)
-                .hasMessageContaining("2");
-
-        // Phải rollback, không được ghi gì.
-        verify(customerRepository, never()).save(any());
-        assertThat(customer.getDeletedAt()).isNull();
     }
 
     @Test
@@ -251,7 +235,6 @@ class CustomerServiceImplTest {
         customerService.deleteCustomer(CUSTOMER_ID);
 
         verify(customerRepository, never()).save(any());
-        verify(vehicleRepository, never()).countByCustomerIdAndIsActiveTrue(any());
     }
 
     @Test

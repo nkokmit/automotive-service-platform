@@ -3,7 +3,6 @@ package com.example.customer_vehicle_service.mapper;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
 import com.example.customer_vehicle_service.entity.Vehicle;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 
 /**
  * MapStruct mapper cho Entity → DTO của hồ sơ xe (PLAN.md bước 4).
@@ -20,11 +19,9 @@ import org.mapstruct.Mapping;
 public interface VehicleMapper {
 
     /**
-     * Chỉ {@code customerId} cần khai báo tay: entity lưu quan hệ
-     * {@code Vehicle.customer} nên không có field {@code customerId} thuần.
-     * {@code modelYear} kiểu {@code Short} ở cả entity lẫn DTO nên MapStruct map
-     * thẳng, và {@code deletedAt} cố ý không xuất hiện trong DTO.
+     * Không cần khai báo tay bất kỳ {@code @Mapping} nào: entity {@code Vehicle}
+     * không có quan hệ với customer nữa nên mọi field của DTO đều khớp tên 1-1
+     * với entity. {@code deletedAt} cố ý không xuất hiện trong DTO.
      */
-    @Mapping(source = "customer.id", target = "customerId")
     VehicleResponse toVehicleResponse(Vehicle vehicle);
 }

@@ -33,12 +33,15 @@ class VehicleRequestValidationTest {
     }
 
     @Test
-    void createRequiresCustomerAndNonBlankRequiredFields() {
-        var request = new VehicleCreateRequest(null, " ", null, "", "\t", null,
-                null, null, null, null, null, null, null);
+    void createRequiresNonBlankRequiredFields() {
+        var request = new VehicleCreateRequest(" ", null, "", "\t",
+                null, null, null, null, null, null, null, null);
 
         assertThat(validator.validate(request)).extracting(v -> v.getPropertyPath().toString())
-                .contains("customerId", "licensePlate", "make", "model");
+                .contains("licensePlate", "make", "model")
+                // Không có customerId trong DTO nữa, nên không thể có lỗi nào
+                // ở property đó — assert này chặn việc thêm lại field cho tiện.
+                .doesNotContain("customerId");
     }
 
     @Test
@@ -97,12 +100,12 @@ class VehicleRequestValidationTest {
 
     @Test
     void enforcesColumnLengthsInCreateAndUpdate() {
-        var create = new VehicleCreateRequest(CUSTOMER_ID, "x".repeat(21), null,
+        var create = new VehicleCreateRequest("x".repeat(21), null,
                 "x".repeat(101), "x".repeat(101), null, "x".repeat(101), "x".repeat(51),
                 "x".repeat(31), "x".repeat(31), null, null, null);
         var update = new VehicleUpdateRequest(create.licensePlate(), null, create.make(), create.model(),
                 null, create.trim(), create.color(), create.fuelType(), create.transmission(), null,
-                null, null, null);
+                null, null);
 
         for (Object request : new Object[]{create, update}) {
             assertThat(validator.validate(request)).extracting(v -> v.getPropertyPath().toString())
@@ -111,13 +114,13 @@ class VehicleRequestValidationTest {
     }
 
     private VehicleCreateRequest create(String vin, Short year, Integer odometer) {
-        return new VehicleCreateRequest(CUSTOMER_ID, "30A-12345", vin, "Honda", "Accord", year,
+        return new VehicleCreateRequest("30A-12345", vin, "Honda", "Accord", year,
                 null, null, null, null, odometer, null, null);
     }
 
     private VehicleUpdateRequest update(String plate, String vin, String make, String model,
                                         Short year, Integer odometer) {
         return new VehicleUpdateRequest(plate, vin, make, model, year, null, null, null, null,
-                odometer, null, null, null);
+                odometer, null, null);
     }
 }

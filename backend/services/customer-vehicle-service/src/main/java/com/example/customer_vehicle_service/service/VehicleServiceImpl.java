@@ -4,14 +4,10 @@ import com.example.customer_vehicle_service.dto.request.VehicleCreateRequest;
 import com.example.customer_vehicle_service.dto.request.VehicleUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
-import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.entity.Vehicle;
-import com.example.customer_vehicle_service.exception.CustomerInactiveException;
-import com.example.customer_vehicle_service.exception.CustomerNotFoundException;
 import com.example.customer_vehicle_service.exception.VehicleNotFoundException;
 import com.example.customer_vehicle_service.exception.VehicleVinAlreadyExistsException;
 import com.example.customer_vehicle_service.mapper.VehicleMapper;
-import com.example.customer_vehicle_service.repository.CustomerRepository;
 import com.example.customer_vehicle_service.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +26,11 @@ import java.util.UUID;
  * <p>Chiều ghi không dùng MapStruct: entity {@link Vehicle} có {@code @Builder} cùng
  * {@code @PrePersist}/{@code @PreUpdate} tự quản lý {@code created_at}/{@code updated_at},
  * nên gán từng field rõ ràng dễ kiểm soát hơn so với mapping hàng loạt.
+ *
+ * <p>Cố ý KHÔNG inject {@code CustomerRepository}: xe không còn quan hệ với khách
+ * hàng nào ({@code V3__decouple_customer_from_vehicle.sql}), nên service này không
+ * cần tới khách hàng. Liên kết khách hàng với xe được ghi ở tầng lịch sử bảo dưỡng
+ * ({@code ServiceHistoryServiceImpl}).
  */
 @Service
 @RequiredArgsConstructor
@@ -38,18 +39,17 @@ import java.util.UUID;
 public class VehicleServiceImpl implements VehicleService {
 
     private final VehicleRepository vehicleRepository;
-    private final CustomerRepository customerRepository;
     private final VehicleMapper vehicleMapper;
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<VehicleResponse> getVehicles(UUID customerId, String licensePlate,
+    public PageResponse<VehicleResponse> getVehicles(String licensePlate,
                                                       String keyword, Boolean isActive,
                                                       Pageable pageable) {
-        log.debug("Tìm kiếm xe: customerId={}, licensePlate={}, keyword={}, isActive={}",
-                customerId, licensePlate, keyword, isActive);
+        log.debug("Tìm kiếm xe: licensePlate={}, keyword={}, isActive={}",
+                licensePlate, keyword, isActive);
 
-        Page<Vehicle> page = vehicleRepository.search(customerId,
+        Page<Vehicle> page = vehicleRepository.search(
                 normalizeLicensePlate(licensePlate),
                 normalizeKeyword(keyword),
                 isActive,
@@ -68,16 +68,12 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResponse createVehicle(VehicleCreateRequest request) {
-        // Chủ sở hữu phải hợp lệ trước khi tạo xe, nếu không xe sẽ thành "mồ côi".
-        Customer customer = requireActiveCustomer(request.customerId());
-
         String vin = normalizeVin(request.vin());
         if (vin != null) {
             requireVinAvailable(vin);
         }
 
         Vehicle vehicle = Vehicle.builder()
-                .customer(customer)
                 .licensePlate(normalizeLicensePlate(request.licensePlate()))
                 .vin(vin)
                 .make(request.make().trim())
@@ -94,7 +90,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .build();
 
         Vehicle saved = vehicleRepository.save(vehicle);
-        log.info("Đã tạo xe mới cho khách hàng {}: biển số={}", customer.getId(), saved.getLicensePlate());
+        log.info("Đã tạo xe mới: biển số={}", saved.getLicensePlate());
         return vehicleMapper.toVehicleResponse(saved);
     }
 
@@ -102,16 +98,6 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse updateVehicle(UUID id, VehicleUpdateRequest request) {
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new VehicleNotFoundException("Không tìm thấy xe với id: " + id));
-
-        // --- Chuyển chủ sở hữu ---
-        // Gửi lại chính id hiện tại là thao tác không đổi: bỏ qua để không tốn query.
-        if (request.customerId() != null
-                && !request.customerId().equals(customerIdOf(vehicle))) {
-            Customer newCustomer = requireActiveCustomer(request.customerId());
-            log.info("Chuyển chủ sở hữu xe {} từ khách hàng {} sang {}",
-                    id, customerIdOf(vehicle), newCustomer.getId());
-            vehicle.setCustomer(newCustomer);
-        }
 
         // --- VIN ---
         // So sánh trước với giá trị hiện tại để giữ nguyên VIN không tốn query exists.
@@ -181,28 +167,6 @@ public class VehicleServiceImpl implements VehicleService {
     // ===== Helpers =====
 
     /**
-     * Chủ sở hữu phải tồn tại và còn hoạt động (PLAN.md bước 4: chỉ tạo xe mới hoặc
-     * nhận chuyển xe cho khách hàng còn hoạt động).
-     *
-     * <p>Tách hai trường hợp vì chúng gợi ý hành động khác nhau: không tìm thấy là
-     * nhập sai id, còn không hoạt động thì hồ sơ vẫn còn nhưng không được nhận xe.
-     * Hồ sơ đã xoá mềm không tới được case thứ hai vì {@code @SQLRestriction} khiến
-     * {@code findById} trả rỗng → thuộc về {@code CustomerNotFoundException}.
-     */
-    private Customer requireActiveCustomer(UUID customerId) {
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new CustomerNotFoundException(
-                        "Không tìm thấy khách hàng với id: " + customerId));
-
-        if (!Boolean.TRUE.equals(customer.getIsActive())) {
-            throw new CustomerInactiveException(
-                    "Khách hàng " + customerId + " không còn hoạt động, "
-                            + "không thể tạo xe mới hoặc nhận chuyển xe");
-        }
-        return customer;
-    }
-
-    /**
      * Chặn VIN trùng kể cả với xe đã xoá mềm, khớp với uk_vehicles_vin.
      * Update chỉ gọi khi VIN thay đổi nên không thể trùng với chính xe đang sửa.
      */
@@ -212,15 +176,6 @@ public class VehicleServiceImpl implements VehicleService {
                     "VIN đã tồn tại: " + vin
             );
         }
-    }
-
-    /**
-     * Lấy {@code customerId} mà không chạm vào {@code customer.name} — quan hệ là
-     * {@code LAZY} và {@code open-in-view} đang tắt nên đọc định danh thì an toàn,
-     * còn đọc thuộc tính khác sẽ phát sinh query không cần thiết.
-     */
-    private UUID customerIdOf(Vehicle vehicle) {
-        return vehicle.getCustomer() != null ? vehicle.getCustomer().getId() : null;
     }
 
     /**

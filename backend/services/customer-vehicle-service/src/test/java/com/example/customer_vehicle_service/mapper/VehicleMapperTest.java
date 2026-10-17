@@ -1,6 +1,5 @@
 package com.example.customer_vehicle_service.mapper;
 
-import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.entity.Vehicle;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
@@ -14,11 +13,14 @@ class VehicleMapperTest {
 
     private final VehicleMapper mapper = Mappers.getMapper(VehicleMapper.class);
 
+    /**
+     * Không có {@code customerId} trong DTO nữa — đây là phần assert quan trọng
+     * nhất của test, vì nó chặn cả MapStruct lẫn việc ai đó thêm lại
+     * {@code customerId} vào {@code VehicleResponse} "cho tiện".
+     */
     @Test
-    void toVehicleResponse_mapsOwnerIdAndAllPublicFields() {
-        UUID ownerId = UUID.randomUUID();
+    void toVehicleResponse_mapsAllPublicFieldsAndNoOwnerId() {
         Vehicle vehicle = Vehicle.builder().id(UUID.randomUUID())
-                .customer(Customer.builder().id(ownerId).build())
                 .licensePlate("30A-12345").vin("1HGCM82633A004352")
                 .make("Honda").model("Accord").modelYear((short) 2020)
                 .trim("EX").color("Black").fuelType("Petrol").transmission("Automatic")
@@ -29,11 +31,9 @@ class VehicleMapperTest {
 
         var result = mapper.toVehicleResponse(vehicle);
 
-        assertThat(result.customerId()).isEqualTo(ownerId);
-        assertThat(result).usingRecursiveComparison().ignoringFields("customerId")
-                .isEqualTo(vehicle);
+        assertThat(result).usingRecursiveComparison().isEqualTo(vehicle);
         assertThat(result.getClass().getRecordComponents()).extracting("name")
-                .doesNotContain("deletedAt", "customerName", "customer");
+                .doesNotContain("deletedAt", "customerId", "customerName", "customer");
     }
 
     @Test

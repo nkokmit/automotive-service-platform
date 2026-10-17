@@ -21,7 +21,8 @@ public interface ServiceHistoryMapper {
     /**
      * Chỉ {@code vehicleId} cần khai báo tay: entity lưu quan hệ
      * {@code VehicleServiceHistory.vehicle} nên không có field {@code vehicleId}
-     * thuần. Các field còn lại khớp tên 1-1 nên MapStruct map thẳng.
+     * thuần. {@code customerId} thì map thẳng vì entity lưu UUID thuần (không
+     * phải {@code @ManyToOne}) — xem javadoc entity để biết vì sao.
      */
     @Mapping(source = "vehicle.id", target = "vehicleId")
     ServiceHistoryResponse toServiceHistoryResponse(VehicleServiceHistory history);

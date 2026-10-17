@@ -11,21 +11,26 @@ import java.util.UUID;
 /**
  * Nghiệp vụ hồ sơ xe (PLAN.md bước 4).
  *
- * <p>Mỗi xe có đúng một chủ sở hữu hiện tại; chưa hỗ trợ đồng sở hữu.
+ * <p>Cố ý KHÔNG có khái niệm chủ sở hữu: xe không gắn với khách hàng nào
+ * ({@code V3__decouple_customer_from_vehicle.sql}). Khách hàng và xe gặp nhau ở
+ * từng lần tiếp nhận, dữ liệu đó thuộc về lịch sử bảo dưỡng — xem
+ * {@link ServiceHistoryService}.
  */
 public interface VehicleService {
 
     /**
      * Danh sách xe có phân trang, lọc và tìm kiếm. Xe đã xoá mềm không trả về.
      *
-     * @param customerId   lọc theo chủ sở hữu hiện tại. {@code null} thì không lọc.
+     * <p>Cố ý không có tham số lọc theo khách hàng: muốn biết khách nào từng mang
+     * xe đến thì tra {@link ServiceHistoryService#getServiceHistoryByCustomer}.
+     *
      * @param licensePlate lọc theo biển số (so khớp chính xác, không phân biệt hoa
      *                     thường). {@code null} thì không lọc.
      * @param keyword      tìm chuỗi con trong biển số / VIN / hãng / dòng xe.
      *                     Rỗng hoặc {@code null} thì không tìm.
      * @param isActive     lọc theo trạng thái hoạt động. {@code null} thì không lọc.
      */
-    PageResponse<VehicleResponse> getVehicles(UUID customerId, String licensePlate,
+    PageResponse<VehicleResponse> getVehicles(String licensePlate,
                                                String keyword, Boolean isActive,
                                                Pageable pageable);
 
@@ -35,16 +40,14 @@ public interface VehicleService {
     VehicleResponse getVehicleById(UUID id);
 
     /**
-     * Tạo xe. Khách hàng phải tồn tại và còn hoạt động; VIN không được trùng với
-     * bất kỳ xe nào, kể cả xe đã xoá mềm.
+     * Tạo xe. VIN không được trùng với bất kỳ xe nào, kể cả xe đã xoá mềm.
      */
     VehicleResponse createVehicle(VehicleCreateRequest request);
 
     /**
      * Cập nhật một phần: field {@code null} trong request được giữ nguyên.
      *
-     * <p>Gửi {@code customerId} khác id hiện tại để chuyển chủ sở hữu, sau khi xác
-     * minh khách hàng mới tồn tại và còn hoạt động.
+     * <p>Cố ý không có thao tác chuyển chủ sở hữu — quan hệ đó không còn tồn tại.
      */
     VehicleResponse updateVehicle(UUID id, VehicleUpdateRequest request);
 

@@ -2,12 +2,9 @@ package com.example.customer_vehicle_service.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -24,10 +21,14 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Entity đại diện cho xe của khách hàng.
+ * Entity đại diện cho xe.
  *
- * <p>Mỗi xe có đúng một chủ sở hữu hiện tại ({@link Customer}). Đây là quan hệ
- * nội bộ của service nên dùng {@code @ManyToOne} + foreign key trong DB.
+ * <p>Cố ý KHÔNG có quan hệ với {@link Customer}. Mô hình đã đổi: Customer là
+ * hồ sơ người liên hệ, không phải chủ sở hữu pháp lý của xe — bất kỳ ai cũng
+ * có thể mang bất kỳ xe nào đến gara. Việc ai mang xe đến lần tiếp nhận được
+ * ghi ở {@link VehicleServiceHistory#getCustomer()}, theo từng bản ghi.
+ * Xem {@code V3__decouple_customer_from_vehicle.sql} và
+ * {@code CUSTOMER_VEHICLE_RELATIONSHIP_CONTEXT.md}.
  *
  * <p>Soft delete được áp dụng thông qua {@code @SQLRestriction} — mọi truy vấn
  * JPA sẽ tự động bỏ qua xe đã bị xoá ({@code deleted_at IS NOT NULL}).
@@ -47,15 +48,6 @@ public class Vehicle {
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "id", length = 36, updatable = false, nullable = false)
     private UUID id;
-
-    /**
-     * Quan hệ nội bộ: khách hàng đang sở hữu xe.
-     * LAZY + cùng {@code @SQLRestriction} để xe của khách hàng đã xoá mềm
-     * cũng không bị trả về trong các truy vấn thông thường.
-     */
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private Customer customer;
 
     @Column(name = "license_plate", length = 20, nullable = false)
     private String licensePlate;

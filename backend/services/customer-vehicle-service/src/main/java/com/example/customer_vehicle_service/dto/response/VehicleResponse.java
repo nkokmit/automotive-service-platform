@@ -10,14 +10,13 @@ import java.util.UUID;
  * xoá mềm nhờ {@code @SQLRestriction} ở entity {@code Vehicle}, nên client không
  * cần biết trạng thái xoá mềm.
  *
- * <p>Cố ý chỉ trả {@code customerId} chứ không trả tên khách hàng: quan hệ
- * {@code Vehicle.customer} là {@code LAZY} và {@code open-in-view} đang tắt, nên
- * đọc thêm thuộc tính tên sẽ tạo thêm một cây query cho từng dòng khi phân trang.
- * Trả id khớp với cách {@code CustomerResponse} chỉ trả {@code userId}.
+ * <p>Cố ý KHÔNG có {@code customerId}: hồ sơ xe không còn gắn với khách hàng
+ * nào ({@code V3__decouple_customer_from_vehicle.sql}). Muốn biết ai từng mang
+ * xe này đến thì tra {@code GET /api/vehicles/{id}/service-history} và đọc
+ * {@code customerId} của từng bản ghi.
  */
 public record VehicleResponse(
         UUID id,
-        UUID customerId,
         String licensePlate,
         String vin,
         String make,

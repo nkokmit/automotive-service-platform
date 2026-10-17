@@ -6,14 +6,16 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
-import java.util.UUID;
-
 /**
  * Request cập nhật hồ sơ xe — cập nhật một phần (PLAN.md bước 4).
  *
  * <p>Field null được bỏ qua. {@code @Pattern} chặn chuỗi toàn khoảng trắng
  * khi cập nhật các field bắt buộc nhưng vẫn cho phép bỏ qua field bằng null.
  * {@code @Size} giới hạn độ dài theo schema.
+ *
+ * <p>Cố ý KHÔNG có {@code customerId}, nên cũng không có thao tác chuyển chủ
+ * sở hữu: quan hệ đó không còn tồn tại ({@code V3__decouple_customer_from_vehicle.sql}).
+ * Muốn biết khách nào từng mang xe này đến thì tra lịch sử bảo dưỡng.
  */
 public record VehicleUpdateRequest(
         @Pattern(regexp = "(?s).*\\S.*", message = "Biển số xe không được để trống")
@@ -53,14 +55,6 @@ public record VehicleUpdateRequest(
 
         String notes,
 
-        Boolean isActive,
-
-        /**
-         * Chuyển chủ sở hữu hiện tại. Gửi {@code null} giữ nguyên; gửi id khác thì
-         * đổi sang khách hàng mới sau khi xác minh hồ sơ đó tồn tại và còn hoạt
-         * động (PLAN.md bước 4). Gửi lại chính id hiện tại là thao tác không đổi
-         * nên bỏ qua việc tra cứu.
-         */
-        UUID customerId
+        Boolean isActive
 ) {
 }

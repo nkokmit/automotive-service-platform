@@ -6,7 +6,6 @@ import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
 import com.example.customer_vehicle_service.exception.GlobalExceptionHandler;
 import com.example.customer_vehicle_service.exception.VehicleNotFoundException;
-import com.example.customer_vehicle_service.service.CurrentCustomerService;
 import com.example.customer_vehicle_service.service.VehicleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,22 +39,19 @@ class VehicleControllerTest {
 
     @Mock
     private VehicleService vehicleService;
-    @Mock
-    private CurrentCustomerService currentCustomerService;
     private MockMvc mvc;
     private static final UUID ID = UUID.randomUUID();
-    private static final UUID OWNER_ID = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new VehicleController(vehicleService, currentCustomerService))
+        mvc = MockMvcBuilders.standaloneSetup(new VehicleController(vehicleService))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
     @Test
     void listUsesDefaultPaginationAndApiEnvelope() throws Exception {
         var pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
-        given(vehicleService.getVehicles(null, null, null, null, pageable))
+        given(vehicleService.getVehicles(null, null, null, pageable))
                 .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0, false, false));
 
         mvc.perform(get("/api/vehicles"))
@@ -67,15 +63,15 @@ class VehicleControllerTest {
     @Test
     void listBindsFiltersAndCustomPagination() throws Exception {
         var pageable = PageRequest.of(1, 5, Sort.by(Sort.Direction.ASC, "licensePlate"));
-        given(vehicleService.getVehicles(OWNER_ID, "30A-12345", "Honda", true, pageable))
+        given(vehicleService.getVehicles("30A-12345", "Honda", true, pageable))
                 .willReturn(new PageResponse<>(List.of(), 1, 5, 0, 0, false, true));
 
-        mvc.perform(get("/api/vehicles").param("customerId", OWNER_ID.toString())
+        mvc.perform(get("/api/vehicles")
                         .param("licensePlate", "30A-12345").param("keyword", "Honda")
                         .param("isActive", "true").param("page", "1").param("size", "5")
                         .param("sortBy", "licensePlate").param("sortDirection", "ASC"))
                 .andExpect(status().isOk());
-        verify(vehicleService).getVehicles(OWNER_ID, "30A-12345", "Honda", true, pageable);
+        verify(vehicleService).getVehicles("30A-12345", "Honda", true, pageable);
     }
 
     @Test
@@ -83,9 +79,9 @@ class VehicleControllerTest {
         given(vehicleService.getVehicleById(ID)).willReturn(response());
 
         mvc.perform(get("/api/vehicles/{id}", ID)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.customerId").value(OWNER_ID.toString()))
                 .andExpect(jsonPath("$.result.licensePlate").value("30A-12345"))
                 .andExpect(jsonPath("$.result.deletedAt").doesNotExist())
+                .andExpect(jsonPath("$.result.customerId").doesNotExist())
                 .andExpect(jsonPath("$.result.customerName").doesNotExist());
     }
 
@@ -95,21 +91,28 @@ class VehicleControllerTest {
 
         mvc.perform(post("/api/vehicles").contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customerId":"%s","licensePlate":"30A-12345","make":"Honda","model":"Accord"}
-                                """.formatted(OWNER_ID)))
+                                {"licensePlate":"30A-12345","make":"Honda","model":"Accord"}
+                                """))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.result.id").value(ID.toString()));
     }
 
+    /**
+     * Xe không thuộc về khách hàng nào nên không có thao tác chuyển chủ sở hữu: gửi
+     * {@code customerId} trong body phải bị Jackson bỏ qua, còn mọi field hợp lệ
+     * vẫn được đọc bình thường.
+     */
     @Test
-    void updateAcceptsPartialOwnershipTransfer() throws Exception {
+    void updateIgnoresCustomerIdBecauseVehiclesHaveNoOwner() throws Exception {
         given(vehicleService.updateVehicle(eq(ID), any(VehicleUpdateRequest.class))).willReturn(response());
 
         mvc.perform(put("/api/vehicles/{id}", ID).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"customerId\":\"" + OWNER_ID + "\"}"))
+                        .content("""
+                                {"customerId":"%s","trim":"EX-L"}
+                                """.formatted(UUID.randomUUID())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(0));
         verify(vehicleService).updateVehicle(ID, new VehicleUpdateRequest(null, null, null, null,
-                null, null, null, null, null, null, null, null, OWNER_ID));
+                null, "EX-L", null, null, null, null, null, null));
     }
 
     @Test
@@ -142,7 +145,7 @@ class VehicleControllerTest {
     }
 
     private VehicleResponse response() {
-        return new VehicleResponse(ID, OWNER_ID, "30A-12345", null, "Honda", "Accord", null,
+        return new VehicleResponse(ID, "30A-12345", null, "Honda", "Accord", null,
                 null, null, null, null, null, null, true, null, null);
     }
 }
