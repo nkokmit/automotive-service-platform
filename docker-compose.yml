@@ -1,163 +1,272 @@
-version: "3.9"
-
-# ════════════════════════════════════════════════════════════════
-# Automotive Service Platform – Docker Compose
-# Services: PostgreSQL, Qdrant, agent-service, damage-detection
-#           garage-service, content-service, commerce-service
-# ════════════════════════════════════════════════════════════════
-
-x-common-env: &common-env
-  TZ: Asia/Ho_Chi_Minh
-
-networks:
-  app-network:
-    driver: bridge
-
-volumes:
-  postgres-data:
-  qdrant-data:
-  onnx-models:
-
 services:
-  # ── Infrastructure ──────────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
+  # ── Infrastructure: MySQL ───────────────────────────────────────────────────
+  mysql:
+    image: mysql:9.7
+    restart: unless-stopped
     environment:
-      <<: *common-env
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: automotive
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./scripts/init-db:/docker-entrypoint-initdb.d:ro
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-user_service}
+      CUSTOMER_VEHICLE_MYSQL_DATABASE: ${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
     ports:
-      - "5432:5432"
-    networks: [app-network]
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # Chỉ chạy khi volume trống: tạo database cho các service ngoài user_service.
+      - ./backend/infra/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - platform
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u\"$$MYSQL_USER\" -D\"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 30
+      start_period: 120s
 
+  # ── Infrastructure: Kafka (KRaft single-node) ───────────────────────────────
+  kafka:
+    image: apache/kafka:4.2.1
+    restart: unless-stopped
+    init: true
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: CONTROLLER://:29093,PLAINTEXT_HOST://:9092,PLAINTEXT://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:${KAFKA_PORT:-9092},PLAINTEXT://kafka:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-REd9mkeFMGNXMYId4xJDNA}
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 40s
+
+  # ── Infrastructure: Qdrant Vector Database (cho AI Agent) ───────────────────
   qdrant:
     image: qdrant/qdrant:v1.12.1
-    environment:
-      <<: *common-env
+    restart: unless-stopped
     volumes:
       - qdrant-data:/qdrant/storage
     ports:
-      - "6333:6333"   # REST API
-      - "6334:6334"   # gRPC
-    networks: [app-network]
+      - "${QDRANT_PORT:-6333}:6333"
+      - "6334:6334"
+    networks:
+      - platform
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
 
-  # ── AI Services ─────────────────────────────────────────────
-  agent-service:
+  # ── Backend: Discovery Server (Eureka) ──────────────────────────────────────
+  discovery-server:
     build:
-      context: ./ai-services/agent-service
+      context: ./backend
       dockerfile: Dockerfile
-    env_file: ./ai-services/agent-service/.env.example
-    environment:
-      <<: *common-env
-      POSTGRES_DSN: postgresql+asyncpg://postgres:postgres@postgres:5432/automotive
-      QDRANT_URL: http://qdrant:6333
-      GARAGE_SERVICE_URL: http://garage-service:8000
-      DAMAGE_SERVICE_URL: http://damage-detection-service:8001
-    ports:
-      - "8002:8002"
-    networks: [app-network]
-    depends_on:
-      postgres: { condition: service_healthy }
-      qdrant:   { condition: service_healthy }
+      args:
+        MODULE_PATH: discovery-server
     restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8761
+      EUREKA_INSTANCE_HOSTNAME: discovery-server
+    ports:
+      - "${DISCOVERY_SERVER_PORT:-8761}:8761"
+    networks:
+      - platform
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8002/api/v1/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8761/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
 
+  # ── Backend: User Service ───────────────────────────────────────────────────
+  user-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE_PATH: services/user-service
+    restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8081
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-user_service}
+      DB_USERNAME: ${MYSQL_USER:-app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 JWT_SECRET (at least 32 decoded bytes) in .env}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
+      EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
+    ports:
+      - "${USER_SERVICE_PORT:-8081}:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8081/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  # ── Backend: Customer Vehicle Service ───────────────────────────────────────
+  customer-vehicle-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE_PATH: services/customer-vehicle-service
+    restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8082
+      DB_URL: jdbc:mysql://mysql:3306/${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}
+      DB_USERNAME: ${MYSQL_USER:-app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 JWT_SECRET (at least 32 decoded bytes) in .env}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
+      EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS_CONTAINER:-kafka:19092}
+    ports:
+      - "${CUSTOMER_VEHICLE_SERVICE_PORT:-8082}:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8082/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  # ── Backend: Spring Cloud API Gateway ───────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE_PATH: api-gateway
+    restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8000
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 JWT_SECRET (at least 32 decoded bytes) in .env}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
+      EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
+    ports:
+      - "${API_GATEWAY_PORT:-8000}:8000"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      customer-vehicle-service:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8000/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  # ── AI Service: Vehicle Damage Detection (YOLOv8s ONNX) ─────────────────────
   damage-detection-service:
     build:
       context: ./ai-services/damage-detection-service
       dockerfile: Dockerfile
-    env_file: ./ai-services/damage-detection-service/.env.example
-    environment:
-      <<: *common-env
-      ONNX_MODEL_PATH: /models/yolov8s-seg.onnx
-    volumes:
-      # Mount your exported ONNX model here:
-      # docker run -v /path/to/your/yolov8s-seg.onnx:/models/yolov8s-seg.onnx ...
-      - onnx-models:/models
-    ports:
-      - "8001:8001"
-    networks: [app-network]
     restart: unless-stopped
+    environment:
+      ONNX_MODEL_PATH: /models/yolov8s-seg.onnx
+      CONF_THRESHOLD: ${CONF_THRESHOLD:-0.25}
+      IOU_THRESHOLD: ${IOU_THRESHOLD:-0.45}
+    volumes:
+      - onnx-models:/models
+      - ./ai-services/damage-detection-service/app/models:/models:ro
+    ports:
+      - "${DAMAGE_SERVICE_PORT:-8001}:8001"
+    networks:
+      - platform
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/v1/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # ── Backend Services ─────────────────────────────────────────
-  garage-service:
+  # ── AI Service: LangGraph ReAct Agent ───────────────────────────────────────
+  agent-service:
     build:
-      context: ./services/garage-service
+      context: ./ai-services/agent-service
       dockerfile: Dockerfile
-    environment:
-      <<: *common-env
-      POSTGRES_DSN: postgresql+asyncpg://postgres:postgres@postgres:5432/automotive
-    ports:
-      - "8000:8000"
-    networks: [app-network]
-    depends_on:
-      postgres: { condition: service_healthy }
     restart: unless-stopped
-
-  content-service:
-    build:
-      context: ./services/content-service
-      dockerfile: Dockerfile
     environment:
-      <<: *common-env
-      POSTGRES_DSN: postgresql+asyncpg://postgres:postgres@postgres:5432/automotive
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       QDRANT_URL: http://qdrant:6333
+      DAMAGE_SERVICE_URL: http://damage-detection-service:8001
+      API_GATEWAY_URL: http://api-gateway:8000
+      GARAGE_SERVICE_URL: http://api-gateway:8000
     ports:
-      - "8003:8003"
-    networks: [app-network]
+      - "${AGENT_SERVICE_PORT:-8002}:8002"
     depends_on:
-      postgres: { condition: service_healthy }
-      qdrant:   { condition: service_healthy }
-    restart: unless-stopped
+      qdrant:
+        condition: service_healthy
+      damage-detection-service:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8002/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  commerce-service:
-    build:
-      context: ./services/commerce-service
-      dockerfile: Dockerfile
-    environment:
-      <<: *common-env
-      POSTGRES_DSN: postgresql+asyncpg://postgres:postgres@postgres:5432/automotive
-    ports:
-      - "8004:8004"
-    networks: [app-network]
-    depends_on:
-      postgres: { condition: service_healthy }
-    restart: unless-stopped
+networks:
+  platform:
+    driver: bridge
 
-  # ── Gateway ──────────────────────────────────────────────────
-  gateway:
-    image: nginx:1.27-alpine
-    volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "80:80"
-    networks: [app-network]
-    depends_on:
-      - agent-service
-      - damage-detection-service
-      - garage-service
-    restart: unless-stopped
-
+volumes:
+  mysql-data:
+  kafka-data:
+  qdrant-data:
+  onnx-models:
