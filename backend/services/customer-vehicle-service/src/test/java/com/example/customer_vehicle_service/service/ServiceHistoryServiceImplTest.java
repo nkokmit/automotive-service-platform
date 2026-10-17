@@ -6,9 +6,11 @@ import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.entity.Vehicle;
 import com.example.customer_vehicle_service.entity.VehicleServiceHistory;
 import com.example.customer_vehicle_service.enums.ServiceRecordType;
+import com.example.customer_vehicle_service.exception.CustomerNotFoundException;
 import com.example.customer_vehicle_service.exception.ServiceHistoryInvalidTypeException;
 import com.example.customer_vehicle_service.exception.VehicleNotFoundException;
 import com.example.customer_vehicle_service.mapper.ServiceHistoryMapper;
+import com.example.customer_vehicle_service.repository.CustomerRepository;
 import com.example.customer_vehicle_service.repository.VehicleRepository;
 import com.example.customer_vehicle_service.repository.VehicleServiceHistoryRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -21,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,6 +49,8 @@ class ServiceHistoryServiceImplTest {
     @Mock
     private VehicleRepository vehicleRepository;
     @Mock
+    private CustomerRepository customerRepository;
+    @Mock
     private ServiceHistoryMapper historyMapper;
     @Mock
     private CurrentCustomerService currentCustomerService;
@@ -70,7 +75,7 @@ class ServiceHistoryServiceImplTest {
         var entity = history(ServiceRecordType.EXTERNAL_SERVICE);
         given(historyRepository.findByVehicleId(VEHICLE_ID, pageable))
                 .willReturn(new PageImpl<>(List.of(entity), pageable, 1));
-        ServiceHistoryResponse mapped = response();
+        ServiceHistoryResponse mapped = response(null);
         given(historyMapper.toServiceHistoryResponse(entity)).willReturn(mapped);
 
         var result = serviceHistoryService.getServiceHistory(VEHICLE_ID, pageable);
@@ -96,7 +101,7 @@ class ServiceHistoryServiceImplTest {
     @Test
     void createServiceHistory_persistsFieldsAndLeavesWorkOrderIdNull() {
         Vehicle vehicle = vehicle();
-        ServiceHistoryResponse mapped = response();
+        ServiceHistoryResponse mapped = response(null);
         given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle));
         given(historyRepository.save(any(VehicleServiceHistory.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -104,7 +109,7 @@ class ServiceHistoryServiceImplTest {
                 .willReturn(mapped);
 
         var result = serviceHistoryService.createServiceHistory(VEHICLE_ID,
-                request(ServiceRecordType.EXTERNAL_SERVICE, "  Thay dầu  ", "Gara An Phú"));
+                request(null, ServiceRecordType.EXTERNAL_SERVICE, "  Thay dầu  ", "Gara An Phú"));
 
         assertThat(result).isEqualTo(mapped);
         ArgumentCaptor<VehicleServiceHistory> captor =
@@ -128,7 +133,7 @@ class ServiceHistoryServiceImplTest {
         given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
 
         assertThatThrownBy(() -> serviceHistoryService.createServiceHistory(VEHICLE_ID,
-                request(ServiceRecordType.GARAGE_SERVICE, "Thay dầu", null)))
+                request(null, ServiceRecordType.GARAGE_SERVICE, "Thay dầu", null)))
                 .isInstanceOf(ServiceHistoryInvalidTypeException.class)
                 .hasMessageContaining("GARAGE_SERVICE");
 
@@ -142,10 +147,10 @@ class ServiceHistoryServiceImplTest {
         given(historyRepository.save(any(VehicleServiceHistory.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
         given(historyMapper.toServiceHistoryResponse(any(VehicleServiceHistory.class)))
-                .willReturn(response());
+                .willReturn(response(null));
 
         serviceHistoryService.createServiceHistory(VEHICLE_ID,
-                request(ServiceRecordType.CUSTOMER_REPORTED, "Khách nói vừa thay phanh", null));
+                request(null, ServiceRecordType.CUSTOMER_REPORTED, "Khách nói vừa thay phanh", null));
 
         ArgumentCaptor<VehicleServiceHistory> captor =
                 ArgumentCaptor.forClass(VehicleServiceHistory.class);
@@ -158,49 +163,36 @@ class ServiceHistoryServiceImplTest {
         given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> serviceHistoryService.createServiceHistory(VEHICLE_ID,
-                request(ServiceRecordType.EXTERNAL_SERVICE, "Thay dầu", null)))
+                request(null, ServiceRecordType.EXTERNAL_SERVICE, "Thay dầu", null)))
                 .isInstanceOf(VehicleNotFoundException.class);
 
         verifyNoInteractions(historyRepository);
     }
 
-    // ===== Lọc theo chủ xe =====
-
-    @Test
-    void getServiceHistory_customerReadsOwnVehicleHistory() {
-        authenticateAsCustomer();
-        var pageable = PageRequest.of(0, 20);
-        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicleOwnedBy(OWNER_ID)));
-        given(currentCustomerService.getRequiredCustomerId()).willReturn(OWNER_ID);
-        given(historyRepository.findByVehicleId(VEHICLE_ID, pageable))
-                .willReturn(new PageImpl<>(List.of(), pageable, 0));
-
-        serviceHistoryService.getServiceHistory(VEHICLE_ID, pageable);
-
-        verify(historyRepository).findByVehicleId(VEHICLE_ID, pageable);
-    }
+    // ===== Chặn khách hàng đọc lịch sử kỹ thuật của xe =====
 
     /**
-     * Xe của người khác phải trả 404 chứ không phải 403: trả 403 cho id có thật
-     * sẽ biến API thành công cụ dò xem id nào tồn tại.
+     * Đảo ngược hoàn toàn mô hình cũ: trước đây khách hàng đọc được lịch sử của
+     * "xe mình sở hữu". Nay xe không thuộc về ai, và nếu vẫn mở thì bất kỳ khách
+     * nào đăng nhập cũng đọc được lịch sử của mọi xe trong hệ thống chỉ bằng cách
+     * đoán id.
      */
     @Test
-    void getServiceHistory_hidesForeignVehicleAsNotFound() {
+    void getServiceHistory_rejectsCustomer() {
         authenticateAsCustomer();
-        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicleOwnedBy(UUID.randomUUID())));
-        given(currentCustomerService.getRequiredCustomerId()).willReturn(OWNER_ID);
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
 
         assertThatThrownBy(() -> serviceHistoryService.getServiceHistory(VEHICLE_ID, PageRequest.of(0, 20)))
-                .isInstanceOf(VehicleNotFoundException.class);
+                .isInstanceOf(AccessDeniedException.class);
 
         verify(historyRepository, never()).findByVehicleId(any(), any());
     }
 
     @Test
-    void getServiceHistory_staffBypassesOwnershipCheck() {
-        authenticateAs("VEHICLE_READ");
+    void getServiceHistory_staffReadsAnyVehicleHistory() {
+        authenticateAs("SERVICE_HISTORY_READ");
         var pageable = PageRequest.of(0, 20);
-        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicleOwnedBy(UUID.randomUUID())));
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
         given(historyRepository.findByVehicleId(VEHICLE_ID, pageable))
                 .willReturn(new PageImpl<>(List.of(), pageable, 0));
 
@@ -213,15 +205,147 @@ class ServiceHistoryServiceImplTest {
 
     /** Không có authentication (vd. gọi nội bộ) thì không ai bị coi là khách hàng. */
     @Test
-    void getServiceHistory_withoutAuthenticationSkipsOwnershipCheck() {
+    void getServiceHistory_withoutAuthenticationIsTreatedAsStaff() {
         var pageable = PageRequest.of(0, 20);
-        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicleOwnedBy(UUID.randomUUID())));
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
         given(historyRepository.findByVehicleId(VEHICLE_ID, pageable))
                 .willReturn(new PageImpl<>(List.of(), pageable, 0));
 
         serviceHistoryService.getServiceHistory(VEHICLE_ID, pageable);
 
         verifyNoInteractions(currentCustomerService);
+    }
+
+    // ===== Đọc lịch sử theo khách hàng =====
+
+    /**
+     * Bất biến bảo mật cốt lõi (spec §6): khách A và khách B cùng mang một xe tới,
+     * mỗi người chỉ thấy lần của chính mình.
+     *
+     * <p>Test khoá hành vi ở tầng service: truy vấn lọc theo {@code customerId}
+     * được truyền vào, không lọc theo xe. Vì vậy kể cả khi hai khách dùng chung một
+     * {@code vehicleId}, hai lần gọi vẫn trả về hai tập bản ghi khác nhau.
+     */
+    @Test
+    void getServiceHistoryByCustomer_neverLeaksAnotherCustomersVisit() {
+        UUID customerA = UUID.randomUUID();
+        UUID customerB = UUID.randomUUID();
+        var pageable = PageRequest.of(0, 20);
+
+        // Cùng một xe, hai khách mang tới ở hai thời điểm khác nhau.
+        VehicleServiceHistory visitByA = history(customerA, ServiceRecordType.EXTERNAL_SERVICE);
+        VehicleServiceHistory visitByB = history(customerB, ServiceRecordType.EXTERNAL_SERVICE);
+        given(historyRepository.findByCustomerIdOrderByServiceDateDesc(customerA, pageable))
+                .willReturn(new PageImpl<>(List.of(visitByA), pageable, 1));
+        given(historyRepository.findByCustomerIdOrderByServiceDateDesc(customerB, pageable))
+                .willReturn(new PageImpl<>(List.of(visitByB), pageable, 1));
+        ServiceHistoryResponse responseA = response(customerA);
+        ServiceHistoryResponse responseB = response(customerB);
+        given(historyMapper.toServiceHistoryResponse(visitByA)).willReturn(responseA);
+        given(historyMapper.toServiceHistoryResponse(visitByB)).willReturn(responseB);
+
+        var resultA = serviceHistoryService.getServiceHistoryByCustomer(customerA, pageable);
+        var resultB = serviceHistoryService.getServiceHistoryByCustomer(customerB, pageable);
+
+        assertThat(resultA.items()).containsExactly(responseA);
+        assertThat(resultA.items()).noneMatch(item -> customerB.equals(item.customerId()));
+        assertThat(resultB.items()).containsExactly(responseB);
+        assertThat(resultB.items()).noneMatch(item -> customerA.equals(item.customerId()));
+    }
+
+    /**
+     * {@code getServiceHistoryByCustomer} không cần resolve hồ sơ khách hàng: id
+     * đã do {@code CurrentCustomerService} lấy từ token và truyền vào. Truy vấn
+     * theo id thuần nên cũng không chạm tới {@code CustomerRepository}.
+     */
+    @Test
+    void getServiceHistoryByCustomer_doesNotRequireAuthenticationContext() {
+        UUID customerId = UUID.randomUUID();
+        var pageable = PageRequest.of(0, 20);
+        given(historyRepository.findByCustomerIdOrderByServiceDateDesc(customerId, pageable))
+                .willReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        serviceHistoryService.getServiceHistoryByCustomer(customerId, pageable);
+
+        verifyNoInteractions(currentCustomerService, customerRepository, vehicleRepository);
+    }
+
+    // ===== Gắn khách hàng vào lần tiếp nhận =====
+
+    @Test
+    void createServiceHistory_linksTheCustomerWhoBroughtTheVehicle() {
+        UUID customerId = UUID.randomUUID();
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(customerRepository.findById(customerId)).willReturn(Optional.of(customer(customerId, true)));
+        given(historyRepository.save(any(VehicleServiceHistory.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(historyMapper.toServiceHistoryResponse(any(VehicleServiceHistory.class)))
+                .willReturn(response(customerId));
+
+        serviceHistoryService.createServiceHistory(VEHICLE_ID,
+                request(customerId, ServiceRecordType.EXTERNAL_SERVICE, "Thay dầu", "Gara An Phú"));
+
+        ArgumentCaptor<VehicleServiceHistory> captor =
+                ArgumentCaptor.forClass(VehicleServiceHistory.class);
+        verify(historyRepository).save(captor.capture());
+        assertThat(captor.getValue().getCustomerId()).isEqualTo(customerId);
+    }
+
+    /** Không rõ ai mang xe tới (xe gửi hộ, nhập hậu kỳ) thì để null, không bắt buộc. */
+    @Test
+    void createServiceHistory_allowsMissingCustomer() {
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(historyRepository.save(any(VehicleServiceHistory.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(historyMapper.toServiceHistoryResponse(any(VehicleServiceHistory.class)))
+                .willReturn(response(null));
+
+        serviceHistoryService.createServiceHistory(VEHICLE_ID,
+                request(null, ServiceRecordType.CUSTOMER_REPORTED, "Khách nói vừa thay phanh", null));
+
+        ArgumentCaptor<VehicleServiceHistory> captor =
+                ArgumentCaptor.forClass(VehicleServiceHistory.class);
+        verify(historyRepository).save(captor.capture());
+        assertThat(captor.getValue().getCustomerId()).isNull();
+        verifyNoInteractions(customerRepository);
+    }
+
+    /**
+     * Khách hàng không còn hoạt động vẫn gửi xe bảo dưỡng được — {@code isActive =
+     * FALSE} chính là "đang gửi xe đi bảo dưỡng", nên chặn ở đây sẽ loại đúng người
+     * ta muốn phục vụ.
+     */
+    @Test
+    void createServiceHistory_allowsInactiveCustomer() {
+        UUID customerId = UUID.randomUUID();
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(customerRepository.findById(customerId))
+                .willReturn(Optional.of(customer(customerId, false)));
+        given(historyRepository.save(any(VehicleServiceHistory.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(historyMapper.toServiceHistoryResponse(any(VehicleServiceHistory.class)))
+                .willReturn(response(customerId));
+
+        serviceHistoryService.createServiceHistory(VEHICLE_ID,
+                request(customerId, ServiceRecordType.EXTERNAL_SERVICE, "Thay dầu", null));
+
+        ArgumentCaptor<VehicleServiceHistory> captor =
+                ArgumentCaptor.forClass(VehicleServiceHistory.class);
+        verify(historyRepository).save(captor.capture());
+        assertThat(captor.getValue().getCustomerId()).isEqualTo(customerId);
+    }
+
+    @Test
+    void createServiceHistory_rejectsUnknownCustomer() {
+        UUID customerId = UUID.randomUUID();
+        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle()));
+        given(customerRepository.findById(customerId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> serviceHistoryService.createServiceHistory(VEHICLE_ID,
+                request(customerId, ServiceRecordType.EXTERNAL_SERVICE, "Thay dầu", null)))
+                .isInstanceOf(CustomerNotFoundException.class);
+
+        verify(historyRepository, never()).save(any(VehicleServiceHistory.class));
     }
 
     // ===== Helpers =====
@@ -236,32 +360,33 @@ class ServiceHistoryServiceImplTest {
                         List.of(new SimpleGrantedAuthority(authority))));
     }
 
-    private Vehicle vehicleOwnedBy(UUID customerId) {
-        return Vehicle.builder().id(VEHICLE_ID)
-                .customer(Customer.builder().id(customerId).build())
-                .licensePlate("30A-12345").make("Honda").model("Accord").build();
+    private Customer customer(UUID id, boolean active) {
+        return Customer.builder().id(id).isActive(active).build();
     }
 
     private Vehicle vehicle() {
         return Vehicle.builder().id(VEHICLE_ID)
-                .customer(Customer.builder().id(UUID.randomUUID()).build())
                 .licensePlate("30A-12345").make("Honda").model("Accord").build();
     }
 
     private VehicleServiceHistory history(ServiceRecordType type) {
-        return VehicleServiceHistory.builder().id(UUID.randomUUID())
-                .vehicle(vehicle()).recordType(type).serviceDate(SERVICE_DATE)
-                .summary("Thay dầu").build();
+        return history(UUID.randomUUID(), type);
     }
 
-    private ServiceHistoryCreateRequest request(ServiceRecordType type, String summary,
-                                               String garageName) {
-        return new ServiceHistoryCreateRequest(type, SERVICE_DATE, 15000, summary,
+    private VehicleServiceHistory history(UUID customerId, ServiceRecordType type) {
+        return VehicleServiceHistory.builder().id(UUID.randomUUID())
+                .vehicle(vehicle()).customerId(customerId).recordType(type)
+                .serviceDate(SERVICE_DATE).summary("Thay dầu").build();
+    }
+
+    private ServiceHistoryCreateRequest request(UUID customerId, ServiceRecordType type,
+                                               String summary, String garageName) {
+        return new ServiceHistoryCreateRequest(customerId, type, SERVICE_DATE, 15000, summary,
                 "Thay dầu và lọc gió", garageName);
     }
 
-    private ServiceHistoryResponse response() {
-        return new ServiceHistoryResponse(UUID.randomUUID(), VEHICLE_ID, null,
+    private ServiceHistoryResponse response(UUID customerId) {
+        return new ServiceHistoryResponse(UUID.randomUUID(), VEHICLE_ID, customerId, null,
                 ServiceRecordType.EXTERNAL_SERVICE, SERVICE_DATE, 15000, "Thay dầu",
                 "Thay dầu và lọc gió", "Gara An Phú", SERVICE_DATE);
     }

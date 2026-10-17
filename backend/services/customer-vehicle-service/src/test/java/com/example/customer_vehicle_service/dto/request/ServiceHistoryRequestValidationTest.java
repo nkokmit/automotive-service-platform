@@ -34,7 +34,7 @@ class ServiceHistoryRequestValidationTest {
 
     @Test
     void createRequiresRecordTypeServiceDateAndSummary() {
-        var request = new ServiceHistoryCreateRequest(null, null, null, " ", null, null);
+        var request = new ServiceHistoryCreateRequest(null, null, null, null, " ", null, null);
 
         assertThat(validator.validate(request)).extracting(v -> v.getPropertyPath().toString())
                 .contains("recordType", "serviceDate", "summary");
@@ -102,7 +102,7 @@ class ServiceHistoryRequestValidationTest {
     private ServiceHistoryCreateRequest request(ServiceRecordType type, String summary,
                                                Instant serviceDate, Integer odometerKm,
                                                String garageName) {
-        return new ServiceHistoryCreateRequest(type, serviceDate, odometerKm, summary,
+        return new ServiceHistoryCreateRequest(null, type, serviceDate, odometerKm, summary,
                 null, garageName);
     }
 }

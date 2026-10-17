@@ -24,7 +24,6 @@ public enum ErrorCode {
     CUSTOMER_EMAIL_EXISTS(2003, "Email khách hàng đã tồn tại"),
     CUSTOMER_PHONE_EXISTS(2004, "Số điện thoại khách hàng đã tồn tại"),
     CUSTOMER_USER_ID_EXISTS(2005, "Tài khoản đã liên kết với khách hàng khác"),
-    CUSTOMER_HAS_ACTIVE_VEHICLES(2006, "Khách hàng còn xe đang hoạt động"),
     CUSTOMER_INACTIVE(2007, "Khách hàng không còn hoạt động"),
 
     // Vehicle (21xx)

@@ -31,6 +31,12 @@ import java.util.UUID;
  * khách hàng cung cấp) hoặc tự động tạo khi nhận sự kiện Work Order hoàn
  * thành — nguồn được phân biệt bằng {@link ServiceRecordType}.
  *
+ * <p>{@link #getCustomerId()} là khách hàng ĐÃ MANG XE ĐẾN lần tiếp nhận này —
+ * không phải chủ sở hữu xe. Mô hình đã bỏ quan hệ sở hữu
+ * ({@code V3__decouple_customer_from_vehicle.sql}), nên cùng một xe có thể xuất
+ * hiện trong lịch sử của nhiều khách hàng khác nhau: mỗi lần mang xe đến là
+ * một dòng riêng.
+ *
  * <p>{@code workOrderId} là ID ở {@code work-order-service}: cross-service nên
  * chỉ lưu ID dạng {@link UUID}, không có JPA relationship hay foreign key
  * (GLOBAL_RULES §2).
@@ -60,6 +66,25 @@ public class VehicleServiceHistory {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
+
+    /**
+     * Khách hàng đã mang xe đến lần tiếp nhận này. NULL khi không rõ ai mang
+     * xe tới (ví dụ bản ghi từ hệ thống cũ).
+     *
+     * <p>Không dùng {@code @ManyToOne Customer} dù có foreign key trong DB:
+     * {@link Customer} có {@code @SQLRestriction("deleted_at IS NULL")}, và
+     * {@code @ManyToOne} sẽ kéo restriction đó vào mọi truy vấn lịch sử —
+     * khiến lịch sử biến mất chỉ vì khách hàng đã bị xoá mềm. Bảng lịch sử
+     * cố ý giữ dòng dữ liệu để audit, nên ở đây chỉ lưu UUID thuần, giống
+     * {@link #workOrderId}.
+     *
+     * <p>Cột là {@code VARCHAR(36)} nên phải khai báo {@code @JdbcTypeCode} —
+     * nếu không Hibernate 7 sẽ mặc định map UUID thành {@code binary(36)} và
+     * validate fail.
+     */
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "customer_id", length = 36)
+    private UUID customerId;
 
     /**
      * ID Work Order sinh ra bản ghi này. NULL với bản ghi nhập từ bên ngoài.

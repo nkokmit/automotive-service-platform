@@ -1,6 +1,5 @@
 package com.example.customer_vehicle_service.controller;
 
-import com.example.customer_vehicle_service.service.CurrentCustomerService;
 import com.example.customer_vehicle_service.service.VehicleService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,10 +22,8 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -40,14 +37,11 @@ class VehicleControllerSecurityTest {
     private VehicleController controller;
     @Autowired
     private VehicleService service;
-    @Autowired
-    private CurrentCustomerService currentCustomerService;
     private static final UUID ID = UUID.randomUUID();
-    private static final UUID CUSTOMER_ID = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        reset(service, currentCustomerService);
+        reset(service);
         SecurityContextHolder.clearContext();
     }
 
@@ -70,10 +64,8 @@ class VehicleControllerSecurityTest {
         invoke(operation);
 
         switch (operation) {
-            case "list" -> verify(service).getVehicles(null, null, null, null,
-                    org.springframework.data.domain.PageRequest.of(0, 20,
-                            org.springframework.data.domain.Sort.by(
-                                    org.springframework.data.domain.Sort.Direction.DESC, "createdAt")));
+            case "list" -> verify(service).getVehicles(null, null, null,
+                    PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
             case "detail" -> verify(service).getVehicleById(ID);
             case "create" -> verify(service).createVehicle(null);
             case "update" -> verify(service).updateVehicle(ID, null);
@@ -99,26 +91,15 @@ class VehicleControllerSecurityTest {
     }
 
     /**
-     * {@code /me} chỉ yêu cầu đã đăng nhập nên CUSTOMER gọi được, và danh sách
-     * được giới hạn theo customerId của chính họ chứ không nhận tham số lọc.
+     * Điểm chuyển hướng của refactor: danh sách "xe của tôi" đã bị xoá khỏi
+     * {@code VehicleController} vì xe không thuộc về ai. Quyền đọc dữ liệu cá nhân
+     * của khách hàng giờ nằm ở {@code CustomerServiceHistoryController}, test tại
+     * {@code CustomerServiceHistoryControllerSecurityTest}.
      */
     @Test
-    void permitsAuthenticatedCustomerToListOwnVehicles() {
-        authenticate("ROLE_CUSTOMER");
-        given(currentCustomerService.getRequiredCustomerId()).willReturn(CUSTOMER_ID);
-
-        controller.getCurrentCustomerVehicles(0, 20, "createdAt", "DESC");
-
-        verify(currentCustomerService).getRequiredCustomerId();
-        verify(service).getVehicles(eq(CUSTOMER_ID), isNull(), isNull(), isNull(),
-                eq(PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"))));
-    }
-
-    @Test
-    void rejectsMissingAuthenticationOnOwnVehicles() {
-        assertThatThrownBy(() -> controller.getCurrentCustomerVehicles(0, 20, "createdAt", "DESC"))
-                .isInstanceOf(AuthenticationCredentialsNotFoundException.class);
-        verifyNoInteractions(service, currentCustomerService);
+    void vehicleEndpointsNoLongerExposeCustomerScopedReads() {
+        assertThat(VehicleController.class.getDeclaredMethods())
+                .noneMatch(method -> method.getName().toLowerCase().contains("currentcustomer"));
     }
 
     private void authenticate(String authority) {
@@ -129,7 +110,7 @@ class VehicleControllerSecurityTest {
 
     private void invoke(String operation) {
         switch (operation) {
-            case "list" -> controller.getVehicles(null, null, null, null, 0, 20, "createdAt", "DESC");
+            case "list" -> controller.getVehicles(null, null, null, 0, 20, "createdAt", "DESC");
             case "detail" -> controller.getVehicleById(ID);
             case "create" -> controller.createVehicle(null);
             case "update" -> controller.updateVehicle(ID, null);
@@ -147,14 +128,8 @@ class VehicleControllerSecurityTest {
         }
 
         @Bean
-        CurrentCustomerService currentCustomerService() {
-            return mock(CurrentCustomerService.class);
-        }
-
-        @Bean
-        VehicleController vehicleController(VehicleService service,
-                                           CurrentCustomerService currentCustomerService) {
-            return new VehicleController(service, currentCustomerService);
+        VehicleController vehicleController(VehicleService service) {
+            return new VehicleController(service);
         }
     }
 }

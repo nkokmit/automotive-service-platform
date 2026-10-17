@@ -43,6 +43,8 @@ class VehicleServiceHistoryControllerTest {
     private ServiceHistoryService serviceHistoryService;
     private MockMvc mvc;
     private static final UUID VEHICLE_ID = UUID.randomUUID();
+    /** Khách đã mang xe tới lần tiếp nhận — không phải chủ sở hữu. */
+    private static final UUID CUSTOMER_ID = UUID.randomUUID();
     private static final Instant SERVICE_DATE = Instant.parse("2026-01-15T08:30:00Z");
 
     @BeforeEach
@@ -189,7 +191,7 @@ class VehicleServiceHistoryControllerTest {
     }
 
     private ServiceHistoryResponse response() {
-        return new ServiceHistoryResponse(UUID.randomUUID(), VEHICLE_ID, null,
+        return new ServiceHistoryResponse(UUID.randomUUID(), VEHICLE_ID, CUSTOMER_ID, null,
                 ServiceRecordType.EXTERNAL_SERVICE, SERVICE_DATE, 15000, "Thay dầu",
                 null, "Gara An Phú", SERVICE_DATE);
     }

@@ -20,16 +20,17 @@ Owns customer and vehicle data.
 
 ## Endpoints
 
-| Endpoint | Required permission |
-| --- | --- |
-| `GET /api/customers/me` | authenticated |
-| `GET /api/vehicles/me` | authenticated |
-| `GET /api/customers`, `GET /api/customers/{id}` | `CUSTOMER_READ` |
-| `GET /api/vehicles`, `GET /api/vehicles/{id}` | `VEHICLE_READ` |
-| `POST`/`PUT`/`DELETE /api/customers[/{id}]` | `CUSTOMER_CREATE`/`UPDATE`/`DELETE` |
-| `POST`/`PUT`/`DELETE /api/vehicles[/{id}]` | `VEHICLE_CREATE`/`UPDATE`/`DELETE` |
-| `GET /api/vehicles/{vehicleId}/service-history` | `SERVICE_HISTORY_READ` |
-| `POST /api/vehicles/{vehicleId}/service-history` | `SERVICE_HISTORY_CREATE` |
+| Endpoint                                          | Required permission |
+|---------------------------------------------------| --- |
+| `GET /api/customers/me`                           | authenticated |
+| `GET /api/service-history/me`                     | authenticated |
+| `GET /api/customers`, `GET /api/customers/{id}`   | `CUSTOMER_READ` |
+| `GET /api/vehicles`, `GET /api/vehicles/{id}`     | `VEHICLE_READ` |
+| `POST`/`PUT`/`DELETE /api/customers[/{id}]`       | `CUSTOMER_CREATE`/`UPDATE`/`DELETE` |
+| `POST`/`PUT`/`DELETE /api/vehicles[/{id}]`        | `VEHICLE_CREATE`/`UPDATE`/`DELETE` |
+| `GET /api/customers/{customerId}/service-history` | `SERVICE_HISTORY_READ` and not `ROLE_CUSTOMER` |
+| `GET /api/vehicles/{vehicleId}/service-history`   | `SERVICE_HISTORY_READ` |
+| `POST /api/vehicles/{vehicleId}/service-history`  | `SERVICE_HISTORY_CREATE` |
 
 ## Customer self-service
 
@@ -54,3 +55,48 @@ off, so only `getCustomer().getId()` may be read.
 `/me` endpoints take no filter parameters on purpose — the garage-wide
 filters (`customerId`, `keyword`, `licensePlate`) belong to the staff
 listing endpoints.
+
+## Staff service history by customer
+
+`GET /api/customers/{customerId}/service-history` answers "every time this
+person brought a car in", across all their vehicles. It is the second way to
+read the same rows as `GET /api/vehicles/{vehicleId}/service-history`: the
+vehicle view is technical history of one car, this is service history of one
+person. Same `ServiceHistoryService.getServiceHistoryByCustomer` call, no new
+service method and no user-service migration — `SERVICE_HISTORY_READ` was
+already seeded (V5) and granted to `ADMIN`/`MANAGER`/`MECHANIC`, and already
+revoked from `CUSTOMER` by V7.
+
+Two authorization clauses, and the second one is not redundant:
+
+- `hasAuthority('SERVICE_HISTORY_READ')` closes the door in today's
+  configuration, since V7 removed that permission from `CUSTOMER`.
+- `not hasAuthority('ROLE_CUSTOMER')` repeats the role check that
+  `ServiceHistoryServiceImpl#requireCallerIsNotCustomer` applies to the
+  vehicle endpoint. `customerId` here comes from the URL, so a future
+  migration that re-grants `SERVICE_HISTORY_READ` to `CUSTOMER` would
+  otherwise turn this endpoint into a way to read every customer's history by
+  guessing ids, while the vehicle endpoint would stay protected. V6 is proof
+  that this re-grant has happened before. Checking the role rather than the
+  permission keeps the guarantee independent of the permission data.
+
+The cost of the second clause: a user holding both a staff role and
+`ROLE_CUSTOMER` is blocked here too. That is accepted — this is a data
+protection boundary and failing closed wins; such a user still reads their own
+history through `/api/service-history/me`.
+
+No existence check on `customerId`, unlike the vehicle endpoint which returns
+2101. Two reasons: history must stay readable for soft-deleted customers so
+staff can audit an old profile (the history table carries no
+`@SQLRestriction`), and on `/me` a missing customer is already rejected by
+`CurrentCustomerService`. The accepted trade-off is that an unknown
+`customerId` returns 200 with an empty page instead of 404 — this endpoint is
+deliberately not an existence oracle, and customers cannot reach it at all.
+
+Sorting is fixed to `serviceDate` descending and pagination takes only `page`
+and `size`. Accepting a `sortBy` would let a client push the most recent visit
+to the bottom of a "recent service history" screen. The repository method
+`findByCustomerIdOrderByServiceDateDesc` already encodes that order.
+
+No gateway change was needed: `/api/customers/**` was already routed to this
+service.

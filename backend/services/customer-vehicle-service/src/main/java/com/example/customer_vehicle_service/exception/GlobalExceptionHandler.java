@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -52,6 +53,33 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ErrorCode.INVALID_REQUEST,
                         "Body không hợp lệ: " + ex.getMostSpecificCause().getMessage()));
+    }
+
+    /**
+     * Path variable hoặc query param sai kiểu, ví dụ {@code customerId} không
+     * phải UUID.
+     *
+     * <p>Cùng lý do với {@link #handleUnreadableBody}: đây là lỗi của client,
+     * nhưng không có handler riêng thì exception rơi xuống
+     * {@link #handleUnknown} và client nhận 500, tưởng server lỗi — trong khi
+     * 500 lại là loại lỗi khiến cảnh báo giám sát và đội vận hành mở điều tra
+     * nhầm.
+     *
+     * <p>Chỉ đưa tên tham số vào message, không đưa {@code ex.getMessage()}: với
+     * kiểu target là {@code Class} (path variable) thì message của Spring là
+     * cả stack trace nội bộ, đọc vào như sự cố production còn nặng hơn lỗi gốc.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex) {
+        String requiredType = ex.getRequiredType() == null
+                ? "hợp lệ"
+                : ex.getRequiredType().getSimpleName();
+        String message = "Tham số '" + ex.getName() + "' phải là " + requiredType;
+        log.warn("Type mismatch: {}", message);
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ErrorCode.INVALID_REQUEST, message));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

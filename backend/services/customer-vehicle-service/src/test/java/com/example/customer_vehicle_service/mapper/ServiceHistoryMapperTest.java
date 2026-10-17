@@ -1,6 +1,5 @@
 package com.example.customer_vehicle_service.mapper;
 
-import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.entity.Vehicle;
 import com.example.customer_vehicle_service.entity.VehicleServiceHistory;
 import com.example.customer_vehicle_service.enums.ServiceRecordType;
@@ -16,13 +15,19 @@ class ServiceHistoryMapperTest {
 
     private final ServiceHistoryMapper mapper = Mappers.getMapper(ServiceHistoryMapper.class);
 
+    /**
+     * {@code customerId} trong DTO là UUID thuần, đọc thẳng từ cột
+     * {@code customer_id} của bản ghi chứ không đi qua quan hệ
+     * {@code Vehicle.customer} — quan hệ đó không còn tồn tại.
+     */
     @Test
-    void toServiceHistoryResponse_mapsVehicleIdAndAllPublicFields() {
+    void toServiceHistoryResponse_mapsVehicleAndCustomerIds() {
         UUID vehicleId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
         VehicleServiceHistory history = VehicleServiceHistory.builder()
                 .id(UUID.randomUUID())
-                .vehicle(Vehicle.builder().id(vehicleId)
-                        .customer(Customer.builder().id(UUID.randomUUID()).build()).build())
+                .vehicle(Vehicle.builder().id(vehicleId).build())
+                .customerId(customerId)
                 .recordType(ServiceRecordType.EXTERNAL_SERVICE)
                 .serviceDate(Instant.parse("2026-01-15T08:30:00Z"))
                 .odometerKm(15000)
@@ -35,8 +40,25 @@ class ServiceHistoryMapperTest {
         var result = mapper.toServiceHistoryResponse(history);
 
         assertThat(result.vehicleId()).isEqualTo(vehicleId);
+        assertThat(result.customerId()).isEqualTo(customerId);
         assertThat(result.recordType()).isEqualTo(ServiceRecordType.EXTERNAL_SERVICE);
-        assertThat(result).usingRecursiveComparison().ignoringFields("vehicleId").isEqualTo(history);
+        assertThat(result).usingRecursiveComparison()
+                .ignoringFields("vehicleId", "customerId").isEqualTo(history);
+    }
+
+    /**
+     * Bản ghi nhập hậu kỳ không biết ai mang xe tới thì {@code customerId} là
+     * {@code null} — và đó là dữ liệu hợp lệ, không phải lỗi mapping.
+     */
+    @Test
+    void toServiceHistoryResponse_toleratesMissingCustomer() {
+        var history = VehicleServiceHistory.builder().id(UUID.randomUUID())
+                .vehicle(Vehicle.builder().id(UUID.randomUUID()).build())
+                .recordType(ServiceRecordType.CUSTOMER_REPORTED)
+                .serviceDate(Instant.parse("2026-01-15T08:30:00Z"))
+                .summary("Thay dầu").build();
+
+        assertThat(mapper.toServiceHistoryResponse(history).customerId()).isNull();
     }
 
     @Test

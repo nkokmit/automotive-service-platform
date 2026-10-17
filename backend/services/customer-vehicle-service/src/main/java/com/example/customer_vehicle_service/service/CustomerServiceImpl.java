@@ -6,11 +6,9 @@ import com.example.customer_vehicle_service.dto.response.CustomerResponse;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.exception.CustomerAlreadyExistsException;
-import com.example.customer_vehicle_service.exception.CustomerHasActiveVehiclesException;
 import com.example.customer_vehicle_service.exception.CustomerNotFoundException;
 import com.example.customer_vehicle_service.mapper.CustomerMapper;
 import com.example.customer_vehicle_service.repository.CustomerRepository;
-import com.example.customer_vehicle_service.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,7 +26,6 @@ import java.util.UUID;
 public class CustomerServiceImpl implements CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final VehicleRepository vehicleRepository;
     private final CustomerMapper customerMapper;
 
     @Override
@@ -117,14 +114,11 @@ public class CustomerServiceImpl implements CustomerService {
             return;
         }
 
-        // Chặn xoá mềm khi còn xe hoạt động: xoá cứng sẽ vi phạm fk_vehicles_customer
-        // và làm mất dấu vết các xe đang vận hành (PLAN.md bước 3).
-        long activeVehicles = vehicleRepository.countByCustomerIdAndIsActiveTrue(id);
-        if (activeVehicles > 0) {
-            throw new CustomerHasActiveVehiclesException(
-                    "Khách hàng còn " + activeVehicles + " xe đang hoạt động, không thể xoá");
-        }
-
+        // Cố ý KHÔNG kiểm tra "còn xe hoạt động" nữa: xe không thuộc về khách hàng
+        // nữa nên không có khái niệm xe của khách hàng này. Việc một khách từng
+        // mang xe tới không ngăn được việc xoá hồ sơ — dữ liệu lịch sử được
+        // giữ nguyên để audit, và đây là bản ghi của một sự kiện đã xảy ra, không
+        // phải tài sản đang vận hành.
         customer.setDeletedAt(Instant.now());
         customer.setIsActive(Boolean.FALSE);
         customerRepository.save(customer);

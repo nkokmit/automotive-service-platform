@@ -15,12 +15,6 @@ import java.util.UUID;
 public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
 
     /**
-     * Phân trang xe theo chủ sở hữu hiện tại. Soft-deleted vehicle tự động bị loại
-     * nhờ {@code @SQLRestriction}.
-     */
-    Page<Vehicle> findByCustomerId(UUID customerId, Pageable pageable);
-
-    /**
      * Kiểm tra VIN đã tồn tại chưa (chỉ xét xe chưa bị xoá).
      */
     boolean existsByVin(String vin);
@@ -50,9 +44,13 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
      *
      * <p>Soft-deleted vehicle tự động bị loại nhờ {@code @SQLRestriction}.
      *
+     * <p>Cố ý KHÔNG có tham số lọc theo khách hàng: xe không còn quan hệ sở hữu
+     * với customer nào ({@code V3__decouple_customer_from_vehicle.sql}). Muốn
+     * biết khách nào từng mang xe này đến thì tra lịch sử bảo dưỡng theo
+     * {@code customerId}, không lọc được ở mức hồ sơ xe.
+     *
      * <p>Mỗi tham số {@code null} nghĩa là bỏ qua điều kiện lọc tương ứng:
      * <ul>
-     *   <li>{@code customerId} — lọc theo chủ sở hữu hiện tại</li>
      *   <li>{@code licensePlate} — so khớp chính xác biển số (đã chuẩn hoá
      *       uppercase ở service), vì biển số là mã định danh ngắn chứ không phải
      *       từ khoá tìm kiếm</li>
@@ -66,8 +64,7 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
      */
     @Query("""
             SELECT v FROM Vehicle v
-            WHERE (:customerId IS NULL OR v.customer.id = :customerId)
-              AND (:licensePlate IS NULL OR v.licensePlate = :licensePlate)
+            WHERE (:licensePlate IS NULL OR v.licensePlate = :licensePlate)
               AND (:keyword IS NULL OR :keyword = ''
                    OR LOWER(v.licensePlate) LIKE LOWER(CONCAT('%', :keyword, '%'))
                    OR (v.vin IS NOT NULL
@@ -76,8 +73,7 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
                    OR LOWER(v.model) LIKE LOWER(CONCAT('%', :keyword, '%')))
               AND (:isActive IS NULL OR v.isActive = :isActive)
             """)
-    Page<Vehicle> search(@Param("customerId") UUID customerId,
-                         @Param("licensePlate") String licensePlate,
+    Page<Vehicle> search(@Param("licensePlate") String licensePlate,
                          @Param("keyword") String keyword,
                          @Param("isActive") Boolean isActive,
                          Pageable pageable);
@@ -88,11 +84,4 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
      */
     @Query(value = "SELECT * FROM vehicles WHERE id = :id", nativeQuery = true)
     Optional<Vehicle> findByIdRaw(@Param("id") UUID id);
-
-    /**
-     * Đếm xe đang hoạt động của một khách hàng — dùng để chặn xoá mềm khách
-     * hàng khi còn xe (PLAN.md bước 3). Soft-deleted vehicle bị loại nhờ
-     * {@code @SQLRestriction}.
-     */
-    long countByCustomerIdAndIsActiveTrue(UUID customerId);
 }

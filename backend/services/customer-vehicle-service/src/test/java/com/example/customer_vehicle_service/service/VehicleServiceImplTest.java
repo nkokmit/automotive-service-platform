@@ -3,15 +3,11 @@ package com.example.customer_vehicle_service.service;
 import com.example.customer_vehicle_service.dto.request.VehicleCreateRequest;
 import com.example.customer_vehicle_service.dto.request.VehicleUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
-import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.entity.Vehicle;
-import com.example.customer_vehicle_service.exception.CustomerInactiveException;
-import com.example.customer_vehicle_service.exception.CustomerNotFoundException;
 import com.example.customer_vehicle_service.exception.ErrorCode;
 import com.example.customer_vehicle_service.exception.VehicleNotFoundException;
 import com.example.customer_vehicle_service.exception.VehicleVinAlreadyExistsException;
 import com.example.customer_vehicle_service.mapper.VehicleMapper;
-import com.example.customer_vehicle_service.repository.CustomerRepository;
 import com.example.customer_vehicle_service.repository.VehicleRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,28 +33,30 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-/** Unit test nghiệp vụ xe, không cần MySQL/Flyway. */
+/**
+ * Unit test nghiệp vụ xe, không cần MySQL/Flyway.
+ *
+ * <p>Cố ý KHÔNG mock {@code CustomerRepository}: {@link VehicleServiceImpl}
+ * không còn phụ thuộc khách hàng nào nữa. Nếu sau này ai đó thêm lại, Mockito sẽ
+ * inject {@code null} và test này ném {@code NullPointerException} ngay — đó là
+ * cách rẻ nhất để phát hiện quan hệ cũ quay lại.
+ */
 @ExtendWith(MockitoExtension.class)
 class VehicleServiceImplTest {
 
     @Mock
     private VehicleRepository vehicleRepository;
     @Mock
-    private CustomerRepository customerRepository;
-    @Mock
     private VehicleMapper vehicleMapper;
     @InjectMocks
     private VehicleServiceImpl vehicleService;
 
     private static final UUID VEHICLE_ID = UUID.randomUUID();
-    private static final UUID CUSTOMER_ID = UUID.randomUUID();
     private static final String VIN = "1HGCM82633A004352";
     private static final String NEW_VIN = "1HGCM82633A004353";
 
     @Test
     void createVehicle_persistsFieldsAndDefaultsToActive() {
-        Customer customer = customer(CUSTOMER_ID, true);
-        given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(customer));
         given(vehicleRepository.save(any(Vehicle.class))).willAnswer(invocation -> invocation.getArgument(0));
         VehicleResponse expected = response(vehicle());
         given(vehicleMapper.toVehicleResponse(any(Vehicle.class))).willReturn(expected);
@@ -69,7 +67,6 @@ class VehicleServiceImplTest {
         ArgumentCaptor<Vehicle> captor = ArgumentCaptor.forClass(Vehicle.class);
         verify(vehicleRepository).save(captor.capture());
         Vehicle saved = captor.getValue();
-        assertThat(saved.getCustomer()).isSameAs(customer);
         assertThat(saved.getLicensePlate()).isEqualTo("30A-12345");
         assertThat(saved.getVin()).isEqualTo(VIN);
         assertThat(saved.getMake()).isEqualTo("Honda");
@@ -86,10 +83,24 @@ class VehicleServiceImplTest {
         verify(vehicleRepository).countByVinIncludingDeleted(VIN);
     }
 
+    /**
+     * Xe không thuộc về khách hàng nào, nên không có đường nào để gắn owner khi
+     * tạo. Nếu ai đó thêm lại {@code .customer(...)} vào builder, phần schema thì
+     * do V3 migration lo — test này chỉ chứng minh "không còn truy cập khách
+     * hàng".
+     */
+    @Test
+    void createVehicle_needsNoOwner() {
+        given(vehicleRepository.save(any(Vehicle.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(vehicleMapper.toVehicleResponse(any(Vehicle.class))).willReturn(response(vehicle()));
+
+        vehicleService.createVehicle(createRequest(VIN, null));
+
+        verify(vehicleRepository).save(any(Vehicle.class));
+    }
+
     @Test
     void createVehicle_allowsMissingVinAndExplicitInactiveStatus() {
-        given(customerRepository.findById(CUSTOMER_ID))
-                .willReturn(Optional.of(customer(CUSTOMER_ID, true)));
         given(vehicleRepository.save(any(Vehicle.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         vehicleService.createVehicle(createRequest(null, false));
@@ -101,30 +112,13 @@ class VehicleServiceImplTest {
         verify(vehicleRepository, never()).countByVinIncludingDeleted(any());
     }
 
-    @Test
-    void createVehicle_rejectsMissingOrSoftDeletedCustomer() {
-        given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.empty());
-
-        assertThatThrownBy(() -> vehicleService.createVehicle(createRequest(VIN, null)))
-                .isInstanceOf(CustomerNotFoundException.class);
-        verifyNoInteractions(vehicleRepository, vehicleMapper);
-    }
-
-    @Test
-    void createVehicle_rejectsInactiveCustomer() {
-        given(customerRepository.findById(CUSTOMER_ID))
-                .willReturn(Optional.of(customer(CUSTOMER_ID, false)));
-
-        assertThatThrownBy(() -> vehicleService.createVehicle(createRequest(VIN, null)))
-                .isInstanceOf(CustomerInactiveException.class)
-                .extracting("errorCode").isEqualTo(ErrorCode.CUSTOMER_INACTIVE);
-        verifyNoInteractions(vehicleRepository, vehicleMapper);
-    }
-
+    /**
+     * Ràng buộc cốt lõi của đợt tách chủ sở hữu: tạo xe không được yêu cầu khách
+     * hàng. Cả hai test cũ (khách chưa tồn tại / khách không hoạt động) đều bị
+     * gỡ vì không còn tình huống nào để chặn.
+     */
     @Test
     void createVehicle_rejectsVinReservedByAnyVehicleIncludingDeleted() {
-        given(customerRepository.findById(CUSTOMER_ID))
-                .willReturn(Optional.of(customer(CUSTOMER_ID, true)));
         given(vehicleRepository.countByVinIncludingDeleted(VIN)).willReturn(1L);
 
         assertThatThrownBy(() -> vehicleService.createVehicle(createRequest(VIN, null)))
@@ -133,63 +127,24 @@ class VehicleServiceImplTest {
         verify(vehicleRepository, never()).save(any());
     }
 
+    /**
+     * Không còn chuyển chủ sở hữu nữa, nên cũng không còn nhánh gọi tới
+     * CustomerRepository. Test khoá hành vi: cập nhật xe không bao giờ chạm tới
+     * khách hàng — và vì {@code VehicleUpdateRequest} không còn có
+     * {@code customerId}, client cũ gửi field đó cũng bị Jackson bỏ qua chứ
+     * không tạo được đường nâng quyền.
+     */
     @Test
-    void updateVehicle_transfersOwnershipToActiveCustomer() {
+    void updateVehicle_hasNoOwnershipTransferPath() {
         Vehicle vehicle = vehicle();
-        UUID newCustomerId = UUID.randomUUID();
-        Customer newCustomer = customer(newCustomerId, true);
         given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle));
-        given(customerRepository.findById(newCustomerId)).willReturn(Optional.of(newCustomer));
         given(vehicleRepository.save(vehicle)).willReturn(vehicle);
         given(vehicleMapper.toVehicleResponse(vehicle)).willAnswer(invocation -> response(vehicle));
 
-        var result = vehicleService.updateVehicle(VEHICLE_ID, updateRequest(newCustomerId, null));
+        vehicleService.updateVehicle(VEHICLE_ID, updateRequest(null));
 
-        assertThat(vehicle.getCustomer()).isSameAs(newCustomer);
-        assertThat(result.customerId()).isEqualTo(newCustomerId);
-        assertThat(vehicle.getVin()).isEqualTo(VIN);
+        assertThat(vehicle.getIsActive()).isTrue();
         verify(vehicleRepository).save(vehicle);
-    }
-
-    @Test
-    void updateVehicle_rejectsMissingNewOwner() {
-        Vehicle vehicle = vehicle();
-        UUID newCustomerId = UUID.randomUUID();
-        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle));
-        given(customerRepository.findById(newCustomerId)).willReturn(Optional.empty());
-
-        assertThatThrownBy(() -> vehicleService.updateVehicle(VEHICLE_ID, updateRequest(newCustomerId, null)))
-                .isInstanceOf(CustomerNotFoundException.class);
-        assertThat(vehicle.getCustomer().getId()).isEqualTo(CUSTOMER_ID);
-        verify(vehicleRepository, never()).save(any());
-    }
-
-    @Test
-    void updateVehicle_rejectsInactiveNewOwner() {
-        Vehicle vehicle = vehicle();
-        UUID newCustomerId = UUID.randomUUID();
-        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle));
-        given(customerRepository.findById(newCustomerId))
-                .willReturn(Optional.of(customer(newCustomerId, false)));
-
-        assertThatThrownBy(() -> vehicleService.updateVehicle(VEHICLE_ID, updateRequest(newCustomerId, null)))
-                .isInstanceOf(CustomerInactiveException.class);
-        assertThat(vehicle.getCustomer().getId()).isEqualTo(CUSTOMER_ID);
-        verify(vehicleRepository, never()).save(any());
-    }
-
-    @Test
-    void updateVehicle_skipsChecksWhenOwnerAndVinAreUnchanged() {
-        Vehicle vehicle = vehicle();
-        vehicle.getCustomer().setIsActive(false);
-        given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle));
-        given(vehicleRepository.save(vehicle)).willReturn(vehicle);
-
-        vehicleService.updateVehicle(VEHICLE_ID, updateRequest(CUSTOMER_ID, VIN.toLowerCase(Locale.ROOT)));
-
-        verifyNoInteractions(customerRepository);
-        verify(vehicleRepository, never()).countByVinIncludingDeleted(any());
-        assertThat(vehicle.getVin()).isEqualTo(VIN);
     }
 
     @Test
@@ -198,7 +153,7 @@ class VehicleServiceImplTest {
         given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle));
         given(vehicleRepository.countByVinIncludingDeleted(NEW_VIN)).willReturn(1L);
 
-        assertThatThrownBy(() -> vehicleService.updateVehicle(VEHICLE_ID, updateRequest(null, NEW_VIN)))
+        assertThatThrownBy(() -> vehicleService.updateVehicle(VEHICLE_ID, updateRequest(NEW_VIN)))
                 .isInstanceOf(VehicleVinAlreadyExistsException.class);
         assertThat(vehicle.getVin()).isEqualTo(VIN);
         verify(vehicleRepository, never()).save(any());
@@ -211,7 +166,7 @@ class VehicleServiceImplTest {
         given(vehicleRepository.save(vehicle)).willReturn(vehicle);
         var request = new VehicleUpdateRequest(" 30b-54321 ", NEW_VIN.toLowerCase(Locale.ROOT),
                 " Toyota ", " Camry ", (short) 2024, "LE", "White", "Hybrid", "CVT", 0,
-                "updated", false, null);
+                "updated", false);
 
         vehicleService.updateVehicle(VEHICLE_ID, request);
 
@@ -228,7 +183,6 @@ class VehicleServiceImplTest {
         assertThat(vehicle.getNotes()).isEqualTo("updated");
         assertThat(vehicle.getIsActive()).isFalse();
         verify(vehicleRepository).countByVinIncludingDeleted(NEW_VIN);
-        verifyNoInteractions(customerRepository);
     }
 
     @Test
@@ -237,7 +191,7 @@ class VehicleServiceImplTest {
         given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.of(vehicle));
         given(vehicleRepository.save(vehicle)).willReturn(vehicle);
         var request = new VehicleUpdateRequest(null, null, null, null, null, null,
-                "White", null, null, null, null, null, null);
+                "White", null, null, null, null, null);
 
         vehicleService.updateVehicle(VEHICLE_ID, request);
 
@@ -248,16 +202,15 @@ class VehicleServiceImplTest {
         assertThat(vehicle.getModel()).isEqualTo("Accord");
         assertThat(vehicle.getOdometerKm()).isEqualTo(15000);
         assertThat(vehicle.getIsActive()).isTrue();
-        verifyNoInteractions(customerRepository);
     }
 
     @Test
-    void updateVehicle_rejectsMissingOrDeletedVehicleBeforeCheckingOwner() {
+    void updateVehicle_rejectsMissingOrDeletedVehicle() {
         given(vehicleRepository.findById(VEHICLE_ID)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> vehicleService.updateVehicle(VEHICLE_ID, updateRequest(UUID.randomUUID(), NEW_VIN)))
+        assertThatThrownBy(() -> vehicleService.updateVehicle(VEHICLE_ID, updateRequest(NEW_VIN)))
                 .isInstanceOf(VehicleNotFoundException.class);
-        verifyNoInteractions(customerRepository, vehicleMapper);
+        verifyNoInteractions(vehicleMapper);
         verify(vehicleRepository, never()).save(any());
     }
 
@@ -281,16 +234,22 @@ class VehicleServiceImplTest {
         verify(vehicleRepository, never()).findByIdRaw(any());
     }
 
+    /**
+     * Ràng buộc cốt lõi của đợt tách chủ sở hữu: {@code getVehicles} xuất phát từ
+     * XE, không từ khách hàng. Signature mới có đúng ba bộ lọc, nên test gọi với
+     * ba tham số — nếu ai đó vô tình thêm lại tham số lọc khách hàng vào đây thì
+     * test này sẽ không còn biên dịch nữa.
+     */
     @Test
     void getVehicles_normalizesFiltersAndPreservesPageMetadata() {
         Vehicle vehicle = vehicle();
         VehicleResponse expected = response(vehicle);
         Pageable pageable = PageRequest.of(1, 2);
-        given(vehicleRepository.search(CUSTOMER_ID, "30A-12345", "Honda", false, pageable))
+        given(vehicleRepository.search("30A-12345", "Honda", false, pageable))
                 .willReturn(new PageImpl<>(List.of(vehicle), pageable, 7));
         given(vehicleMapper.toVehicleResponse(vehicle)).willReturn(expected);
 
-        var result = vehicleService.getVehicles(CUSTOMER_ID, " 30a-12345 ", " Honda ", false, pageable);
+        var result = vehicleService.getVehicles(" 30a-12345 ", " Honda ", false, pageable);
 
         assertThat(result.items()).containsExactly(expected);
         assertThat(result.page()).isEqualTo(1);
@@ -299,29 +258,28 @@ class VehicleServiceImplTest {
         assertThat(result.totalPages()).isEqualTo(4);
         assertThat(result.hasNext()).isTrue();
         assertThat(result.hasPrevious()).isTrue();
-        verifyNoInteractions(customerRepository);
     }
 
     @Test
     void getVehicles_normalizesBlankFiltersToNull() {
         Pageable pageable = PageRequest.of(0, 20);
-        given(vehicleRepository.search(null, null, null, null, pageable))
+        given(vehicleRepository.search(null, null, null, pageable))
                 .willReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        var result = vehicleService.getVehicles(null, "  ", " \t ", null, pageable);
+        var result = vehicleService.getVehicles("  ", " \t ", null, pageable);
 
         assertThat(result.items()).isEmpty();
         assertThat(result.totalElements()).isZero();
-        verify(vehicleRepository).search(null, null, null, null, pageable);
+        verify(vehicleRepository).search(null, null, null, pageable);
     }
 
     @Test
     void getVehicles_acceptsNullFilters() {
         Pageable pageable = PageRequest.of(0, 20);
-        given(vehicleRepository.search(null, null, null, null, pageable))
+        given(vehicleRepository.search(null, null, null, pageable))
                 .willReturn(new PageImpl<>(List.of(), pageable, 0));
 
-        assertThat(vehicleService.getVehicles(null, null, null, null, pageable).items()).isEmpty();
+        assertThat(vehicleService.getVehicles(null, null, null, pageable).items()).isEmpty();
     }
 
     @Test
@@ -336,7 +294,7 @@ class VehicleServiceImplTest {
         assertThat(vehicle.getIsActive()).isFalse();
         verify(vehicleRepository).save(vehicle);
         verify(vehicleRepository, never()).delete(any());
-        verifyNoInteractions(customerRepository, vehicleMapper);
+        verifyNoInteractions(vehicleMapper);
     }
 
     @Test
@@ -363,29 +321,25 @@ class VehicleServiceImplTest {
         verify(vehicleRepository, never()).save(any());
     }
 
-    private Customer customer(UUID id, boolean active) {
-        return Customer.builder().id(id).isActive(active).build();
-    }
-
     private Vehicle vehicle() {
-        return Vehicle.builder().id(VEHICLE_ID).customer(customer(CUSTOMER_ID, true))
+        return Vehicle.builder().id(VEHICLE_ID)
                 .licensePlate("30A-12345").vin(VIN).make("Honda").model("Accord")
                 .modelYear((short) 2020).odometerKm(15000).color("Black")
                 .isActive(true).build();
     }
 
     private VehicleCreateRequest createRequest(String vin, Boolean active) {
-        return new VehicleCreateRequest(CUSTOMER_ID, " 30a-12345 ", vin, " Honda ", " Accord ",
+        return new VehicleCreateRequest(" 30a-12345 ", vin, " Honda ", " Accord ",
                 (short) 2020, "EX", "Black", "Petrol", "Automatic", 15000, "ghi chú", active);
     }
 
-    private VehicleUpdateRequest updateRequest(UUID customerId, String vin) {
+    private VehicleUpdateRequest updateRequest(String vin) {
         return new VehicleUpdateRequest(null, vin, null, null, null, null, null,
-                null, null, null, null, null, customerId);
+                null, null, null, null, null);
     }
 
     private VehicleResponse response(Vehicle vehicle) {
-        return new VehicleResponse(vehicle.getId(), vehicle.getCustomer().getId(),
+        return new VehicleResponse(vehicle.getId(),
                 vehicle.getLicensePlate(), vehicle.getVin(), vehicle.getMake(), vehicle.getModel(),
                 vehicle.getModelYear(), vehicle.getTrim(), vehicle.getColor(), vehicle.getFuelType(),
                 vehicle.getTransmission(), vehicle.getOdometerKm(), vehicle.getNotes(),

@@ -3,28 +3,23 @@ package com.example.customer_vehicle_service.dto.request;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
-import java.util.UUID;
-
 /**
  * Request tạo hồ sơ xe (PLAN.md bước 4).
+ *
+ * <p>Cố ý KHÔNG có {@code customerId}: xe không thuộc về khách hàng nào
+ * ({@code V3__decouple_customer_from_vehicle.sql}). Khách hàng gắn với xe qua
+ * từng lần tiếp nhận, ghi ở
+ * {@link com.example.customer_vehicle_service.dto.request.ServiceHistoryCreateRequest}.
  *
  * <p>Ràng buộc {@code @Size} bám theo độ rộng cột trong
  * {@code V1__create_customer_vehicle_tables.sql} để validation ở tầng API báo lỗi
  * sớm, thay vì để MySQL chặn bằng lỗi constraint.
  */
 public record VehicleCreateRequest(
-        /**
-         * Chủ sở hữu hiện tại. Khách hàng phải tồn tại và còn hoạt động — được
-         * kiểm tra lại ở {@code VehicleServiceImpl} vì đây là khóa ngoại trong DB.
-         */
-        @NotNull(message = "Khách hàng sở hữu không được để trống")
-        UUID customerId,
-
         @Size(max = 20, message = "Biển số xe tối đa 20 ký tự")
         @NotBlank(message = "Biển số xe không được để trống")
         String licensePlate,
