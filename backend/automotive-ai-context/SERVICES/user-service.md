@@ -31,6 +31,18 @@ Do not generalize this rule to every future entity automatically.
 When extending this pattern, follow the existing entity, migration and
 repository implementation.
 
+## User contact uniqueness
+
+`users.email` is required and unique. `users.phone` is optional and unique
+when present; the database allows multiple `NULL` phone values. The unique
+constraints include soft-deleted accounts, so deleting an account does not
+release its email or phone for reuse. User create, update and registration
+validate these values, with database constraints protecting concurrent writes.
+
+After a registration transaction commits, `user-service` publishes a
+`UserRegistered` event to Kafka. `customer-vehicle-service` consumes the
+event and creates the matching customer profile asynchronously.
+
 ## API
 
 The previous context contained a detailed user API. Treat the current

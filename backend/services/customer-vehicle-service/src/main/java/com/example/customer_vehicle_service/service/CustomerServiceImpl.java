@@ -47,10 +47,8 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public CustomerResponse createCustomer(CustomerCreateRequest request) {
-        // userId là cột UNIQUE duy nhất nên chỉ field này cần kiểm tra trùng.
-        // existsByUserIdIncludingDeleted cố ý tính cả hồ sơ đã xoá mềm: tài khoản
-        // đã gắn với một hồ sơ lịch sử thì không được gắn lại vào hồ sơ mới.
-        if (request.userId() != null && customerRepository.existsByUserIdIncludingDeleted(request.userId())) {
+        // Tài khoản không được liên kết với hồ sơ khác, kể cả hồ sơ đã xoá mềm.
+        if (request.userId() != null && customerRepository.countByUserIdIncludingDeleted(request.userId()) > 0) {
             throw new CustomerAlreadyExistsException(
                     "Tài khoản đã được liên kết với khách hàng khác: " + request.userId());
         }
@@ -147,9 +145,10 @@ public class CustomerServiceImpl implements CustomerService {
      * chắc chắn là hồ sơ khác đang giữ tài khoản đó.
      */
     private void validateUserIdAvailable(UUID userId) {
-        if (customerRepository.existsByUserIdIncludingDeleted(userId)) {
+        if (customerRepository.countByUserIdIncludingDeleted(userId) > 0) {
             throw new CustomerAlreadyExistsException(
                     "Tài khoản đã được liên kết với khách hàng khác: " + userId);
         }
     }
+
 }

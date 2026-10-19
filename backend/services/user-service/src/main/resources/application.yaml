@@ -3,10 +3,22 @@ server:
 
 app:
   api-gateway-url: ${API_GATEWAY_URL:http://localhost:8000}
+  kafka:
+    topics:
+      user-registered: ${USER_REGISTERED_TOPIC:user-registered}
 
 spring:
   application:
     name: user-service
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        "[spring.json.add.type.headers]": false
 
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/user_service}
@@ -65,4 +77,3 @@ management:
       show-details: never
       probes:
         enabled: true
-

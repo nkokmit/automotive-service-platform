@@ -59,7 +59,7 @@ public class Customer {
     @Column(name = "full_name", length = 150, nullable = false)
     private String fullName;
 
-    @Column(name = "phone", length = 20, nullable = false)
+    @Column(name = "phone", length = 20, nullable = true)
     private String phone;
 
     @Column(name = "email", length = 255)

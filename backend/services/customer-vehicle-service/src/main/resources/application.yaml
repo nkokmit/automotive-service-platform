@@ -3,6 +3,9 @@ server:
 
 app:
   api-gateway-url: ${API_GATEWAY_URL:http://localhost:8000}
+  kafka:
+    topics:
+      user-registered: ${USER_REGISTERED_TOPIC:user-registered}
 
 spring:
   application:
@@ -48,10 +51,10 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
-        # Chặn deserialization type ngoài allowlist. Khi có event thật từ service
-        # khác (vd work-order-service) cần thêm package của producer vào đây.
+        spring.json.value.default.type: com.example.customer_vehicle_service.messaging.UserRegisteredEvent
+        spring.json.use.type.headers: false
+        # Chỉ deserialize event theo DTO được khai báo tại service này.
         spring.json.trusted.packages: com.example.customer_vehicle_service
-        spring.json.use.type.headers: true
     listener:
       # Thiếu topic không được làm sập app (topic sẽ được tạo khi producer ghi).
       missing-topics-fatal: false

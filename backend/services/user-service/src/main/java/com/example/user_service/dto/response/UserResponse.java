@@ -7,6 +7,7 @@ public record UserResponse(
         UUID id,
         String username,
         String email,
+        String phone,
         String fullName,
         Boolean isActive,
         Set<RoleResponse> roles

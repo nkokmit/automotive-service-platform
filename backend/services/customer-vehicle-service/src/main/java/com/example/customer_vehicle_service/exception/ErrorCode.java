@@ -21,8 +21,6 @@ public enum ErrorCode {
     // Customer (20xx)
     CUSTOMER_NOT_FOUND(2001, "Không tìm thấy khách hàng"),
     CUSTOMER_ALREADY_EXISTS(2002, "Khách hàng đã tồn tại"),
-    CUSTOMER_EMAIL_EXISTS(2003, "Email khách hàng đã tồn tại"),
-    CUSTOMER_PHONE_EXISTS(2004, "Số điện thoại khách hàng đã tồn tại"),
     CUSTOMER_USER_ID_EXISTS(2005, "Tài khoản đã liên kết với khách hàng khác"),
     CUSTOMER_INACTIVE(2007, "Khách hàng không còn hoạt động"),
 
