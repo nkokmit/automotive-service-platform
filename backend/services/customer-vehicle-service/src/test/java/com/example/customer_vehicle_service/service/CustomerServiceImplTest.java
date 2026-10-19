@@ -58,7 +58,7 @@ class CustomerServiceImplTest {
         CustomerCreateRequest request = new CustomerCreateRequest(
                 "Nguyễn Văn A", "0901234567", "a@example.com", "Hà Nội", "ghi chú", userId, null);
 
-        given(customerRepository.existsByUserIdIncludingDeleted(userId)).willReturn(false);
+        given(customerRepository.countByUserIdIncludingDeleted(userId)).willReturn(0L);
         given(customerRepository.save(any(Customer.class))).willAnswer(invocation -> invocation.getArgument(0));
         CustomerResponse expected = response(TRUE);
         given(customerMapper.toCustomerResponse(any(Customer.class))).willReturn(expected);
@@ -83,13 +83,28 @@ class CustomerServiceImplTest {
         CustomerCreateRequest request = new CustomerCreateRequest(
                 "Nguyễn Văn A", "0901234567", null, null, null, userId, null);
 
-        given(customerRepository.existsByUserIdIncludingDeleted(userId)).willReturn(true);
+        given(customerRepository.countByUserIdIncludingDeleted(userId)).willReturn(1L);
 
         assertThatThrownBy(() -> customerService.createCustomer(request))
                 .isInstanceOf(CustomerAlreadyExistsException.class)
                 .hasMessageContaining(userId.toString());
 
         verify(customerRepository, never()).save(any());
+    }
+
+    @Test
+    void createCustomer_allowsDuplicateContactsAndMissingPhone() {
+        CustomerCreateRequest request = new CustomerCreateRequest(
+                "Nguyễn Văn B", null, "a@example.com", null, null, null, null);
+        given(customerRepository.save(any(Customer.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(customerMapper.toCustomerResponse(any(Customer.class))).willReturn(response(TRUE));
+
+        customerService.createCustomer(request);
+
+        ArgumentCaptor<Customer> captor = ArgumentCaptor.forClass(Customer.class);
+        verify(customerRepository).save(captor.capture());
+        assertThat(captor.getValue().getPhone()).isNull();
+        assertThat(captor.getValue().getEmail()).isEqualTo("a@example.com");
     }
 
     // ===== Đọc khách hàng =====
@@ -181,7 +196,7 @@ class CustomerServiceImplTest {
         UUID takenUserId = UUID.randomUUID();
         Customer customer = customer();
         given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(customer));
-        given(customerRepository.existsByUserIdIncludingDeleted(takenUserId)).willReturn(true);
+        given(customerRepository.countByUserIdIncludingDeleted(takenUserId)).willReturn(1L);
         CustomerUpdateRequest request = new CustomerUpdateRequest(
                 null, null, null, null, null, takenUserId, null);
 
@@ -189,6 +204,36 @@ class CustomerServiceImplTest {
                 .isInstanceOf(CustomerAlreadyExistsException.class);
 
         verify(customerRepository, never()).save(any());
+    }
+
+    @Test
+    void updateCustomer_allowsPhoneAlreadyUsedByAnotherProfile() {
+        Customer customer = customer();
+        given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(customer));
+        given(customerRepository.save(customer)).willReturn(customer);
+        given(customerMapper.toCustomerResponse(customer)).willReturn(response(TRUE));
+        CustomerUpdateRequest request = new CustomerUpdateRequest(
+                null, "0987654321", null, null, null, null, null);
+
+        customerService.updateCustomer(CUSTOMER_ID, request);
+
+        assertThat(customer.getPhone()).isEqualTo("0987654321");
+        verify(customerRepository).save(customer);
+    }
+
+    @Test
+    void updateCustomer_allowsEmailAlreadyUsedByAnotherProfile() {
+        Customer customer = customer();
+        given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(customer));
+        given(customerRepository.save(customer)).willReturn(customer);
+        given(customerMapper.toCustomerResponse(customer)).willReturn(response(TRUE));
+        CustomerUpdateRequest request = new CustomerUpdateRequest(
+                null, null, "b@example.com", null, null, null, null);
+
+        customerService.updateCustomer(CUSTOMER_ID, request);
+
+        assertThat(customer.getEmail()).isEqualTo("b@example.com");
+        verify(customerRepository).save(customer);
     }
 
     @Test
@@ -204,7 +249,7 @@ class CustomerServiceImplTest {
         customerService.updateCustomer(CUSTOMER_ID, request);
 
         // Giữ nguyên userId hiện tại không được gọi exists check.
-        verify(customerRepository, never()).existsByUserIdIncludingDeleted(any());
+        verify(customerRepository, never()).countByUserIdIncludingDeleted(any());
     }
 
     // ===== Xoá mềm =====

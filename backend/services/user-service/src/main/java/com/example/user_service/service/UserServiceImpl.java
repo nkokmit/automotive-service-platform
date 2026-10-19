@@ -8,9 +8,12 @@ import com.example.user_service.dto.response.PageResponse;
 import com.example.user_service.dto.response.UserResponse;
 import com.example.user_service.entity.Role;
 import com.example.user_service.entity.User;
+import com.example.user_service.event.UserRegisteredEvent;
 import com.example.user_service.exception.ApiException;
 import com.example.user_service.exception.ErrorCode;
 import com.example.user_service.exception.RoleNotFoundException;
+import com.example.user_service.exception.UserEmailAlreadyExistsException;
+import com.example.user_service.exception.UserPhoneAlreadyExistsException;
 import com.example.user_service.exception.UserAlreadyExistsException;
 import com.example.user_service.exception.UserNotFoundException;
 import com.example.user_service.mapper.EntityMapper;
@@ -20,6 +23,7 @@ import com.example.user_service.security.jwt.JwtService;
 import com.example.user_service.security.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -48,6 +52,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** Role cố định được gán cho mọi tài khoản tự đăng ký. */
     private static final String DEFAULT_REGISTER_ROLE = "CUSTOMER";
@@ -86,7 +91,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse createUser(UserCreateRequest request) {
-        validateUniqueUsernameAndEmail(request.username(), request.email(), null);
+        validateUniqueUsernameEmailAndPhone(request.username(), request.email(), request.phone(), null);
 
         Set<Role> roles = resolveRoles(request.roleIds());
 
@@ -94,6 +99,7 @@ public class UserServiceImpl implements UserService {
                 .username(request.username())
                 .password(passwordEncoder.encode(request.password()))
                 .email(request.email())
+                .phone(request.phone())
                 .fullName(request.fullName())
                 .isActive(request.isActive() == null ? Boolean.TRUE : request.isActive())
                 .roles(roles)
@@ -110,12 +116,16 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng với id: " + id));
 
         if (request.username() != null && !request.username().equals(user.getUsername())) {
-            validateUniqueUsernameAndEmail(request.username(), null, id);
+            validateUniqueUsernameEmailAndPhone(request.username(), null, null, id);
             user.setUsername(request.username());
         }
         if (request.email() != null && !request.email().equals(user.getEmail())) {
-            validateUniqueUsernameAndEmail(null, request.email(), id);
+            validateUniqueUsernameEmailAndPhone(null, request.email(), null, id);
             user.setEmail(request.email());
+        }
+        if (request.phone() != null && !request.phone().equals(user.getPhone())) {
+            validateUniqueUsernameEmailAndPhone(null, null, request.phone(), id);
+            user.setPhone(request.phone());
         }
         if (request.fullName() != null) {
             user.setFullName(request.fullName());
@@ -177,7 +187,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public AuthenticationResponse registerUser(RegisterRequest request) {
-        validateUniqueUsernameAndEmail(request.username(), request.email(), null);
+        validateUniqueUsernameEmailAndPhone(request.username(), request.email(), request.phone(), null);
 
         // Role gán cứng server-side: endpoint public, không tin role do client gửi lên.
         Role defaultRole = roleRepository.findByName(DEFAULT_REGISTER_ROLE)
@@ -188,6 +198,7 @@ public class UserServiceImpl implements UserService {
                 .username(request.username())
                 .password(passwordEncoder.encode(request.password()))
                 .email(request.email())
+                .phone(request.phone())
                 .fullName(request.fullName())
                 .isActive(Boolean.TRUE)
                 .roles(Set.of(defaultRole))
@@ -195,6 +206,12 @@ public class UserServiceImpl implements UserService {
 
         User saved = userRepository.save(user);
         log.info("Đã đăng ký user mới: {}", saved.getUsername());
+        eventPublisher.publishEvent(new UserRegisteredEvent(
+                saved.getId(),
+                saved.getUsername(),
+                saved.getFullName(),
+                saved.getEmail(),
+                saved.getPhone()));
 
         return issueTokens(saved);
     }
@@ -213,7 +230,8 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
-    private void validateUniqueUsernameAndEmail(String username, String email, UUID excludeUserId) {
+    private void validateUniqueUsernameEmailAndPhone(
+            String username, String email, String phone, UUID excludeUserId) {
         if (username != null) {
             boolean exists = excludeUserId == null
                     ? userRepository.existsByUsername(username)
@@ -225,13 +243,19 @@ public class UserServiceImpl implements UserService {
             }
         }
         if (email != null) {
-            boolean exists = excludeUserId == null
-                    ? userRepository.existsByEmail(email)
-                    : userRepository.findByEmail(email)
-                        .map(u -> !u.getId().equals(excludeUserId))
-                        .orElse(false);
-            if (exists) {
-                throw new UserAlreadyExistsException("Email đã tồn tại: " + email);
+            long count = excludeUserId == null
+                    ? userRepository.countByEmailIncludingDeleted(email)
+                    : userRepository.countByEmailAndIdNotIncludingDeleted(email, excludeUserId);
+            if (count > 0) {
+                throw new UserEmailAlreadyExistsException("Email đã tồn tại: " + email);
+            }
+        }
+        if (phone != null) {
+            long count = excludeUserId == null
+                    ? userRepository.countByPhoneIncludingDeleted(phone)
+                    : userRepository.countByPhoneAndIdNotIncludingDeleted(phone, excludeUserId);
+            if (count > 0) {
+                throw new UserPhoneAlreadyExistsException("Số điện thoại đã tồn tại: " + phone);
             }
         }
     }
@@ -289,4 +313,3 @@ public class UserServiceImpl implements UserService {
                 .anyMatch(authority -> ADMIN_AUTHORITY.equals(authority.getAuthority()));
     }
 }
-

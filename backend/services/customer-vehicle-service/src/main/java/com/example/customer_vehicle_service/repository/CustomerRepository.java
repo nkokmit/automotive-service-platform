@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -53,8 +54,21 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
      * Trả về true cả khi khách hàng đã xoá mềm, để không tái sử dụng được
      * tài khoản đã gắn với một hồ sơ lịch sử.
      */
-    @Query(value = "SELECT COUNT(*) > 0 FROM customers WHERE user_id = :userId", nativeQuery = true)
-    boolean existsByUserIdIncludingDeleted(@Param("userId") UUID userId);
+    @Query(value = "SELECT COUNT(*) FROM customers WHERE user_id = :userId", nativeQuery = true)
+    long countByUserIdIncludingDeleted(@Param("userId") UUID userId);
+
+    /**
+     * Tìm các hồ sơ chưa gắn tài khoản khớp email hoặc phone để giữ lại lịch sử
+     * nhập thủ công nhưng ngừng dùng làm hồ sơ hoạt động sau khi đăng ký.
+     */
+    @Query("""
+            SELECT c FROM Customer c
+            WHERE c.userId IS NULL
+              AND ((:email IS NOT NULL AND LOWER(c.email) = LOWER(:email))
+                   OR (:phone IS NOT NULL AND c.phone = :phone))
+            """)
+    List<Customer> findUnlinkedByEmailOrPhone(@Param("email") String email,
+                                               @Param("phone") String phone);
 
     /**
      * Lấy khách hàng theo ID kể cả khi đã soft delete (native query để bypass

@@ -24,6 +24,9 @@ public record RegisterRequest(
         @Email(message = "Email không hợp lệ")
         String email,
 
+        @Size(min = 1, max = 20, message = "Số điện thoại phải từ 1 đến 20 ký tự")
+        String phone,
+
         @Size(max = 100, message = "Họ tên tối đa 100 ký tự")
         String fullName
 ) {

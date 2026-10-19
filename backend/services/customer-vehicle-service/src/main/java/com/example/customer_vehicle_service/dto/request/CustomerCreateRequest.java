@@ -19,7 +19,6 @@ public record CustomerCreateRequest(
         String fullName,
 
         @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
-        @NotBlank(message = "Số điện thoại không được để trống")
         String phone,
 
         @Email(message = "Email không hợp lệ")

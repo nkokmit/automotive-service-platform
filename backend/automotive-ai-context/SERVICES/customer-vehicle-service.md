@@ -18,6 +18,18 @@ Owns customer and vehicle data.
     needed.
 -   Booking may reference customer/vehicle IDs.
 
+## Customer contacts
+
+Customer phone and email are not unique: contacts may be shared or reused.
+Phone is nullable for profiles created from registrations without a phone
+number. The columns have non-unique indexes for searching.
+
+When a `UserRegistered` event matches an unlinked, manually entered customer
+by email or phone, the existing profile is retained but marked inactive; a
+new active profile linked to the user is created. Inactive customers remain
+searchable in the general customer listing unless the caller explicitly
+filters `isActive=true`.
+
 ## Endpoints
 
 | Endpoint                                          | Required permission |

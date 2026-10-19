@@ -35,6 +35,34 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmail(String email);
 
     /**
+     * Kiểm tra email đã được dùng chưa, kể cả user đã soft delete.
+     */
+    @Query(value = "SELECT COUNT(*) FROM users WHERE email = :email", nativeQuery = true)
+    long countByEmailIncludingDeleted(@Param("email") String email);
+
+    /**
+     * Kiểm tra email đã được user khác dùng chưa, kể cả user đã soft delete.
+     */
+    @Query(value = "SELECT COUNT(*) FROM users WHERE email = :email AND id <> :userId",
+            nativeQuery = true)
+    long countByEmailAndIdNotIncludingDeleted(@Param("email") String email,
+                                               @Param("userId") UUID userId);
+
+    /**
+     * Kiểm tra số điện thoại đã được dùng chưa, kể cả user đã soft delete.
+     */
+    @Query(value = "SELECT COUNT(*) FROM users WHERE phone = :phone", nativeQuery = true)
+    long countByPhoneIncludingDeleted(@Param("phone") String phone);
+
+    /**
+     * Kiểm tra số điện thoại đã được user khác dùng chưa, kể cả user đã soft delete.
+     */
+    @Query(value = "SELECT COUNT(*) FROM users WHERE phone = :phone AND id <> :userId",
+            nativeQuery = true)
+    long countByPhoneAndIdNotIncludingDeleted(@Param("phone") String phone,
+                                               @Param("userId") UUID userId);
+
+    /**
      * Lấy user theo ID kể cả khi đã soft delete (native query để bypass {@code @SQLRestriction}).
      */
     @Query(value = "SELECT * FROM users WHERE id = :id", nativeQuery = true)
@@ -45,5 +73,3 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      */
     Page<User> findAll(Pageable pageable);
 }
-
-

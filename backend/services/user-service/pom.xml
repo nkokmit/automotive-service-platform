@@ -96,6 +96,10 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka</artifactId>
+		</dependency>
 
 		<!-- Swagger / OpenAPI 3 - tương thích Spring Boot 4 / Spring Framework 7 -->
 		<dependency>

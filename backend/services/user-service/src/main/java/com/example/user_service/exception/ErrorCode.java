@@ -16,6 +16,7 @@ public enum ErrorCode {
     USER_ALREADY_EXISTS(1002, "Username hoặc email đã tồn tại"),
     USER_USERNAME_EXISTS(1003, "Username đã tồn tại"),
     USER_EMAIL_EXISTS(1004, "Email đã tồn tại"),
+    USER_PHONE_EXISTS(1005, "Số điện thoại đã tồn tại"),
 
     // Role (11xx)
     ROLE_NOT_FOUND(1101, "Không tìm thấy vai trò"),
