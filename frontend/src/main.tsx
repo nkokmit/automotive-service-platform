@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
 import Home from "./pages/Home";
+import { hydrateUser } from "./data/authStore";
 
 // Auth module
 import Login from "./modules/auth/Login";
@@ -31,6 +32,7 @@ import FoundationDemo from "./pages/FoundationDemo";
 import BoomDemo from "./pages/BoomDemo";
 
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
+import RequireAuth from "./components/RequireAuth";
 import AdminLayout from "./components/AdminLayout";
 import { ToastProvider } from "./components/Toast";
 import Card from "./components/Card";
@@ -46,7 +48,11 @@ import AdminParts from "./modules/admin/AdminParts";
 import AdminOrders from "./modules/admin/AdminOrders";
 import AdminUsers from "./modules/admin/AdminUsers";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+// Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
+// Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
+// và RequireAuth chuyển hướng về /login.
+hydrateUser().finally(() => {
+  ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary
       onError={(error, info) => {
@@ -62,7 +68,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
             {/* ============ AUTH module ============ */}
             <Route path="login" element={<Login />} />
-            <Route path="profile" element={<Profile />} />
+            <Route
+              path="profile"
+              element={
+                <RequireAuth>
+                  <Profile />
+                </RequireAuth>
+              }
+            />
 
             {/* ============ COMMERCE module ============ */}
             <Route path="cars" element={<CarsList />} />
@@ -134,7 +147,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>,
-);
+  );
+});
 
 // =========================
 // Admin placeholder pages

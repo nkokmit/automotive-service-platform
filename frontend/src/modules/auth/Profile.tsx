@@ -76,9 +76,14 @@ export default function Profile() {
   const addresses = useMemo(() => getUserAddresses(user.id), [user.id]);
   const vehicles = useMemo(() => getUserVehicles(user.id), [user.id]);
 
-  const handleLogout = () => {
-    logout();
-    t.info("Đã đăng xuất");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      t.info("Đã đăng xuất");
+    } catch {
+      // authApi.logout luôn clear token cục bộ dù server lỗi, nên không cần xử lý thêm.
+      t.info("Đã đăng xuất");
+    }
   };
 
   return (

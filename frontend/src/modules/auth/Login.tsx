@@ -11,26 +11,47 @@ export default function Login() {
   const initialMode = params.get("mode") === "register" ? "register" : "login";
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [loading, setLoading] = useState(false);
+  // Backend xác thực bằng `username` (không phải email) — xem AuthController.java.
   const [form, setForm] = useState({
-    name: "",
-    email: "nguyenvana@example.com",
+    fullName: "",
+    username: "",
+    email: "",
     phone: "",
     password: "",
+    confirmPassword: "",
   });
   const navigate = useNavigate();
   const t = useToast();
-  const { login } = useAuth();
+  const { login, register } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (mode === "register" && form.password !== form.confirmPassword) {
+      t.error("Mật khẩu xác nhận không khớp");
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
-      // Mock: login bằng email bất kỳ
-      const session = login(form.email || "demo@example.com");
-      setLoading(false);
+    try {
+      const session =
+        mode === "login"
+          ? await login(form.username, form.password)
+          : await register({
+              username: form.username,
+              password: form.password,
+              email: form.email,
+              phone: form.phone || undefined,
+              fullName: form.fullName || undefined,
+            });
       t.success(`Chào mừng ${session.user.name} quay lại!`);
       navigate("/profile");
-    }, 800);
+    } catch (err) {
+      // message đã là tiếng Việt từ GlobalExceptionHandler phía backend
+      t.error(err instanceof Error ? err.message : "Đăng nhập thất bại");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -75,13 +96,23 @@ export default function Login() {
               <Input
                 label="Họ và tên"
                 placeholder="Nguyễn Văn A"
-                value={form.name}
+                value={form.fullName}
                 onChange={(e) =>
-                  setForm({ ...form, name: e.target.value })
+                  setForm({ ...form, fullName: e.target.value })
                 }
                 autoComplete="name"
               />
             )}
+            <Input
+              label="Tên đăng nhập"
+              placeholder="nguyenvana"
+              value={form.username}
+              onChange={(e) =>
+                setForm({ ...form, username: e.target.value })
+              }
+              autoComplete="username"
+              required
+            />
             <Input
               type="email"
               label="Email"
@@ -115,14 +146,20 @@ export default function Login() {
               autoComplete={
                 mode === "login" ? "current-password" : "new-password"
               }
-              hint={mode === "register" ? "Ít nhất 8 ký tự" : undefined}
+              hint={mode === "register" ? "Ít nhất 6 ký tự" : undefined}
+              required
             />
             {mode === "register" && (
               <Input
                 type="password"
                 label="Xác nhận mật khẩu"
                 placeholder="••••••••"
+                value={form.confirmPassword}
+                onChange={(e) =>
+                  setForm({ ...form, confirmPassword: e.target.value })
+                }
                 autoComplete="new-password"
+                required
               />
             )}
 

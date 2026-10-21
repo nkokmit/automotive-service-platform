@@ -7,13 +7,12 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    // Proxy mọi request /api -> API Gateway (Spring Cloud)
-    // Gateway đang chạy ở http://localhost:4000 và expose /v3/api-docs
+    // Mọi request /api -> API Gateway (Spring Cloud) mà Gateway đang chạy ở port 8000.
     proxy: {
       "/api": {
-        target: "http://localhost:4000",
+        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:8000",
         changeOrigin: true,
-        // KHÔNG rewrite — Gateway đã có /api/v1/...
+        // KHÔNG rewrite — Gateway giữ nguyên prefix /api khi forward xuống service.
       },
     },
   },
