@@ -1,390 +1,221 @@
-openapi: 3.0.3
+openapi: "3.1.0"
 info:
-  title: AI Services API
+  title: Automotive AI Services API
+  version: "1.0.0"
   description: |
-    **SKELETON** — Bản nháp contract do Thành viên 1 (Gateway owner) đề xuất.
-    Thành viên 3 phụ trách 3 microservice AI:
-      - damage-detection-service  (:9001) - nhận diện hư hỏng từ ảnh
-      - recommendation-service    (:9002) - gợi ý sản phẩm/dịch vụ
-      - agent-service             (:9003) - chat AI + tra cứu dịch vụ
-  version: 0.1.0-draft
-  contact:
-    name: Thành viên 1
+    API contracts for the AI-powered services of the Automotive Service Platform.
+    Includes the LangGraph ReAct Agent and YOLOv8s-seg damage detection service.
+
 servers:
-  - url: http://localhost:4000/api/v1
-    description: Qua API Gateway (Recommended)
+  - url: http://localhost/api/v1
+    description: Local via Nginx gateway
+
 tags:
-  - name: Damage Detection
-  - name: Recommendation
-  - name: AI Agent (Chat)
-  - name: Admin
+  - name: chat
+    description: ReAct AI Agent chat endpoint
+  - name: damage-detection
+    description: Vehicle damage detection via YOLOv8s-seg ONNX
 
 paths:
-  # ===========================================================
-  # DAMAGE DETECTION  
-  # ===========================================================
-  /ai/damage/detect:
+  # ── Agent Service ──────────────────────────────────────────────────────
+  /chat:
     post:
-      tags: [Damage Detection]
-      summary: Upload ảnh xe và nhận diện hư hỏng
-      security: [{ bearerAuth: [] }]
+      tags: [chat]
+      summary: Send a message to the automotive AI agent
+      description: |
+        The ReAct agent uses 5 tools:
+        - `search_car_news` – Qdrant hybrid search
+        - `search_used_cars` – PostgreSQL filter
+        - `check_slots` – garage availability
+        - `create_booking` – appointment booking
+        - `analyze_vehicle_damage` – YOLOv8s damage detection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+            examples:
+              search_news:
+                summary: Ask about car maintenance
+                value:
+                  message: "Toyota Camry 2022 cần bảo dưỡng định kỳ như thế nào?"
+              search_cars:
+                summary: Find used cars
+                value:
+                  message: "Tìm xe Honda CRV đời 2021, giá dưới 1 tỷ"
+              book_service:
+                summary: Book a service slot
+                value:
+                  message: "Đặt lịch thay dầu xe tại AutoCare ngày 20/10/2026"
+              analyze_image:
+                summary: Detect damage from image
+                value:
+                  message: "Phân tích hư hỏng xe của tôi"
+                  image_url: "https://example.com/my-car.jpg"
+      responses:
+        "200":
+          description: Agent response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream when stream=true
+
+  /health:
+    get:
+      tags: [chat]
+      summary: Health check for agent-service
+      responses:
+        "200":
+          description: Service healthy
+
+  # ── Damage Detection Service ───────────────────────────────────────────
+  /detect:
+    post:
+      tags: [damage-detection]
+      summary: Detect vehicle damage from image URL or base64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DetectionRequest"
+      responses:
+        "200":
+          description: Detection results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResponse"
+
+  /detect/upload:
+    post:
+      tags: [damage-detection]
+      summary: Detect vehicle damage from uploaded image file
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
-              required: [image]
               properties:
-                image:
+                file:
                   type: string
                   format: binary
-                  description: 'Ảnh xe (JPEG/PNG, max 10MB)'
-                vehicleId:
-                  type: string
-                  description: 'ID xe của user (optional, để lưu lịch sử)'
+                conf_threshold:
+                  type: number
+                  default: 0.25
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/DamageDetectionResult' }
-        '413':
-          description: Ảnh quá lớn
-        '415':
-          description: Format ảnh không hỗ trợ
-
-  /ai/damage/history:
-    get:
-      tags: [Damage Detection]
-      summary: Lịch sử các lần detect
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/PageSizeParam'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/DamageDetectionPage' }
-
-  # ===========================================================
-  # RECOMMENDATION
-  # ===========================================================
-  /ai/recommend:
-    post:
-      tags: [Recommendation]
-      summary: Gợi ý dịch vụ / sản phẩm cho user
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RecommendRequest' }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RecommendResult' }
-    get:
-      tags: [Recommendation]
-      summary: Gợi ý mặc định (dựa trên lịch sử user)
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: query
-          name: type
-          schema:
-            type: string
-            enum: [SERVICE, PART, CAR]
-            default: SERVICE
-        - in: query
-          name: limit
-          schema: { type: integer, default: 5 }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/RecommendResult' }
-
-  # ===========================================================
-  # AI AGENT (CHAT)
-  # ===========================================================
-  /ai/assistant/message:
-    post:
-      tags: [AI Agent (Chat)]
-      summary: Gửi tin nhắn cho AI Agent
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/ChatMessageRequest' }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ChatMessageResponse' }
-
-  /ai/assistant/conversations:
-    get:
-      tags: [AI Agent (Chat)]
-      summary: Danh sách cuộc hội thoại của user
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200':
-          description: OK
+        "200":
+          description: Detection results
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: '#/components/schemas/Conversation' }
-
-  /ai/assistant/conversations/{id}:
-    get:
-      tags: [AI Agent (Chat)]
-      summary: Lấy lịch sử 1 cuộc hội thoại
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ConversationDetail' }
-    delete:
-      tags: [AI Agent (Chat)]
-      summary: Xoá cuộc hội thoại
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string }
-      responses:
-        '204': { description: OK }
-
-  /ai/assistant/booking-suggestion:
-    post:
-      tags: [AI Agent (Chat)]
-      summary: AI gợi ý khung giờ đặt lịch (proxy tới garage-service)
-      security: [{ bearerAuth: [] }]
-      description: |
-        Endpoint này cho phép AI Agent tra cứu dịch vụ + khung giờ trống từ
-        garage-service để tư vấn đặt lịch. Implementation có thể gọi trực tiếp
-        hoặc qua Gateway.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [garageId, serviceId, date]
-              properties:
-                garageId: { type: string }
-                serviceId: { type: string }
-                date: { type: string, format: date }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  suggestions:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        slotStart: { type: string, format: date-time }
-                        slotEnd: { type: string, format: date-time }
-                        reason: { type: string, example: 'Ít người đặt, giá rẻ hơn' }
+                $ref: "#/components/schemas/DetectionResponse"
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-  parameters:
-    PageParam:
-      in: query
-      name: page
-      schema: { type: integer, minimum: 1, default: 1 }
-    PageSizeParam:
-      in: query
-      name: pageSize
-      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-
   schemas:
-    # ----- Damage Detection -----
-    DamageDetectionResult:
+    ChatRequest:
       type: object
-      required: [id, damages, severity]
+      required: [message]
       properties:
-        id: { type: string }
-        imageUrl: { type: string, format: uri, description: 'URL ảnh đã upload' }
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: "Tìm xe Toyota Camry đời 2022 giá dưới 1.2 tỷ"
+        session_id:
+          type: string
+          format: uuid
+          description: Session ID for conversation continuity
+        user_id:
+          type: string
+          nullable: true
+        stream:
+          type: boolean
+          default: false
+          description: Enable SSE streaming response
+
+    ChatResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+        response:
+          type: string
+          description: Final agent response in Vietnamese
+        tool_calls:
+          type: array
+          items:
+            type: string
+          description: Names of tools invoked during this turn
+
+    DetectionRequest:
+      type: object
+      properties:
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://example.com/car-damage.jpg"
+        image_base64:
+          type: string
+          nullable: true
+          description: Base64-encoded image without data URI prefix
+        conf_threshold:
+          type: number
+          minimum: 0.01
+          maximum: 1.0
+          nullable: true
+          description: Override confidence threshold
+
+    DamageRegion:
+      type: object
+      properties:
+        class_name:
+          type: string
+          enum: [dent, scratch, crack, glass_damage, lamp_damage, tire_damage, rust, deformation]
+        class_id:
+          type: integer
+        confidence:
+          type: number
+        bbox:
+          type: array
+          items:
+            type: number
+          description: "[x1, y1, x2, y2] normalized 0-1"
+        area_ratio:
+          type: number
+          description: Fraction of image area covered
+        severity:
+          type: string
+          enum: [low, medium, high]
+
+    DetectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        num_detections:
+          type: integer
         damages:
           type: array
           items:
-            type: object
-            properties:
-              part: { type: string, example: 'Cản trước' }
-              damageType: { type: string, example: 'Trầy xước' }
-              severity:
-                type: string
-                enum: [MINOR, MODERATE, SEVERE]
-              confidence: { type: number, format: float, minimum: 0, maximum: 1 }
-              boundingBox:
-                type: object
-                properties:
-                  x: { type: number }
-                  y: { type: number }
-                  width: { type: number }
-                  height: { type: number }
-              estimatedCostVND: { type: integer, nullable: true }
-        overallSeverity:
+            $ref: "#/components/schemas/DamageRegion"
+        overall_severity:
           type: string
-          enum: [MINOR, MODERATE, SEVERE]
-        suggestions:
-          type: array
-          items: { type: string }
-          example: ['Nên thay cản trước', 'Kiểm tra đèn pha']
-        recommendedServices:
-          type: array
-          items: { $ref: '#/components/schemas/RecommendedService' }
-        createdAt: { type: string, format: date-time }
-
-    RecommendedService:
-      type: object
-      properties:
-        serviceId: { type: string }
-        serviceName: { type: string }
-        estimatedCostVND: { type: integer }
-        reason: { type: string }
-
-    DamageDetectionPage:
-      type: object
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/DamageDetectionResult' }
-        page: { type: integer }
-        pageSize: { type: integer }
-        total: { type: integer }
-
-    # ----- Recommendation -----
-    RecommendRequest:
-      type: object
-      properties:
-        type:
+          enum: [none, low, medium, high, critical]
+        summary:
           type: string
-          enum: [SERVICE, PART, CAR]
-          default: SERVICE
-        context:
-          type: string
-          description: 'Mô tả ngữ cảnh (vd: "xe bị trầy cản trước")'
-        limit: { type: integer, default: 5, maximum: 20 }
+          description: Human-readable summary in Vietnamese
+        image_width:
+          type: integer
+        image_height:
+          type: integer
+        processing_time_ms:
+          type: number
 
-    RecommendResult:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            type: object
-            properties:
-              refType:
-                type: string
-                enum: [SERVICE, PART, CAR]
-              refId: { type: string }
-              refSlug: { type: string }
-              title: { type: string }
-              subtitle: { type: string, nullable: true }
-              priceVND: { type: integer, nullable: true }
-              imageUrl: { type: string, format: uri, nullable: true }
-              score: { type: number, format: float, minimum: 0, maximum: 1, description: 'Điểm relevance' }
-              reason: { type: string, nullable: true, description: 'Lý do gợi ý' }
-
-    # ----- AI Agent Chat -----
-    ChatMessageRequest:
-      type: object
-      required: [text]
-      properties:
-        conversationId:
-          type: string
-          nullable: true
-          description: 'null = tạo cuộc hội thoại mới'
-        text: { type: string, minLength: 1, maxLength: 4000 }
-
-    ChatMessageResponse:
-      type: object
-      required: [conversationId, reply]
-      properties:
-        conversationId: { type: string }
-        userMessageId: { type: string }
-        assistantMessageId: { type: string }
-        reply: { type: string, description: 'Câu trả lời từ AI' }
-        sources:
-          type: array
-          items:
-            type: object
-            properties:
-              type: { type: string, enum: [SERVICE, GARAGE, ARTICLE, PART] }
-              refId: { type: string }
-              title: { type: string }
-              url: { type: string, nullable: true }
-          description: 'Các nguồn AI dùng để trả lời'
-        suggestedActions:
-          type: array
-          items:
-            type: object
-            properties:
-              type: { type: string, enum: [BOOK_SERVICE, VIEW_GARAGE, OPEN_ARTICLE] }
-              label: { type: string }
-              payload: { type: object, additionalProperties: true }
-
-    Conversation:
-      type: object
-      properties:
-        id: { type: string }
-        title: { type: string, description: 'Auto-generated từ tin nhắn đầu tiên' }
-        lastMessageAt: { type: string, format: date-time }
-        messageCount: { type: integer }
-
-    ConversationDetail:
-      allOf:
-        - $ref: '#/components/schemas/Conversation'
-        - type: object
-          properties:
-            messages:
-              type: array
-              items:
-                type: object
-                properties:
-                  id: { type: string }
-                  role:
-                    type: string
-                    enum: [USER, ASSISTANT, SYSTEM]
-                  content: { type: string }
-                  sources:
-                    type: array
-                    items:
-                      type: object
-                  createdAt: { type: string, format: date-time }
-
-    ErrorResponse:
-      type: object
-      required: [code, message, timestamp]
-      properties:
-        code: { type: string }
-        message: { type: string }
-        timestamp: { type: string, format: date-time }

@@ -1,802 +1,181 @@
-openapi: 3.0.3
+openapi: "3.1.0"
 info:
   title: Garage Service API
-  description: |
-    Quản lý dịch vụ gara, lịch đặt, khung giờ trống.
-    Phục vụ Frontend public + Admin UI + AI Agent tra cứu.
-  version: 0.1.0
-  contact:
-    name: Thành viên 3
+  version: "1.0.0"
+  description: Garage slot availability and booking management
+
 servers:
-  - url: http://localhost:8082/api/v1
-    description: Local dev (direct)
-  - url: http://localhost:4000/api/v1/garages
-    description: Qua API Gateway (Recommended)
+  - url: http://localhost/api/v1
+
 tags:
-  - name: Services
-    description: Danh mục dịch vụ sửa chữa / bảo dưỡng
-  - name: Garages
-    description: Quản lý gara
-  - name: Cars
-    description: Danh mục xe & model
-  - name: Bookings
-    description: Đặt lịch sửa chữa
-  - name: TimeSlots
-    description: Khung giờ trống phục vụ đặt lịch
-  - name: Admin
-    description: API dành riêng cho Admin (yêu cầu role=ADMIN)
+  - name: garages
+  - name: bookings
+  - name: slots
 
 paths:
-  # ===========================================================
-  # SERVICES
-  # ===========================================================
-  /services:
-    get:
-      tags: [Services]
-      summary: Danh sách dịch vụ
-      parameters:
-        - in: query
-          name: q
-          schema: { type: string }
-          description: Từ khoá tìm kiếm (tên, mô tả)
-        - in: query
-          name: category
-          schema:
-            $ref: '#/components/schemas/ServiceCategory'
-        - in: query
-          name: minPrice
-          schema: { type: integer, minimum: 0 }
-        - in: query
-          name: maxPrice
-          schema: { type: integer, minimum: 0 }
-        - in: query
-          name: isActive
-          schema: { type: boolean, default: true }
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/PageSizeParam'
-      responses:
-        '200':
-          description: Trang dịch vụ
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ServicePage'
-    post:
-      tags: [Admin, Services]
-      summary: Tạo dịch vụ mới
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ServiceCreateRequest'
-      responses:
-        '201':
-          description: Đã tạo
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Service'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  /services/{slug}:
-    get:
-      tags: [Services]
-      summary: Chi tiết dịch vụ theo slug
-      parameters:
-        - $ref: '#/components/parameters/SlugParam'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Service'
-        '404': { $ref: '#/components/responses/NotFound' }
-    patch:
-      tags: [Admin, Services]
-      summary: Cập nhật dịch vụ
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/SlugParam'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ServiceUpdateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Service'
-        '404': { $ref: '#/components/responses/NotFound' }
-    delete:
-      tags: [Admin, Services]
-      summary: Xoá mềm dịch vụ
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/SlugParam'
-      responses:
-        '204': { description: Đã xoá }
-        '404': { $ref: '#/components/responses/NotFound' }
-
-  /services/categories:
-    get:
-      tags: [Services]
-      summary: Danh sách category enum
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/ServiceCategory' }
-
-  # ===========================================================
-  # GARAGES
-  # ===========================================================
   /garages:
     get:
-      tags: [Garages]
-      summary: Danh sách gara
+      tags: [garages]
+      summary: List all active garages
       parameters:
-        - in: query
-          name: q
-          schema: { type: string }
-        - in: query
-          name: city
-          schema: { type: string }
-        - in: query
-          name: district
-          schema: { type: string }
-        - in: query
-          name: lat
-          schema: { type: number, format: double }
-        - in: query
-          name: lng
-          schema: { type: number, format: double }
-        - in: query
-          name: radiusKm
-          schema: { type: number, default: 5 }
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/PageSizeParam'
-      responses:
-        '200':
-          description: Trang gara
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GaragePage'
-    post:
-      tags: [Admin, Garages]
-      summary: Tạo gara
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GarageCreateRequest'
-      responses:
-        '201':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Garage'
-
-  /garages/{slug}:
-    get:
-      tags: [Garages]
-      summary: Chi tiết gara
-      parameters:
-        - $ref: '#/components/parameters/SlugParam'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GarageDetail'
-        '404': { $ref: '#/components/responses/NotFound' }
-    patch:
-      tags: [Admin, Garages]
-      summary: Cập nhật gara
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - $ref: '#/components/parameters/SlugParam'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GarageUpdateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Garage'
-
-  /garages/{slug}/services:
-    get:
-      tags: [Garages, Services]
-      summary: Danh sách dịch vụ mà gara này cung cấp
-      parameters:
-        - $ref: '#/components/parameters/SlugParam'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/Service' }
-
-  # ===========================================================
-  # CARS
-  # ===========================================================
-  /cars:
-    get:
-      tags: [Cars]
-      summary: Danh sách xe / model
-      parameters:
-        - in: query
-          name: q
-          schema: { type: string }
-        - in: query
-          name: brand
-          schema: { type: string }
-        - in: query
-          name: bodyType
+        - name: city
+          in: query
           schema:
             type: string
-            enum: [SEDAN, HATCHBACK, SUV, MPV, PICKUP, COUPE, WAGON]
-        - in: query
-          name: yearFrom
-          schema: { type: integer }
-        - in: query
-          name: yearTo
-          schema: { type: integer }
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/PageSizeParam'
+          example: "Hà Nội"
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CarPage'
-    post:
-      tags: [Admin, Cars]
-      summary: Thêm xe mới
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CarCreateRequest'
-      responses:
-        '201':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Car'
-
-  /cars/{slug}:
-    get:
-      tags: [Cars]
-      summary: Chi tiết xe
-      parameters:
-        - $ref: '#/components/parameters/SlugParam'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CarDetail'
-        '404': { $ref: '#/components/responses/NotFound' }
-
-  # ===========================================================
-  # TIME SLOTS
-  # ===========================================================
-  /timeslots:
-    get:
-      tags: [TimeSlots, Admin]
-      summary: Khung giờ trống của 1 gara trong 1 ngày
-      parameters:
-        - in: query
-          name: garageId
-          required: true
-          schema: { type: string }
-        - in: query
-          name: date
-          required: true
-          schema: { type: string, format: date, example: '2026-10-08' }
-      responses:
-        '200':
-          description: OK
+        "200":
+          description: List of garages
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/TimeSlot' }
+                items:
+                  $ref: "#/components/schemas/Garage"
 
-  # ===========================================================
-  # BOOKINGS
-  # ===========================================================
-  /bookings:
+  /garages/{garage_id}/slots:
     get:
-      tags: [Bookings]
-      summary: Lịch sửa chữa của user hiện tại
-      security: [{ bearerAuth: [] }]
+      tags: [slots]
+      summary: Get available time slots for a garage on a date
       parameters:
-        - in: query
-          name: status
+        - name: garage_id
+          in: path
+          required: true
           schema:
-            $ref: '#/components/schemas/BookingStatus'
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/PageSizeParam'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BookingPage'
-    post:
-      tags: [Bookings]
-      summary: Đặt lịch sửa chữa mới
-      security: [{ bearerAuth: [] }]
-      description: |
-        Backend sẽ tự động kiểm tra xung đột lịch (cùng gara + cùng khung giờ).
-        Nếu trùng → trả 409 CONFLICT.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BookingCreateRequest'
-      responses:
-        '201':
-          description: Đã đặt lịch
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: Khung giờ đã có người đặt
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /bookings/{id}:
-    get:
-      tags: [Bookings]
-      summary: Chi tiết 1 booking
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: id
+            type: string
+            format: uuid
+        - name: date
+          in: query
           required: true
-          schema: { type: string }
+          schema:
+            type: string
+            format: date
+          example: "2026-10-20"
       responses:
-        '200':
-          description: OK
+        "200":
+          description: Available slots
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BookingDetail'
-    patch:
-      tags: [Bookings]
-      summary: Cập nhật trạng thái (hủy / xác nhận)
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BookingUpdateRequest'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: |
-        Header: `Authorization: Bearer <jwt>`
-        Gateway verify chữ ký + exp, chèn X-User-Id / X-User-Role / X-User-Email.
-
-  parameters:
-    SlugParam:
-      in: path
-      name: slug
-      required: true
-      schema: { type: string }
-      description: Slug của resource
-    PageParam:
-      in: query
-      name: page
-      schema: { type: integer, minimum: 1, default: 1 }
-    PageSizeParam:
-      in: query
-      name: pageSize
-      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-
-  responses:
-    BadRequest:
-      description: Request không hợp lệ
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    Unauthorized:
-      description: Chưa đăng nhập / token hết hạn
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    Forbidden:
-      description: Không đủ quyền
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-    NotFound:
-      description: Không tìm thấy
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-
-  schemas:
-    # ------------------- Enums -------------------
-    ServiceCategory:
-      type: string
-      enum: [MAINTENANCE, REPAIR, DETAILING, INSPECTION, OTHER]
-      description: |
-        - MAINTENANCE: Bảo dưỡng định kỳ
-        - REPAIR: Sửa chữa
-        - DETAILING: Vệ sinh, đánh bóng
-        - INSPECTION: Kiểm tra tổng quát
-        - OTHER: Khác
-
-    BookingStatus:
-      type: string
-      enum: [PENDING, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW]
-
-    # ------------------- Service -------------------
-    Service:
-      type: object
-      required: [id, slug, name, description, category, estimatedDurationMinutes, referenceCostVND, isActive]
-      properties:
-        id: { type: string, format: uuid }
-        slug: { type: string, example: 'thay-nhot-dinh-ky' }
-        name: { type: string, example: 'Thay nhớt định kỳ' }
-        description: { type: string }
-        category: { $ref: '#/components/schemas/ServiceCategory' }
-        estimatedDurationMinutes:
-          type: integer
-          minimum: 5
-          maximum: 600
-          description: Thời lượng dự kiến (phút)
-        referenceCostVND:
-          type: integer
-          minimum: 0
-          description: Chi phí tham khảo (VNĐ)
-        imageUrl: { type: string, format: uri, nullable: true }
-        isActive: { type: boolean, default: true }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-
-    ServiceCreateRequest:
-      type: object
-      required: [name, description, category, estimatedDurationMinutes, referenceCostVND]
-      properties:
-        name: { type: string, minLength: 3, maxLength: 120 }
-        description: { type: string, minLength: 10, maxLength: 2000 }
-        category: { $ref: '#/components/schemas/ServiceCategory' }
-        estimatedDurationMinutes: { type: integer, minimum: 5, maximum: 600 }
-        referenceCostVND: { type: integer, minimum: 0 }
-        imageUrl: { type: string, format: uri, nullable: true }
-        isActive: { type: boolean, default: true }
-
-    ServiceUpdateRequest:
-      type: object
-      properties:
-        name: { type: string, minLength: 3, maxLength: 120 }
-        description: { type: string, minLength: 10, maxLength: 2000 }
-        category: { $ref: '#/components/schemas/ServiceCategory' }
-        estimatedDurationMinutes: { type: integer, minimum: 5, maximum: 600 }
-        referenceCostVND: { type: integer, minimum: 0 }
-        imageUrl: { type: string, format: uri, nullable: true }
-        isActive: { type: boolean }
-
-    # ------------------- Garage -------------------
-    Garage:
-      type: object
-      required: [id, slug, name, address, phone, isActive]
-      properties:
-        id: { type: string, format: uuid }
-        slug: { type: string }
-        name: { type: string }
-        address: { type: string }
-        city: { type: string }
-        district: { type: string }
-        phone: { type: string }
-        email: { type: string, nullable: true }
-        rating:
-          type: number
-          format: float
-          minimum: 0
-          maximum: 5
-          nullable: true
-        totalReviews: { type: integer, minimum: 0 }
-        thumbnailUrl: { type: string, format: uri, nullable: true }
-        latitude: { type: number, format: double, nullable: true }
-        longitude: { type: number, format: double, nullable: true }
-        isActive: { type: boolean }
-
-    GarageDetail:
-      allOf:
-        - $ref: '#/components/schemas/Garage'
-        - type: object
-          properties:
-            services:
-              type: array
-              items: { $ref: '#/components/schemas/Service' }
-            openHours:
-              type: object
-              additionalProperties: { type: string }
-              example: { monday: '08:00-18:00', saturday: '08:00-12:00' }
-            reviews:
-              type: array
-              items: { $ref: '#/components/schemas/Review' }
-
-    GarageCreateRequest:
-      type: object
-      required: [name, address, phone]
-      properties:
-        name: { type: string }
-        address: { type: string }
-        city: { type: string }
-        district: { type: string }
-        phone: { type: string }
-        email: { type: string, nullable: true }
-        latitude: { type: number, format: double, nullable: true }
-        longitude: { type: number, format: double, nullable: true }
-        thumbnailUrl: { type: string, format: uri, nullable: true }
-        openHours:
-          type: object
-          additionalProperties: { type: string }
-        serviceIds:
-          type: array
-          items: { type: string }
-
-    GarageUpdateRequest:
-      type: object
-      properties:
-        name: { type: string }
-        address: { type: string }
-        city: { type: string }
-        district: { type: string }
-        phone: { type: string }
-        email: { type: string, nullable: true }
-        latitude: { type: number, format: double, nullable: true }
-        longitude: { type: number, format: double, nullable: true }
-        thumbnailUrl: { type: string, format: uri, nullable: true }
-        isActive: { type: boolean }
-
-    Review:
-      type: object
-      properties:
-        id: { type: string }
-        userId: { type: string }
-        userName: { type: string }
-        rating: { type: integer, minimum: 1, maximum: 5 }
-        comment: { type: string }
-        createdAt: { type: string, format: date-time }
-
-    # ------------------- Car -------------------
-    Car:
-      type: object
-      required: [id, slug, brand, model, year]
-      properties:
-        id: { type: string, format: uuid }
-        slug: { type: string, example: 'toyota-vios-2023' }
-        brand: { type: string, example: 'Toyota' }
-        model: { type: string, example: 'Vios' }
-        year: { type: integer, example: 2023 }
-        bodyType:
-          type: string
-          enum: [SEDAN, HATCHBACK, SUV, MPV, PICKUP, COUPE, WAGON]
-        engineCapacity: { type: string, example: '1.5L' }
-        fuelType: { type: string, enum: [GASOLINE, DIESEL, HYBRID, EV] }
-        seats: { type: integer }
-        imageUrl: { type: string, format: uri, nullable: true }
-        referencePriceVND: { type: integer, nullable: true }
-
-    CarDetail:
-      allOf:
-        - $ref: '#/components/schemas/Car'
-        - type: object
-          properties:
-            description: { type: string }
-            specifications:
-              type: object
-              additionalProperties: { type: string }
-              example: { 'Công suất': '105 HP', 'Hộp số': 'CVT' }
-
-    CarCreateRequest:
-      type: object
-      required: [brand, model, year]
-      properties:
-        brand: { type: string }
-        model: { type: string }
-        year: { type: integer, minimum: 1900, maximum: 2100 }
-        bodyType:
-          type: string
-          enum: [SEDAN, HATCHBACK, SUV, MPV, PICKUP, COUPE, WAGON]
-        engineCapacity: { type: string }
-        fuelType: { type: string, enum: [GASOLINE, DIESEL, HYBRID, EV] }
-        seats: { type: integer }
-        imageUrl: { type: string, format: uri, nullable: true }
-        referencePriceVND: { type: integer, nullable: true }
-        description: { type: string }
-
-    # ------------------- TimeSlot -------------------
-    TimeSlot:
-      type: object
-      properties:
-        start: { type: string, format: date-time, example: '2026-10-08T08:00:00+07:00' }
-        end: { type: string, format: date-time, example: '2026-10-08T09:00:00+07:00' }
-        available: { type: boolean }
-        capacity: { type: integer, default: 1, description: 'Số chỗ còn trống' }
-
-    # ------------------- Booking -------------------
-    Booking:
-      type: object
-      required: [id, garageId, serviceId, slotStart, slotEnd, status]
-      properties:
-        id: { type: string, format: uuid }
-        userId: { type: string }
-        garageId: { type: string }
-        garageName: { type: string }
-        serviceId: { type: string }
-        serviceName: { type: string }
-        vehicleId: { type: string, nullable: true }
-        vehiclePlate: { type: string, nullable: true }
-        slotStart: { type: string, format: date-time }
-        slotEnd: { type: string, format: date-time }
-        status: { $ref: '#/components/schemas/BookingStatus' }
-        note: { type: string, nullable: true }
-        totalEstimatedCostVND: { type: integer, nullable: true }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-
-    BookingDetail:
-      allOf:
-        - $ref: '#/components/schemas/Booking'
-        - type: object
-          properties:
-            customerName: { type: string }
-            customerPhone: { type: string }
-            history:
-              type: array
-              items:
                 type: object
                 properties:
-                  status: { $ref: '#/components/schemas/BookingStatus' }
-                  changedAt: { type: string, format: date-time }
-                  changedBy: { type: string }
-                  note: { type: string }
+                  garage_id:
+                    type: string
+                  date:
+                    type: string
+                  slots:
+                    type: array
+                    items:
+                      type: string
+                    example: ["08:00", "09:00", "10:00", "14:00", "15:00"]
 
-    BookingCreateRequest:
-      type: object
-      required: [garageId, serviceId, slotStart]
-      properties:
-        garageId: { type: string }
-        serviceId: { type: string }
-        vehicleId: { type: string, nullable: true, description: 'ID xe của user (từ user-service)' }
-        slotStart: { type: string, format: date-time }
-        note: { type: string, nullable: true }
+  /bookings:
+    post:
+      tags: [bookings]
+      summary: Create a new booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingRequest"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "409":
+          description: Slot already taken
 
-    BookingUpdateRequest:
-      type: object
-      properties:
-        status:
-          $ref: '#/components/schemas/BookingStatus'
-          description: |
-            - User có thể set CANCELLED khi status hiện tại là PENDING hoặc CONFIRMED
-            - Admin/Staff có thể set bất kỳ status nào
-        note: { type: string, nullable: true }
+  /bookings/{booking_id}:
+    get:
+      tags: [bookings]
+      summary: Get booking by ID
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
 
-    # ------------------- Pagination -------------------
-    ServicePage:
-      type: object
-      required: [items, page, pageSize, total]
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/Service' }
-        page: { type: integer }
-        pageSize: { type: integer }
-        total: { type: integer }
-
-    GaragePage:
-      type: object
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/Garage' }
-        page: { type: integer }
-        pageSize: { type: integer }
-        total: { type: integer }
-
-    CarPage:
-      type: object
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/Car' }
-        page: { type: integer }
-        pageSize: { type: integer }
-        total: { type: integer }
-
-    BookingPage:
+components:
+  schemas:
+    Garage:
       type: object
       properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/Booking' }
-        page: { type: integer }
-        pageSize: { type: integer }
-        total: { type: integer }
-
-    # ------------------- Error -------------------
-    ErrorResponse:
-      type: object
-      required: [code, message, timestamp]
-      properties:
-        code:
+        id:
           type: string
-          example: 'SLOT_CONFLICT'
-          description: |
-            Mã lỗi chuẩn, ví dụ:
-            - VALIDATION_ERROR
-            - UNAUTHORIZED
-            - FORBIDDEN
-            - NOT_FOUND
-            - SLOT_CONFLICT
-            - INTERNAL_ERROR
-        message: { type: string, example: 'Khung giờ này đã có người đặt' }
-        details:
-          type: object
-          additionalProperties: true
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        phone:
+          type: string
+        rating:
+          type: number
+        services:
+          type: array
+          items:
+            type: string
+
+    CreateBookingRequest:
+      type: object
+      required: [garage_id, date, time_slot, service_type, customer_name, phone]
+      properties:
+        garage_id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        time_slot:
+          type: string
+          example: "09:00"
+        service_type:
+          type: string
+          enum: [oil_change, tire_rotation, full_inspection, brake_service, ac_service, glass_repair, other]
+        customer_name:
+          type: string
+        phone:
+          type: string
+        notes:
+          type: string
           nullable: true
-        timestamp: { type: string, format: date-time }
-        path: { type: string }
+
+    BookingResponse:
+      type: object
+      properties:
+        booking_id:
+          type: string
+          format: uuid
+        garage_id:
+          type: string
+        date:
+          type: string
+        time_slot:
+          type: string
+        service_type:
+          type: string
+        customer_name:
+          type: string
+        phone:
+          type: string
+        status:
+          type: string
+          enum: [confirmed, cancelled, completed, no_show]
+        created_at:
+          type: string
+          format: date-time
+

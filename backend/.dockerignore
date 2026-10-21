@@ -1,0 +1,11 @@
+**/target
+**/.git
+**/.idea
+**/.vscode
+**/*.iml
+**/.env
+**/.env.*
+**/*.log
+**/node_modules
+automotive-ai-context
+infra
