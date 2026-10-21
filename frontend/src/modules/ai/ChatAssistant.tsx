@@ -5,10 +5,13 @@ import {
   IconSparkles,
   IconUser,
   IconArrowRight,
+  IconWarning,
 } from "../../components/icons";
 import Button from "../../components/Button";
 import Card from "../../components/Card";
 import { chatSuggestions } from "../../data/mock";
+import { agentApi } from "../../api/endpoints/ai";
+import type { ChatRequest } from "../../api/endpoints/ai";
 
 interface Msg {
   role: "user" | "assistant";
@@ -16,53 +19,34 @@ interface Msg {
   sources?: Array<{ title: string; url: string }>;
 }
 
-const mockReply = (q: string): Msg => {
-  const lower = q.toLowerCase();
-  if (lower.includes("dầu") || lower.includes("dau")) {
-    return {
-      role: "assistant",
-      content:
-        "Để chọn dầu nhớt phù hợp, bạn cần dựa vào 3 yếu tố chính:\n\n1. **Loại động cơ** (xăng/diesel) và dung tích\n2. **Khuyến cáo của nhà sản xuất** (xem sách hướng dẫn)\n3. **Điều kiện vận hành**: thành phố nhiều → chọn độ nhớt thấp hơn\n\nVí dụ cho xe sedan 1.5L thành phố: thường dùng 5W-30 hoặc 5W-40. Nên thay sau mỗi 5.000 - 10.000 km.",
-      sources: [
-        {
-          title: "Cách chọn dầu nhớt phù hợp cho xe ô tô của bạn",
-          url: "/content/cach-chon-dau-nhot",
-        },
-      ],
-    };
+/**
+ * Module-level state lưu session_id qua nhiều lượt gửi.
+ * Đặt ngoài component để giữ qua lần remount.
+ *
+ * Lưu ý: phía backend session state thực sự là *stateless theo message hiện tại* —
+ * ReAct agent chỉ dùng messages của lượt đó. Việc giữ session_id chỉ để phục vụ
+ * client-side cache nếu sau này tích hợp persistent memory.
+ */
+function randomUUID(): string {
+  // `crypto.randomUUID` có trên trình duyệt hiện đại và Node 19+, nhưng
+  // Vite có thể tích hợp trình duyệt cũ — fallback để an toàn.
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
   }
-  if (lower.includes("bảo dưỡng") || lower.includes("bao duong")) {
-    return {
-      role: "assistant",
-      content:
-        "Tần suất bảo dưỡng định kỳ được khuyến cáo:\n\n- **5.000 - 10.000 km** hoặc **6 tháng** (tuỳ điều kiện nào đến trước)\n- Bảo dưỡng nặng mỗi **40.000 - 60.000 km**\n\nCác hạng mục thường bao gồm: thay dầu, lọc dầu, lọc gió, kiểm tra phanh, lốp, ắc quy.",
-      sources: [
-        {
-          title: "Bao lâu nên bảo dưỡng định kỳ một lần?",
-          url: "/content/bao-lau-bao-duong",
-        },
-      ],
-    };
-  }
-  if (lower.includes("phanh")) {
-    return {
-      role: "assistant",
-      content:
-        "5 dấu hiệu cần thay má phanh:\n\n1. **Tiếng kêu két** khi phanh\n2. **Bàn đạp rung** hoặc giật\n4. **Quãng đường phanh dài hơn** bình thường\n5. **Đèn cảnh báo phanh** sáng trên bảng điều khiển\n6. Má phanh mỏng hơn **3mm** (kiểm tra qua lỗ trên lazang)\n\nNên thay má phanh mỗi 40.000-60.000 km hoặc khi xuất hiện dấu hiệu.",
-      sources: [
-        {
-          title: "5 dấu hiệu cảnh báo cần thay má phanh",
-          url: "/content/dau-hieu-can-thay-phanh",
-        },
-      ],
-    };
-  }
-  return {
-    role: "assistant",
-    content:
-      "Cảm ơn bạn đã hỏi! Đây là câu trả lời mẫu từ trợ lý AI. Trong triển khai thật, tôi sẽ truy vấn knowledge graph về xe, garage, dịch vụ và phụ tùng để đưa ra câu trả lời chính xác nhất.",
-  };
-};
+  // RFC 4122 v4 — đủ tốt cho mục đích định danh phiên client-side.
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+let sessionId: string = randomUUID();
+
+// (mockReply đã bỏ — chuyển sang gọi agent API thật)
+// SOURCES hiện để trống vì trợ lý backend chưa trích dẫn nguồn — nếu sau này
+// agent trả về citation, parse từ response và đưa vào đây.
+const SOURCES: Array<{ title: string; url: string }> = [];
 
 export default function ChatAssistant() {
   const [messages, setMessages] = useState<Msg[]>([
@@ -74,22 +58,52 @@ export default function ChatAssistant() {
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
-  const send = (text?: string) => {
+  const send = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content) return;
-    setMessages((m) => [...m, { role: "user", content }]);
+    const userMsg: Msg = { role: "user", content };
+    setMessages((m) => [...m, userMsg]);
     setInput("");
+    setError(null);
     setTyping(true);
-    setTimeout(() => {
-      setMessages((m) => [...m, mockReply(content)]);
+
+    const payload: ChatRequest = {
+      message: content,
+      session_id: sessionId,
+    };
+
+    try {
+      const res = await agentApi.send(payload);
+      sessionId = res.session_id;
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: res.response,
+          sources: SOURCES,
+        },
+      ]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Agent không phản hồi.";
+      setError(msg);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content:
+            "Xin lỗi, hiện tại tôi không thể trả lời câu hỏi này. Vui lòng thử lại sau.",
+        },
+      ]);
+    } finally {
       setTyping(false);
-    }, 900);
+    }
   };
 
   return (
@@ -156,6 +170,13 @@ export default function ChatAssistant() {
               )}
               <div ref={endRef} />
             </div>
+
+            {error && (
+              <div className="mx-5 mb-3 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 flex items-start gap-2">
+                <IconWarning size={16} className="mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
             {/* Input */}
             <div className="border-t border-ink/8 p-4 flex gap-2">
