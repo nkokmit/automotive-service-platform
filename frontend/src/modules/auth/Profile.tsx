@@ -19,6 +19,7 @@ import {
   IconArrowLeft,
   IconCalendar,
   IconSale,
+  IconWarning,
 } from "../../components/icons";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
@@ -31,6 +32,7 @@ import {
   getUserAddresses,
   getUserVehicles,
 } from "../../data/authStore";
+import type { CustomerResponse } from "../../api/types";
 import type {
   Order,
   OrderStatus,
@@ -255,7 +257,8 @@ function TierBadge({ tier }: { tier: "Thành viên" | "Bạc" | "Vàng" | "Bạc
 // Tab: Thông tin
 // =========================
 function InfoTab() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, customer, customerStatus, refreshCustomer } =
+    useAuth();
   const t = useToast();
 
   const [form, setForm] = useState({
@@ -278,7 +281,8 @@ function InfoTab() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    // Mock async
+    // Mock async — backend chưa có endpoint cập nhật user (xem authStore).
+    // Khi PUT /api/users/{id} được kích hoạt, thay setTimeout bằng API call.
     setTimeout(() => {
       updateProfile({
         name: form.name.trim(),
@@ -290,79 +294,140 @@ function InfoTab() {
     }, 600);
   };
 
+  const [reloading, setReloading] = useState(false);
+  const handleReloadCustomer = async () => {
+    setReloading(true);
+    try {
+      await refreshCustomer();
+    } finally {
+      setReloading(false);
+    }
+  };
+
   return (
     <div className="grid lg:grid-cols-3 gap-6">
-      {/* Form */}
-      <Card className="lg:col-span-2">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-bold">Thông tin cá nhân</h2>
-            <Link to="/" className="text-xs text-ink-muted hover:text-primary">
-              <IconArrowLeft size={12} className="inline" /> Về trang chủ
-            </Link>
-          </div>
-
-          <form onSubmit={handleSave} className="space-y-4">
-            <Input
-              label="Họ và tên"
-              value={form.name}
-              onChange={(e) =>
-                setForm({ ...form, name: e.target.value })
-              }
-              leftIcon={<IconUser size={18} />}
-              required
-            />
-            <Input
-              type="email"
-              label="Email"
-              value={form.email}
-              onChange={(e) =>
-                setForm({ ...form, email: e.target.value })
-              }
-              leftIcon={<IconNote size={18} />}
-              required
-            />
-            <Input
-              label="Số điện thoại"
-              value={form.phone}
-              onChange={(e) =>
-                setForm({ ...form, phone: e.target.value })
-              }
-              leftIcon={<IconMapPin size={18} />}
-            />
-            <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={saving}>
-                {saving ? (
-                  <>
-                    <IconRefresh size={16} className="animate-spin" />
-                    Đang lưu...
-                  </>
-                ) : (
-                  <>
-                    <IconCheckCircle size={16} />
-                    Lưu thay đổi
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  setForm({
-                    name: user?.name ?? "",
-                    email: user?.email ?? "",
-                    phone: user?.phone ?? "",
-                  })
-                }
-              >
-                Huỷ
-              </Button>
+      {/* Cột trái: form + hồ sơ khách hàng */}
+      <div className="lg:col-span-2 space-y-6">
+        {/* Banner unlinked — backend trả 403 (CustomerProfileUnresolvedException) */}
+        {customerStatus === "unlinked" && (
+          <Card>
+            <div className="p-5 flex gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <IconWarning size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-ink mb-1">
+                  Tài khoản chưa liên kết hồ sơ khách hàng
+                </h3>
+                <p className="text-sm text-ink-light mb-3">
+                  Tài khoản của bạn đã đăng nhập thành công nhưng chưa được gara
+                  liên kết với hồ sơ khách hàng. Vui lòng liên hệ gara để được
+                  hỗ trợ kích hoạt — sau khi liên kết, các dịch vụ đặt lịch và
+                  lịch sử bảo dưỡng sẽ được đồng bộ.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReloadCustomer}
+                    disabled={reloading}
+                  >
+                    <IconRefresh
+                      size={14}
+                      className={reloading ? "animate-spin" : ""}
+                    />
+                    {reloading ? "Đang tải..." : "Tải lại"}
+                  </Button>
+                  <Link to="/services">
+                    <Button variant="outline" size="sm">
+                      <IconMapPin size={14} />
+                      Tìm gara
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
-          </form>
-        </div>
-      </Card>
+          </Card>
+        )}
 
-      {/* Sidebar — security, tier, quick links */}
+        {/* Hồ sơ khách hàng thật từ /api/customers/me */}
+        {customerStatus === "linked" && customer && (
+          <CustomerCard customer={customer} onReload={handleReloadCustomer} reloading={reloading} />
+        )}
+
+        {/* Form user cơ bản (giữ lại để cập nhật tên/email/SĐT UI; backend
+            PUT /api/users/{id} hiện không được dùng cho CUSTOMER tự sửa) */}
+        <Card>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold">Thông tin tài khoản</h2>
+              <Link to="/" className="text-xs text-ink-muted hover:text-primary">
+                <IconArrowLeft size={12} className="inline" /> Về trang chủ
+              </Link>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4">
+              <Input
+                label="Họ và tên"
+                value={form.name}
+                onChange={(e) =>
+                  setForm({ ...form, name: e.target.value })
+                }
+                leftIcon={<IconUser size={18} />}
+                required
+              />
+              <Input
+                type="email"
+                label="Email"
+                value={form.email}
+                onChange={(e) =>
+                  setForm({ ...form, email: e.target.value })
+                }
+                leftIcon={<IconNote size={18} />}
+                required
+              />
+              <Input
+                label="Số điện thoại"
+                value={form.phone}
+                onChange={(e) =>
+                  setForm({ ...form, phone: e.target.value })
+                }
+                leftIcon={<IconMapPin size={18} />}
+              />
+              <div className="flex gap-2 pt-2">
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <IconRefresh size={16} className="animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <IconCheckCircle size={16} />
+                      Lưu thay đổi
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setForm({
+                      name: user?.name ?? "",
+                      email: user?.email ?? "",
+                      phone: user?.phone ?? "",
+                    })
+                  }
+                >
+                  Huỷ
+                </Button>
+              </div>
+            </form>
+          </div>
+        </Card>
+      </div>
+
+      {/* Cột phải: security, tier, quick links */}
       <div className="space-y-4">
         <Card>
           <div className="p-5">
@@ -406,8 +471,192 @@ function InfoTab() {
             </Link>
           </div>
         </Card>
+
+        {/* Trạng thái hồ sơ — phụ trợ bên sidebar để dễ theo dõi */}
+        <Card>
+          <div className="p-5">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <IconUser size={16} className="text-primary" />
+              Hồ sơ khách hàng
+            </h3>
+            <CustomerStatusBadge status={customerStatus} />
+            <p className="text-xs text-ink-muted mt-2">
+              {customerStatus === "linked"
+                ? `Mã hồ sơ: ${customer?.id?.slice(0, 8) ?? ""}…`
+                : customerStatus === "unlinked"
+                  ? "Liên hệ gara để kích hoạt hồ sơ."
+                  : "Đang đồng bộ…"}
+            </p>
+          </div>
+        </Card>
       </div>
     </div>
+  );
+}
+
+// =========================
+// Card: Hồ sơ khách hàng (CustomerResponse)
+// =========================
+function CustomerCard({
+  customer,
+  onReload,
+  reloading,
+}: {
+  customer: CustomerResponse;
+  onReload: () => void;
+  reloading: boolean;
+}) {
+  // Helper format ISO -> ngày dd/MM/yyyy
+  const fmtDate = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    } catch {
+      return iso;
+    }
+  };
+
+  return (
+    <Card>
+      <div className="p-6">
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <div>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              Hồ sơ khách hàng
+              <Badge tone="accent">
+                <IconCheckCircle size={11} /> Đã liên kết
+              </Badge>
+            </h2>
+            <p className="text-xs text-ink-muted mt-1">
+              Dữ liệu từ <code className="text-[11px] bg-bgsoft px-1 rounded">GET /api/customers/me</code>.
+              Cập nhật lần cuối: {fmtDate(customer.updatedAt)}.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onReload}
+            disabled={reloading}
+          >
+            <IconRefresh
+              size={14}
+              className={reloading ? "animate-spin" : ""}
+            />
+            {reloading ? "Đang tải..." : "Tải lại"}
+          </Button>
+        </div>
+
+        <dl className="grid sm:grid-cols-2 gap-4 mt-5">
+          <Field
+            label="Họ và tên"
+            icon={<IconUser size={16} />}
+            value={customer.fullName}
+            placeholder="Chưa cập nhật"
+          />
+          <Field
+            label="Số điện thoại"
+            icon={<IconMapPin size={16} />}
+            value={customer.phone}
+            placeholder="Chưa cập nhật"
+          />
+          <Field
+            label="Email"
+            icon={<IconNote size={16} />}
+            value={customer.email}
+            placeholder="Chưa cập nhật"
+            className="sm:col-span-2"
+          />
+          <Field
+            label="Địa chỉ liên hệ"
+            icon={<IconMapPin size={16} />}
+            value={customer.address}
+            placeholder="Chưa cập nhật"
+            className="sm:col-span-2"
+          />
+          <Field
+            label="Ghi chú"
+            icon={<IconNote size={16} />}
+            value={customer.notes}
+            placeholder="Không có ghi chú"
+            className="sm:col-span-2"
+          />
+        </dl>
+
+        <div className="mt-5 pt-4 border-t border-ink/8 text-xs text-ink-muted flex flex-wrap gap-x-5 gap-y-1">
+          <span>
+            Trạng thái:{" "}
+            <strong className="text-ink">
+              {customer.isActive ? "Đang hoạt động" : "Tạm khoá"}
+            </strong>
+          </span>
+          <span>
+            Ngày tạo:{" "}
+            <strong className="text-ink">{fmtDate(customer.createdAt)}</strong>
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function Field({
+  label,
+  icon,
+  value,
+  placeholder,
+  className = "",
+}: {
+  label: string;
+  icon: React.ReactNode;
+  value: string | null | undefined;
+  placeholder: string;
+  className?: string;
+}) {
+  const present = value && value.trim().length > 0;
+  return (
+    <div className={className}>
+      <dt className="text-[11px] uppercase tracking-wide text-ink-muted font-semibold mb-1 flex items-center gap-1.5">
+        <span className="text-ink-muted/80">{icon}</span>
+        {label}
+      </dt>
+      <dd
+        className={
+          "text-sm font-medium " + (present ? "text-ink" : "text-ink-muted italic")
+        }
+      >
+        {present ? value : placeholder}
+      </dd>
+    </div>
+  );
+}
+
+function CustomerStatusBadge({
+  status,
+}: {
+  status: "unknown" | "linked" | "unlinked";
+}) {
+  if (status === "linked") {
+    return (
+      <Badge tone="accent">
+        <IconCheckCircle size={11} /> Đã liên kết
+      </Badge>
+    );
+  }
+  if (status === "unlinked") {
+    return (
+      <Badge tone="warning">
+        <IconWarning size={11} /> Chưa liên kết
+      </Badge>
+    );
+  }
+  return (
+    <Badge tone="default">
+      <IconRefresh size={11} className="animate-spin" /> Đang đồng bộ
+    </Badge>
   );
 }
 

@@ -11,14 +11,24 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { authApi } from "../api/endpoints/auth";
-import { userApi } from "../api/endpoints/user";
+import { customerApi, userApi } from "../api/endpoints/user";
+import { isAuthError } from "../api/client";
 import { TOKEN_EVENT, getAccessToken } from "../api/session";
 import { primaryRole } from "../api/types";
-import type { UserResponse } from "../api/types";
+import type { CustomerResponse, UserResponse } from "../api/types";
 import { mockUsers, type Order, type Address, type Vehicle } from "./mock";
 
 export const AUTH_KEY = "autocare:auth";
 export const AUTH_EVENT = "autocare:auth:changed";
+
+/**
+ * Trạng thái hồ sơ khách hàng của tài khoản.
+ *  - `unknown`: chưa thử / đang thử lần đầu
+ *  - `linked`: server trả 200 — đã liên kết
+ *  - `unlinked`: server trả 403 — tài khoản chưa có hồ sơ
+ *    (CustomerProfileUnresolvedException, xem CurrentCustomerServiceImpl.java)
+ */
+export type CustomerStatus = "unknown" | "linked" | "unlinked";
 
 export type AuthUser = {
   id: string;
@@ -41,6 +51,9 @@ export type AuthUser = {
 export type Session = {
   user: AuthUser;
   loggedInAt: string;
+  /** Hồ sơ khách hàng — chỉ có khi `customerStatus === "linked"`. */
+  customer?: CustomerResponse | null;
+  customerStatus?: CustomerStatus;
 };
 
 /** Map DTO của backend sang shape mà giao diện đang dùng. */
@@ -63,6 +76,29 @@ export function mapUserFromApi(dto: UserResponse): AuthUser {
   };
 }
 
+/**
+ * Thử load hồ sơ khách hàng đi kèm tài khoản.
+ * - 200 → `{ status: "linked", customer }`
+ * - 401/403 (`isAuthError`) → `{ status: "unlinked", customer: null }`
+ *      (CustomerProfileUnresolvedException — tài khoản chưa liên kết hồ sơ)
+ * - Lỗi khác (mạng/5xx) → `{ status: "unknown", customer: null }`,
+ *      KHÔNG xoá phiên đăng nhập vì không liên quan tới auth user.
+ */
+export async function loadCustomerProfile(): Promise<{
+  status: CustomerStatus;
+  customer: CustomerResponse | null;
+}> {
+  try {
+    const customer = await customerApi.me();
+    return { status: "linked", customer };
+  } catch (err) {
+    if (isAuthError(err)) {
+      return { status: "unlinked", customer: null };
+    }
+    return { status: "unknown", customer: null };
+  }
+}
+
 /** Đồng bộ cache session với backend. Gọi khi vừa đăng nhập hoặc mount app. */
 export async function hydrateUser(): Promise<Session | null> {
   if (!getAccessToken()) return null;
@@ -71,7 +107,11 @@ export async function hydrateUser(): Promise<Session | null> {
     const session: Session = {
       user: mapUserFromApi(dto),
       loggedInAt: new Date().toISOString(),
+      customerStatus: "unknown",
     };
+    const { status, customer } = await loadCustomerProfile();
+    session.customerStatus = status;
+    session.customer = customer;
     writeSession(session);
     return session;
   } catch {
@@ -87,6 +127,8 @@ export function readSession(): Session | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Session;
     if (!parsed?.user?.id) return null;
+    // Backward-compat: session từ phiên cũ không có customerStatus.
+    if (!parsed.customerStatus) parsed.customerStatus = "unknown";
     return parsed;
   } catch {
     return null;
@@ -118,7 +160,11 @@ export async function login(username: string, password: string): Promise<Session
   const session: Session = {
     user: mapUserFromApi(dto),
     loggedInAt: new Date().toISOString(),
+    customerStatus: "unknown",
   };
+  const { status, customer } = await loadCustomerProfile();
+  session.customerStatus = status;
+  session.customer = customer;
   writeSession(session);
   return session;
 }
@@ -136,9 +182,31 @@ export async function register(payload: {
   const session: Session = {
     user: mapUserFromApi(dto),
     loggedInAt: new Date().toISOString(),
+    customerStatus: "unknown",
   };
+  const { status, customer } = await loadCustomerProfile();
+  session.customerStatus = status;
+  session.customer = customer;
   writeSession(session);
   return session;
+}
+
+/**
+ * Tải lại hồ sơ khách hàng và merge vào session hiện tại.
+ * Dùng khi người dùng vừa liên kết hồ sơ thành công (vd: nhân viên gara xác nhận)
+ * — gọi nút "Tải lại" trên banner để cập nhật mà không phải logout.
+ */
+export async function refreshCustomerProfile(): Promise<Session | null> {
+  const current = readSession();
+  if (!current) return null;
+  const { status, customer } = await loadCustomerProfile();
+  const next: Session = {
+    ...current,
+    customerStatus: status,
+    customer,
+  };
+  writeSession(next);
+  return next;
 }
 
 /** Đăng xuất: revoke token phía server rồi xoá phiên cục bộ. */
@@ -202,7 +270,8 @@ export function useAuthUser(): AuthUser | null {
 }
 
 export function useAuth() {
-  const user = useAuthUser();
+  const session = useSession();
+  const user = session?.user ?? null;
   const loginFn = useCallback((username: string, password: string) => login(username, password), []);
   const registerFn = useCallback(
     (payload: Parameters<typeof register>[0]) => register(payload),
@@ -213,7 +282,17 @@ export function useAuth() {
     (patch: Partial<AuthUser>) => updateProfile(patch),
     [],
   );
-  return { user, login: loginFn, register: registerFn, logout: logoutFn, updateProfile: updateProfileFn };
+  const refreshCustomerFn = useCallback(() => refreshCustomerProfile(), []);
+  return {
+    user,
+    customer: session?.customer ?? null,
+    customerStatus: (session?.customerStatus ?? "unknown") as CustomerStatus,
+    login: loginFn,
+    register: registerFn,
+    logout: logoutFn,
+    updateProfile: updateProfileFn,
+    refreshCustomer: refreshCustomerFn,
+  };
 }
 
 /** Người dùng có phải quản trị viên không — dùng để ẩn/hiện khu vực admin. */
