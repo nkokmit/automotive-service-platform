@@ -1,4 +1,4 @@
-# Common build/dependency artifacts
+# ===== Common build/dependency artifacts =====
 node_modules/
 dist/
 build/
@@ -6,5 +6,41 @@ build/
 __pycache__/
 *.pyc
 
-# TypeScript incremental build cache
+# ===== TypeScript incremental build cache =====
 *.tsbuildinfo
+
+# ===== Frontend (Vite/React) =====
+# (đã được cover bởi node_modules/ + dist/ ở trên, nhưng thêm để rõ ràng)
+frontend/.vite/
+frontend/coverage/
+
+# ===== Logs =====
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===== Editor / OS =====
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+Thumbs.db
+
+# ===== Env =====
+.env
+.env.local
+.env.*.local
+
+# ===== Maven / Java (Gateway, services) =====
+target/
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ===== Wrangler / Cloudflare (nếu có sau) =====
+.wrangler/

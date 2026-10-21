@@ -6,7 +6,7 @@ info:
     Phục vụ Frontend public + Admin UI + AI Agent tra cứu.
   version: 0.1.0
   contact:
-    name: Thành viên 1
+    name: Thành viên 3
 servers:
   - url: http://localhost:8082/api/v1
     description: Local dev (direct)

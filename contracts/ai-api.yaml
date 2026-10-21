@@ -9,7 +9,7 @@ info:
       - agent-service             (:9003) - chat AI + tra cứu dịch vụ
   version: 0.1.0-draft
   contact:
-    name: Thành viên 3 (owner)
+    name: Thành viên 1
 servers:
   - url: http://localhost:4000/api/v1
     description: Qua API Gateway (Recommended)
@@ -21,7 +21,7 @@ tags:
 
 paths:
   # ===========================================================
-  # DAMAGE DETECTION
+  # DAMAGE DETECTION  
   # ===========================================================
   /ai/damage/detect:
     post:
