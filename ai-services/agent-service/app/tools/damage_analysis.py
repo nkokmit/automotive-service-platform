@@ -1,8 +1,6 @@
 """Tool: analyze_vehicle_damage – calls damage-detection-service with image."""
 from __future__ import annotations
-import base64
 import logging
-from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -15,8 +13,12 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-def make_damage_analysis_tool(http_client: httpx.AsyncClient):
-    """Factory that closes over the shared HTTP client."""
+def make_damage_analysis_tool(
+    http_client: httpx.AsyncClient,
+    attached_image_url: str | None = None,
+    attached_image_base64: str | None = None,
+):
+    """Factory that closes over the shared HTTP client and optional attached image."""
     base = settings.damage_service_url.rstrip("/")
 
     @tool(args_schema=AnalyzeVehicleDamageInput)
@@ -26,25 +28,30 @@ def make_damage_analysis_tool(http_client: httpx.AsyncClient):
     ) -> str:
         """Analyze a vehicle image to detect damage using AI vision (YOLOv8s-seg).
 
-        Detects and classifies damage types such as:
-        dent, scratch, crack, glass_damage, lamp_damage, tire_damage, rust, deformation.
+        Detects and classifies 6 CarDD damage types:
+        dent, scratch, crack, glass shatter, lamp broken, tire flat.
 
         Returns damage regions with severity (low/medium/high) and an overall assessment.
 
         Use this tool when:
-        - The user shares an image of their car and asks about damage
-        - The user wants to assess repair costs (provide damage info first)
+        - The user shares or attaches an image of their car and asks about damage
+        - The user wants to assess repair needs from a photo
         - The user uploads a photo before booking a service appointment
         """
-        if not image_url and not image_base64:
-            return "Vui lòng cung cấp URL ảnh hoặc dữ liệu ảnh base64."
+        eff_url = image_url or attached_image_url
+        eff_b64 = image_base64 or attached_image_base64
+
+        if not eff_url and not eff_b64:
+            return "Vui lòng cung cấp URL ảnh hoặc đính kèm dữ liệu ảnh base64."
 
         try:
             payload: dict = {}
-            if image_url:
-                payload["image_url"] = image_url
+            if eff_url and eff_url.startswith("http"):
+                payload["image_url"] = eff_url
+            elif eff_b64:
+                payload["image_base64"] = eff_b64
             else:
-                payload["image_base64"] = image_base64
+                payload["image_url"] = eff_url
 
             resp = await http_client.post(
                 f"{base}/api/v1/detect",
@@ -64,7 +71,7 @@ def make_damage_analysis_tool(http_client: httpx.AsyncClient):
                 return f"✅ {summary}\nThời gian xử lý: {ms:.0f}ms"
 
             lines = [
-                f"🔍 **Kết quả phân tích hư hỏng xe**",
+                "🔍 **Kết quả phân tích hư hỏng xe**",
                 f"Mức độ tổng thể: **{overall.upper()}**",
                 f"Số vùng hư hỏng: {num}",
                 "",
@@ -89,4 +96,3 @@ def make_damage_analysis_tool(http_client: httpx.AsyncClient):
             return f"Không thể phân tích ảnh: {exc}"
 
     return analyze_vehicle_damage
-

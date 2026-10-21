@@ -29,8 +29,8 @@ def make_booking_tools(http_client: httpx.AsyncClient):
                 f"{base}/api/v1/garages/{garage_id}/slots",
                 params={"date": date},
             )
-            resp.raise_for_status()
-            data = resp.json()
+            resp.raise_for_status() #kiểm tra xem phản hồi HTTP có thành công hay không, nếu không thì ném ra ngoại lệ.
+            data = resp.json() 
             slots = data.get("slots", [])
             if not slots:
                 return f"No available slots at garage {garage_id} on {date}."

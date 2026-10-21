@@ -16,11 +16,16 @@ async def get_qdrant() -> AsyncQdrantClient:
         _qdrant_client = AsyncQdrantClient(
             url=settings.qdrant_url,
             api_key=settings.qdrant_api_key or None,
+            timeout=3,
         )
     return _qdrant_client
 
 # ── PostgreSQL ───────────────────────────────────────────────────────────────
-_engine = create_async_engine(settings.postgres_dsn, pool_pre_ping=True)
+_engine = create_async_engine(
+    settings.postgres_dsn,
+    pool_pre_ping=True,
+    connect_args={"timeout": 2.0},
+)
 _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -30,4 +35,4 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # ── HTTP clients ─────────────────────────────────────────────────────────────
 @lru_cache
 def get_http_client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=30.0)
+    return httpx.AsyncClient(timeout=15.0)

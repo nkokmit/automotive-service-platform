@@ -2,7 +2,7 @@
 from __future__ import annotations
 import logging
 import uuid
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -18,10 +18,27 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
 settings = get_settings()
 
 
+def _extract_text(content: Any) -> str:
+    """Normalize LangChain message content (str or list of content blocks) to str."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and "text" in item:
+                parts.append(str(item["text"]))
+        return "\n".join(parts)
+    return str(content)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000)
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str | None = None
+    image_url: str | None = None
+    image_base64: str | None = None
     stream: bool = False
 
 
@@ -40,10 +57,20 @@ async def chat(
     """Send a message to the automotive AI agent."""
     from app.dependencies import _session_factory  # noqa: PLC0415
 
-    graph = build_agent_graph(qdrant, _session_factory, http_client)
+    graph = build_agent_graph(
+        qdrant,
+        _session_factory,
+        http_client,
+        attached_image_url=req.image_url,
+        attached_image_base64=req.image_base64,
+    )
+
+    user_text = req.message
+    if req.image_base64 or req.image_url:
+        user_text += "\n[Người dùng đã đính kèm ảnh xe cần phân tích hư hỏng bằng công cụ analyze_vehicle_damage]"
 
     initial_state = {
-        "messages": [HumanMessage(content=req.message)],
+        "messages": [HumanMessage(content=user_text)],
         "session_id": req.session_id,
         "user_id": req.user_id,
     }
@@ -65,7 +92,7 @@ async def chat(
         ]
         return ChatResponse(
             session_id=req.session_id,
-            response=final_message.content,
+            response=_extract_text(final_message.content),
             tool_calls=list(dict.fromkeys(tool_names)),
         )
     except Exception as exc:
@@ -82,8 +109,9 @@ async def _stream_response(
         kind = event.get("event")
         if kind == "on_chat_model_stream":
             chunk = event["data"]["chunk"]
-            if chunk.content:
-                content = chunk.content.replace("\\", "\\\\").replace('"', '\\"')
+            text = _extract_text(chunk.content)
+            if text:
+                content = text.replace("\\", "\\\\").replace('"', '\\"')
                 yield f'data: {{"content": "{content}"}}\n\n'
         elif kind == "on_tool_start":
             name = event["name"]

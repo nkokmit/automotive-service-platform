@@ -1,10 +1,18 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+from pathlib import Path
+
+_env_file = Path(__file__).resolve().parent.parent / ".env"
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=[str(_env_file), ".env"],
+        extra="ignore",
+    )
 
-    # LLM
+    # LLM (Google Gemini default, OpenAI optional fallback)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3-flash-preview"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
 
