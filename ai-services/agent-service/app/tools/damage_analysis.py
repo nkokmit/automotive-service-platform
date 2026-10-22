@@ -80,9 +80,14 @@ def make_damage_analysis_tool(
                 severity_emoji = {"low": "🟡", "medium": "🟠", "high": "🔴"}.get(
                     d["severity"], "⚪"
                 )
+                area_pct = d.get("area_ratio", 0.0)
+                bbox_pct = d.get("bbox_area_ratio", 0.0)
+                mask_px = d.get("mask_area_px", 0)
                 lines.append(
                     f"{severity_emoji} **{d['class_name']}** "
                     f"(confidence: {d['confidence']:.0%}, "
+                    f"diện tích mask thực tế: {area_pct:.2%} [{mask_px:,} px], "
+                    f"diện tích khung bbox: {bbox_pct:.2%}, "
                     f"mức độ: {d['severity']})"
                 )
             lines += ["", f"📝 {summary}", f"⏱ Thời gian: {ms:.0f}ms"]
