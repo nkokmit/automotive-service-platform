@@ -81,7 +81,7 @@ async def chat(
     try:
         if req.stream:
             return StreamingResponse(
-                _stream_response(graph, initial_state, config, req.session_id),
+                _stream_response(graph, initial_state, config, req.session_id), # stream_response là một hàm bất đồng bộ (asynchronous function) được gọi để tạo ra một luồng dữ liệu (stream) phản hồi từ agent graph. Nó sẽ yield các sự kiện SSE (Server-Sent Events) liên quan đến cuộc trò chuyện, bao gồm các đoạn văn bản từ mô hình chat và thông tin về các công cụ được gọi. Nó cho phép người dùng nhận phản hồi theo thời gian thực thay vì chờ đợi toàn bộ phản hồi được tạo ra trước khi gửi về.
                 media_type="text/event-stream",
             )
 

@@ -57,13 +57,40 @@ def _encode_dense(query: str) -> list[float]:
     return model.encode(query).tolist()
 
 
+def _encode_sparse(text: str) -> SparseVector:
+    """Encode text into a Qdrant SparseVector using FastEmbed BM25 or deterministic lexical TF fallback."""
+    try:
+        from fastembed import SparseTextEmbedding
+        bm25_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+        sparse_embedding = list(bm25_model.embed([text]))[0]
+        return SparseVector(
+            indices=sparse_embedding.indices.tolist(),
+            values=sparse_embedding.values.tolist(),
+        )
+    except Exception:
+        import math
+        import re
+        import zlib
+        from collections import Counter
+
+        tokens = re.findall(r"\w+", text.lower())
+        counts = Counter(
+            zlib.crc32(t.encode("utf-8")) % 1_000_000
+            for t in tokens
+            if len(t) > 1
+        )
+        indices = sorted(counts.keys())
+        values = [round(1.0 + math.log(counts[i]), 4) for i in indices]
+        return SparseVector(indices=indices, values=values)
+
+
 async def _hybrid_search(
     client: AsyncQdrantClient,
     collection: str,
     query: str,
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Run Qdrant hybrid search combining dense and BM25 sparse vectors."""
+    """Run Qdrant hybrid search combining dense and BM25/lexical sparse vectors."""
     # Fast check that Qdrant is reachable and collection exists before loading encoders
     collections_resp = await client.get_collections()
     existing = [c.name for c in collections_resp.collections]
@@ -71,18 +98,7 @@ async def _hybrid_search(
         raise RuntimeError(f"Qdrant collection '{collection}' does not exist yet")
 
     dense_vector = _encode_dense(query)
-
-    try:
-        from fastembed import SparseTextEmbedding
-        bm25_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-        sparse_embedding = list(bm25_model.embed([query]))[0]
-        sparse_vec = SparseVector(
-            indices=sparse_embedding.indices.tolist(),
-            values=sparse_embedding.values.tolist(),
-        )
-    except Exception as exc:
-        logger.warning("BM25 sparse encoding failed, falling back to dense only: %s", exc)
-        sparse_vec = None
+    sparse_vec = _encode_sparse(query)
 
     if sparse_vec:
         results = await client.query_points(
@@ -104,9 +120,10 @@ async def _hybrid_search(
             with_payload=True,
         )
     else:
-        results = await client.search(
+        results = await client.query_points(
             collection_name=collection,
-            query_vector=("dense", dense_vector),
+            query=dense_vector,
+            using="dense",
             limit=limit,
             with_payload=True,
         )
@@ -124,7 +141,7 @@ async def _hybrid_search(
 def make_search_car_news_tool(qdrant_client: AsyncQdrantClient):
     """Factory that closes over the Qdrant client."""
 
-    @tool(args_schema=SearchCarNewsInput)
+    @tool(args_schema=SearchCarNewsInput) 
     async def search_car_news(query: str, limit: int = 5, collection: str = "car_news") -> str:
         """Search automotive news, maintenance tips, and recall information using hybrid semantic + keyword search.
 
