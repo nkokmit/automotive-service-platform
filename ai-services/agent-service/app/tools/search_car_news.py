@@ -39,19 +39,22 @@ _MOCK_ARTICLES = [
     },
 ]
 
-# Load dense encoder once at import time (model is cached)
 _dense_model = None
 
-def _get_dense_model():
+
+def _encode_dense(query: str) -> list[float]:
     global _dense_model
     if _dense_model is None:
         try:
+            from fastembed import TextEmbedding
+            _dense_model = ("fastembed", TextEmbedding(model_name=settings.qdrant_dense_model))
+        except Exception:
             from sentence_transformers import SentenceTransformer
-            _dense_model = SentenceTransformer(settings.qdrant_dense_model)
-        except Exception as exc:
-            logger.warning("Could not load SentenceTransformer: %s", exc)
-            _dense_model = None
-    return _dense_model
+            _dense_model = ("st", SentenceTransformer(settings.qdrant_dense_model))
+    kind, model = _dense_model
+    if kind == "fastembed":
+        return list(model.embed([query]))[0].tolist()
+    return model.encode(query).tolist()
 
 
 async def _hybrid_search(
@@ -61,13 +64,14 @@ async def _hybrid_search(
     limit: int,
 ) -> list[dict[str, Any]]:
     """Run Qdrant hybrid search combining dense and BM25 sparse vectors."""
-    model = _get_dense_model()
-    if model is None:
-        raise RuntimeError("Embedding model unavailable")
+    # Fast check that Qdrant is reachable and collection exists before loading encoders
+    collections_resp = await client.get_collections()
+    existing = [c.name for c in collections_resp.collections]
+    if collection not in existing:
+        raise RuntimeError(f"Qdrant collection '{collection}' does not exist yet")
 
-    dense_vector = model.encode(query).tolist()
+    dense_vector = _encode_dense(query)
 
-    # BM25 sparse – generated via FastEmbed BM25 tokenizer
     try:
         from fastembed import SparseTextEmbedding
         bm25_model = SparseTextEmbedding(model_name="Qdrant/bm25")
@@ -134,7 +138,6 @@ def make_search_car_news_tool(qdrant_client: AsyncQdrantClient):
             hits = await _hybrid_search(qdrant_client, collection, query, limit)
         except Exception as exc:
             logger.info("Qdrant unavailable (%s), falling back to offline knowledge base", exc)
-            # Filter fallback articles matching query keywords
             q_lower = query.lower()
             matched = [
                 a for a in _MOCK_ARTICLES

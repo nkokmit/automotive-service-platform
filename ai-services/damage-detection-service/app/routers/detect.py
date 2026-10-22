@@ -103,11 +103,11 @@ async def detect_damage_upload(
     try:
         bgr = _decode_image(img_bytes)
         h, w = bgr.shape[:2]
-
         t0 = time.perf_counter()
-        damages = await run_in_threadpool(detector.detect, bgr, conf_threshold)
+        damages = await run_in_threadpool(
+            detector.detect, bgr, conf_threshold or settings.conf_threshold
+        )
         elapsed_ms = (time.perf_counter() - t0) * 1000
-
         overall = _compute_overall_severity(damages)
         parts = list({d.class_name for d in damages})
         summary = (

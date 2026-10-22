@@ -90,13 +90,13 @@ class YoloOnnxDetector:
         path_str = str(target_path)
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         self.session = ort.InferenceSession(path_str, providers=providers)
-        self.input_name = self.session.get_inputs()[0].name
+        self.input_name = self.session.get_inputs()[0].name # trả về list các input name, lấy name của input đầu tiên, ngoài ra còn 2 thuộc tính khác là shape và type
         
         # Read model metadata dynamically if available
         meta = self.session.get_modelmeta().custom_metadata_map
         if "names" in meta:
             try:
-                names_dict = ast.literal_eval(meta["names"])
+                names_dict = ast.literal_eval(meta["names"]) # literal_eval để chuyển đổi chuỗi thành dict
                 self.classes = [names_dict[i] for i in sorted(names_dict.keys())]
             except Exception:
                 self.classes = settings.damage_classes
@@ -170,7 +170,7 @@ class YoloOnnxDetector:
         boxes_xyxy = _xywh2xyxy(boxes_raw)
 
         # NMS
-        keep = _nms(boxes_xyxy, confidences, settings.iou_threshold)
+        keep = _nms(boxes_xyxy, confidences, settings.iou_threshold) # keep là danh sách các chỉ số của các bounding box được giữ lại sau khi áp dụng NMS
         keep = keep[: settings.max_detections]
 
         results = []
