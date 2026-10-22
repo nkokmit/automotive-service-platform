@@ -66,6 +66,7 @@ def build_agent_graph(
     qdrant_client: AsyncQdrantClient,
     db_session_factory: async_sessionmaker,
     http_client: httpx.AsyncClient,
+    checkpointer: Any | None = None,
     attached_image_url: str | None = None,
     attached_image_base64: str | None = None,
 ) -> Any:
@@ -118,4 +119,4 @@ def build_agent_graph(
     )
     graph.add_edge("tools", "agent")
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)

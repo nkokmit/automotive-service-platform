@@ -32,6 +32,15 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with _session_factory() as session:
         yield session
 
+# ── Checkpointer (Conversation Memory) ──────────────────────────────────────
+from langgraph.checkpoint.memory import MemorySaver
+
+_checkpointer: MemorySaver = MemorySaver()
+
+def get_checkpointer() -> MemorySaver:
+    """Return the shared in-memory checkpointer for multi-turn sessions."""
+    return _checkpointer
+
 # ── HTTP clients ─────────────────────────────────────────────────────────────
 @lru_cache
 def get_http_client() -> httpx.AsyncClient:
