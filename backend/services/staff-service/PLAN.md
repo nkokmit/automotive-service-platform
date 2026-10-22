@@ -5,7 +5,7 @@
 Staff Service quản lý hồ sơ nhân viên garage và lịch làm việc để các
 service khác có thể tra cứu nhân sự theo thời gian.
 
-Phạm vi triển khai: - Quản lý hồ sơ nhân viên và trạng thái làm việc. -
+Phạm vi triển khai: - Quản lý hồ sơ nhân viên và trạng thái hoạt động. -
 Quản lý các ca làm việc chuẩn của garage. - Thiết lập lịch làm việc định
 kỳ theo thứ trong tuần. - Quản lý ngày nghỉ do quản lý trực tiếp ghi
 nhận. - Quản lý ngoại lệ lịch theo ngày cụ thể khi lịch định kỳ không
@@ -53,8 +53,18 @@ Các trường chính: - `id` - `user_id` nullable: ID tài khoản trong User
 Service; nullable để hỗ trợ nhân viên chưa có tài khoản. -
 `employee_code`: mã nhân viên, duy nhất. - `full_name` - `phone`
 nullable - `email` nullable - `position`: chức danh/vị trí vận hành,
-không phải hệ thống kỹ năng. - `status`: `ACTIVE` hoặc `INACTIVE`. -
-`created_at`, `updated_at`
+không phải hệ thống kỹ năng. - `is_active`: hồ sơ còn hoạt động nghiệp
+vụ hay không; mặc định `TRUE`. - `created_at`, `updated_at` -
+`deleted_at` nullable: thời điểm xóa mềm.
+
+`is_active` khác `deleted_at`: nhân viên `is_active = FALSE` vẫn là hồ
+sơ hợp lệ, được xem trong danh sách thông thường và có thể được kích hoạt
+lại; nhân viên có `deleted_at IS NOT NULL` đã bị xóa mềm và bị loại khỏi
+các truy vấn nghiệp vụ thông thường. Chuyển nhân viên nghỉ việc/tạm
+ngừng sang `is_active = FALSE`; chỉ dùng xóa mềm để loại hồ sơ tạo nhầm,
+trùng lặp hoặc không còn được quản lý như một hồ sơ hợp lệ. Không cho
+tạo/cập nhật lịch mới cho nhân viên không hoạt động hoặc đã xóa mềm;
+các bản ghi lịch và lịch sử hiện có không bị xóa theo hồ sơ.
 
 Đề xuất ràng buộc: - Unique `employee_code`. - Unique `user_id` khi khác
 `NULL` nếu một tài khoản chỉ liên kết với tối đa một hồ sơ nhân viên. -
@@ -65,8 +75,24 @@ Không tạo FK tới bảng `users` của User Service.
 Danh mục các ca chuẩn, ví dụ ca sáng và ca chiều.
 
 Các trường chính: - `id` - `code`: mã ca duy nhất. - `name` -
-`start_time` - `end_time` - `status`: `ACTIVE` hoặc `INACTIVE`. -
-`created_at`, `updated_at`
+`start_time` - `end_time` - `is_active`: ca còn được phép dùng để thiết
+lập lịch mới hay không; mặc định `TRUE`. - `created_at`, `updated_at` -
+`deleted_at` nullable: thời điểm xóa mềm.
+
+Ca `is_active = FALSE` vẫn hiển thị trong danh sách thông thường và vẫn
+có thể được đọc để diễn giải lịch đã cấu hình; không cho chọn ca này khi
+tạo/cập nhật lịch mới. Ca có `deleted_at IS NOT NULL` bị loại khỏi truy
+vấn thông thường. Chỉ cho xóa mềm ca chưa từng được tham chiếu bởi lịch;
+nếu đã được dùng, chuyển `is_active = FALSE` để giữ nguyên khả năng đọc
+và diễn giải lịch cũ.
+
+Với cả hai bảng, xóa mềm không đồng nghĩa với xóa vật lý: `DELETE` đặt
+`deleted_at`, không xóa dòng hay giải phóng các giá trị unique. Truy vấn
+thông thường loại bản ghi đã xóa mềm (theo pattern `@SQLRestriction`
+nếu tương thích với phiên bản Hibernate); các truy vấn lịch sử cần đọc
+bản ghi liên quan phải chủ động dùng đường truy vấn không áp dụng bộ lọc
+này (ví dụ native query hoặc mapping riêng, vì `@SQLRestriction` không
+thể được tắt cho từng truy vấn). MVP không cung cấp xóa vật lý.
 
 Thiết kế MVP giả định một ca bắt đầu và kết thúc trong cùng ngày. Nếu
 sau này cần ca qua đêm, phải xác định rõ cách biểu diễn và tính khoảng
@@ -128,21 +154,22 @@ thể sửa giờ ca.
 Tạo một service/domain component chuyên tổng hợp lịch, không rải logic
 này trong controller.
 
-Với mỗi nhân viên và ngày được truy vấn: 1. Chỉ xét nhân viên đang
-`ACTIVE`. 2. Tìm lịch định kỳ có hiệu lực trong ngày đó và khớp
-`day_of_week`. 3. Áp dụng ngoại lệ theo ngày: hủy ca định kỳ hoặc thêm
-ca bổ sung. 4. Loại bỏ hoặc trừ các khoảng thời gian bị `staff_absences`
-giao nhau. 5. Trả về các khoảng làm việc cuối cùng.
+Với mỗi nhân viên và ngày được truy vấn: 1. Chỉ xét nhân viên có
+`is_active = TRUE` và chưa bị xóa mềm. 2. Tìm lịch định kỳ có hiệu lực
+trong ngày đó và khớp `day_of_week`. 3. Áp dụng ngoại lệ theo ngày: hủy
+ca định kỳ hoặc thêm ca bổ sung. 4. Loại bỏ hoặc trừ các khoảng thời
+gian bị `staff_absences` giao nhau. 5. Trả về các khoảng làm việc cuối
+cùng.
 
 Quy ước cần giữ nhất quán: - Khoảng thời gian được biểu diễn theo
 ISO-8601 và có múi giờ rõ ràng ở API. Chốt một quy ước timezone cho
 garage khi triển khai. - Khoảng thời gian dùng quy ước nửa mở
 `[startAt, endAt)` để xử lý chính xác các khoảng liền kề. - Một nhân
 viên có thể có nhiều khoảng làm việc trong một ngày. - Không trả nhân
-viên `INACTIVE` như người có thể làm việc. - Kiểm tra dữ liệu đầu vào để
-`startAt < endAt`; tránh khoảng nghỉ hoặc lịch có thời lượng không hợp
-lệ. - Nếu lịch định kỳ, ngoại lệ và nghỉ phép mâu thuẫn, áp dụng thứ tự
-ở trên và viết test cho từng tình huống.
+viên `is_active = FALSE` hoặc đã xóa mềm như người có thể làm việc. -
+Kiểm tra dữ liệu đầu vào để `startAt < endAt`; tránh khoảng nghỉ hoặc
+lịch có thời lượng không hợp lệ. - Nếu lịch định kỳ, ngoại lệ và nghỉ
+phép mâu thuẫn, áp dụng thứ tự ở trên và viết test cho từng tình huống.
 
 ## 5. API dự kiến
 
@@ -155,8 +182,12 @@ project.
 -   `GET /api/staff` --- danh sách có phân trang và bộ lọc phù hợp.
 -   `GET /api/staff/{staffId}` --- xem chi tiết.
 -   `PUT /api/staff/{staffId}` --- cập nhật thông tin hồ sơ.
--   `PATCH /api/staff/{staffId}/status` --- đổi trạng thái
-    `ACTIVE`/`INACTIVE`.
+-   `PATCH /api/staff/{staffId}/is-active` --- đổi `isActive`.
+-   `DELETE /api/staff/{staffId}` --- xóa mềm bằng cách đặt `deletedAt`;
+    không dùng endpoint này cho nghiệp vụ nghỉ việc/tạm ngừng.
+-   Các truy vấn danh sách mặc định loại hồ sơ đã xóa mềm; hỗ trợ filter
+    `isActive` tùy chọn, trong đó không truyền filter vẫn bao gồm cả hồ
+    sơ đang và không hoạt động.
 
 ### 5.2 Ca làm việc
 
@@ -164,8 +195,13 @@ project.
 -   `GET /api/work-shifts` --- danh sách ca.
 -   `GET /api/work-shifts/{shiftId}` --- chi tiết ca.
 -   `PUT /api/work-shifts/{shiftId}` --- cập nhật ca.
--   Nếu ca đã được dùng trong lịch, ưu tiên chuyển `INACTIVE` thay vì
-    xóa vật lý làm mất khả năng diễn giải lịch cũ.
+-   `PATCH /api/work-shifts/{shiftId}/is-active` --- đổi `isActive`.
+-   `DELETE /api/work-shifts/{shiftId}` --- xóa mềm; chỉ cho phép nếu ca
+    chưa từng được lịch định kỳ hoặc ngoại lệ tham chiếu.
+-   Nếu ca đã được dùng trong lịch, chuyển `isActive = FALSE` thay vì
+    xóa mềm; lịch cũ vẫn phải đọc và diễn giải được. Danh sách ca mặc
+    định loại ca đã xóa mềm, nhưng bao gồm ca không hoạt động trừ khi có
+    filter `isActive`.
 
 ### 5.3 Lịch định kỳ
 
@@ -239,8 +275,8 @@ hiệu lực được chỉ định trong một transaction, sau khi kiểm tra 
 ### 5.5 Tra cứu khả năng làm việc
 
 -   `GET /api/staff/availability?startAt=...&endAt=...` --- trả về nhân
-    viên đang hoạt động và có lịch làm việc bao phủ khoảng thời gian yêu
-    cầu, sau khi xét ngoại lệ và nghỉ phép.
+    viên `isActive = TRUE`, chưa bị xóa mềm và có lịch làm việc bao phủ
+    khoảng thời gian yêu cầu, sau khi xét ngoại lệ và nghỉ phép.
 
 Hợp đồng availability cần thống nhất với Booking Service: khoảng thời
 gian truy vấn, timezone, định dạng response và ý nghĩa "available".
@@ -275,8 +311,9 @@ Work Order khác sử dụng.
 -   Implement entity/model, repository, DTO, mapper, service và
     controller cho `staff_members`.
 -   Implement CRUD cần thiết cho `work_shifts`.
--   Thêm validation, xử lý ID không tồn tại, mã nhân viên trùng và trạng
-    thái không hợp lệ.
+-   Thêm validation, xử lý ID không tồn tại, mã nhân viên trùng,
+    `isActive` không hợp lệ và quy tắc xóa mềm; không cho xóa mềm ca đã
+    được lịch tham chiếu.
 -   Viết unit/integration tests cho các luồng CRUD và validation.
 
 ### Giai đoạn 4 --- Lịch định kỳ hàng loạt
@@ -303,8 +340,9 @@ Work Order khác sử dụng.
 ### Giai đoạn 6 --- Bộ tính lịch tổng hợp
 
 -   Implement component tổng hợp lịch theo khoảng ngày.
--   Áp dụng thứ tự: trạng thái nhân viên → lịch định kỳ → ngoại lệ →
-    nghỉ phép.
+-   Loại nhân viên `isActive = FALSE` hoặc đã xóa mềm, sau đó áp dụng:
+    lịch định kỳ → ngoại lệ → nghỉ phép. Ca không hoạt động không được
+    dùng để tạo lịch mới; lịch đã tồn tại phải giữ khả năng diễn giải.
 -   Trả về các khoảng thời gian làm việc cuối cùng.
 -   Viết test biên cho khoảng thời gian liền kề, giao nhau, nhiều ca
     trong ngày, khoảng ngày qua nhiều tuần và không có lịch.
@@ -356,8 +394,11 @@ Work Order khác sử dụng.
 -   Quản lý có thể ghi nhận ngày nghỉ trực tiếp, không cần quy trình gửi
     đơn/phê duyệt.
 -   Ngoại lệ có thể thêm hoặc hủy ca theo ngày và có semantics rõ ràng.
--   Availability trả kết quả đúng theo trạng thái nhân viên, lịch định
-    kỳ, ngoại lệ và nghỉ phép.
+-   Availability chỉ trả nhân viên `isActive = TRUE`, chưa bị xóa mềm,
+    và tính lịch định kỳ, ngoại lệ cùng khoảng nghỉ chính xác.
+-   `isActive` (ngừng hoạt động nghiệp vụ) được phân biệt với
+    `deletedAt` (xóa mềm); truy vấn thông thường loại bản ghi đã xóa mềm
+    nhưng không mặc định loại bản ghi không hoạt động.
 -   Không có truy cập trực tiếp vào database của service khác.
 -   Flyway chạy được trên database sạch và tests bao phủ các tình huống
     chính.

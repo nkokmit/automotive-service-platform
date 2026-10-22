@@ -19,7 +19,7 @@ before starting the service:
 
 Run from this directory with `mvnw.cmd spring-boot:run`, or start the complete
 local platform from the repository root with `docker compose up --build`.
-Flyway applies the initial schema automatically; Hibernate only validates it.
+Flyway applies schema migrations automatically; Hibernate only validates it.
 The MySQL bootstrap script creates this database only when the MySQL data
 volume is first initialized. For an existing volume, run
 `docker compose exec mysql bash /docker-entrypoint-initdb.d/01-create-databases.sh`
@@ -33,8 +33,17 @@ once before starting Staff Service.
 
 The Gateway routes `/api/staff/**`, `/api/work-shifts/**`, and
 `/api/schedules/**` to this service and includes its OpenAPI document in the
-Swagger dropdown. Business CRUD and schedule endpoints are not implemented by
-this bootstrap change.
+Swagger dropdown.
+
+Staff and work-shift CRUD are available under `/api/staff` and
+`/api/work-shifts`. List endpoints accept an optional `isActive` filter;
+without it, both active and inactive records are returned. `DELETE` performs
+a soft delete, and normal queries hide soft-deleted records. Staff or shifts
+marked inactive remain visible; a shift already referenced by a schedule
+cannot be soft-deleted and should instead be marked inactive.
+
+Recurring schedule, absence, exception, and availability endpoints are not
+implemented yet.
 
 Availability is based on Staff Service schedule data only; it does not account
 for bookings or work-order assignments.
