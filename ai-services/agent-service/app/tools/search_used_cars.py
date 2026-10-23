@@ -66,8 +66,8 @@ def make_search_used_cars_tool(db_session_factory):
             )
 
             async with db_session_factory() as session:
-                result = await session.execute(sql, params)
-                rows = result.mappings().all()
+                result = await session.execute(sql, params) # kết quả truy vấn được thực thi bất đồng bộ, trả về một đối tượng ResultProxy(tuple-like) chứa các hàng dữ liệu từ bảng used_cars.
+                rows = result.mappings().all() # chuyển đổi kết quả truy vấn thành danh sách các dict, mỗi dict đại diện cho một hàng dữ liệu từ bảng used_cars.
 
             if not rows:
                 return "Không tìm thấy xe cũ phù hợp với tiêu chí tìm kiếm."

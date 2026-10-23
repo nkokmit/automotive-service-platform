@@ -39,19 +39,49 @@ _MOCK_ARTICLES = [
     },
 ]
 
-# Load dense encoder once at import time (model is cached)
 _dense_model = None
 
-def _get_dense_model():
+
+def _encode_dense(query: str) -> list[float]:
     global _dense_model
     if _dense_model is None:
         try:
+            from fastembed import TextEmbedding
+            _dense_model = ("fastembed", TextEmbedding(model_name=settings.qdrant_dense_model))
+        except Exception:
             from sentence_transformers import SentenceTransformer
-            _dense_model = SentenceTransformer(settings.qdrant_dense_model)
-        except Exception as exc:
-            logger.warning("Could not load SentenceTransformer: %s", exc)
-            _dense_model = None
-    return _dense_model
+            _dense_model = ("st", SentenceTransformer(settings.qdrant_dense_model))
+    kind, model = _dense_model
+    if kind == "fastembed":
+        return list(model.embed([query]))[0].tolist()
+    return model.encode(query).tolist()
+
+
+def _encode_sparse(text: str) -> SparseVector:
+    """Encode text into a Qdrant SparseVector using FastEmbed BM25 or deterministic lexical TF fallback."""
+    try:
+        from fastembed import SparseTextEmbedding
+        bm25_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+        sparse_embedding = list(bm25_model.embed([text]))[0]
+        return SparseVector(
+            indices=sparse_embedding.indices.tolist(),
+            values=sparse_embedding.values.tolist(),
+        )
+    except Exception:
+        import math
+        import re
+        import zlib
+        from collections import Counter
+
+        tokens = re.findall(r"\w+", text.lower())
+        counts = Counter(
+            zlib.crc32(t.encode("utf-8")) % 1_000_000
+            for t in tokens
+            if len(t) > 1
+        )
+        indices = sorted(counts.keys())
+        values = [round(1.0 + math.log(counts[i]), 4) for i in indices]
+        return SparseVector(indices=indices, values=values)
 
 
 async def _hybrid_search(
@@ -60,25 +90,15 @@ async def _hybrid_search(
     query: str,
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Run Qdrant hybrid search combining dense and BM25 sparse vectors."""
-    model = _get_dense_model()
-    if model is None:
-        raise RuntimeError("Embedding model unavailable")
+    """Run Qdrant hybrid search combining dense and BM25/lexical sparse vectors."""
+    # Fast check that Qdrant is reachable and collection exists before loading encoders
+    collections_resp = await client.get_collections()
+    existing = [c.name for c in collections_resp.collections]
+    if collection not in existing:
+        raise RuntimeError(f"Qdrant collection '{collection}' does not exist yet")
 
-    dense_vector = model.encode(query).tolist()
-
-    # BM25 sparse – generated via FastEmbed BM25 tokenizer
-    try:
-        from fastembed import SparseTextEmbedding
-        bm25_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-        sparse_embedding = list(bm25_model.embed([query]))[0]
-        sparse_vec = SparseVector(
-            indices=sparse_embedding.indices.tolist(),
-            values=sparse_embedding.values.tolist(),
-        )
-    except Exception as exc:
-        logger.warning("BM25 sparse encoding failed, falling back to dense only: %s", exc)
-        sparse_vec = None
+    dense_vector = _encode_dense(query)
+    sparse_vec = _encode_sparse(query)
 
     if sparse_vec:
         results = await client.query_points(
@@ -100,9 +120,10 @@ async def _hybrid_search(
             with_payload=True,
         )
     else:
-        results = await client.search(
+        results = await client.query_points(
             collection_name=collection,
-            query_vector=("dense", dense_vector),
+            query=dense_vector,
+            using="dense",
             limit=limit,
             with_payload=True,
         )
@@ -120,7 +141,7 @@ async def _hybrid_search(
 def make_search_car_news_tool(qdrant_client: AsyncQdrantClient):
     """Factory that closes over the Qdrant client."""
 
-    @tool(args_schema=SearchCarNewsInput)
+    @tool(args_schema=SearchCarNewsInput) 
     async def search_car_news(query: str, limit: int = 5, collection: str = "car_news") -> str:
         """Search automotive news, maintenance tips, and recall information using hybrid semantic + keyword search.
 
@@ -134,7 +155,6 @@ def make_search_car_news_tool(qdrant_client: AsyncQdrantClient):
             hits = await _hybrid_search(qdrant_client, collection, query, limit)
         except Exception as exc:
             logger.info("Qdrant unavailable (%s), falling back to offline knowledge base", exc)
-            # Filter fallback articles matching query keywords
             q_lower = query.lower()
             matched = [
                 a for a in _MOCK_ARTICLES

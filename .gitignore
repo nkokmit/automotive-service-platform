@@ -136,3 +136,21 @@ ehthumbs.db
 Thumbs.db
 [Dd]esktop.ini
 
+# ── Images & Media Artifacts ──────────────────────────────────────────────────
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+*.tiff
+*.ico
+*.svg
+
+uploads/
+runs/
+outputs/
+
+!frontend/public/**
+!frontend/src/assets/**
+!docs/**
