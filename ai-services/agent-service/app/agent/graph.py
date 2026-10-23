@@ -29,8 +29,13 @@ settings = get_settings()
 
 def _create_llm_with_tools(tools: list[Any]):
     """Instantiate Google Gemini (with multi-model fallbacks for 503/429 resilience) or OpenAI LLM."""
-    if settings.gemini_api_key:
-        api_key = settings.gemini_api_key.strip()
+    gemini_key = (
+        settings.gemini_api_key.get_secret_value().strip()
+        if settings.gemini_api_key
+        else ""
+    )
+    if gemini_key:
+        api_key = gemini_key
         candidate_models = [
             settings.gemini_model,
             "gemini-3-flash-preview",
@@ -39,10 +44,9 @@ def _create_llm_with_tools(tools: list[Any]):
             "gemini-flash-latest",
         ]
         # Deduplicate while preserving order
-        # fromkeys là một cách để loại bỏ các phần tử trùng lặp trong danh sách, giữ nguyên thứ tự xuất hiện của chúng.
         unique_models = list(dict.fromkeys(candidate_models))
         bound_llms = [
-            ChatGoogleGenerativeAI( 
+            ChatGoogleGenerativeAI(
                 model=m,
                 google_api_key=api_key,
                 temperature=0.1,
@@ -55,9 +59,14 @@ def _create_llm_with_tools(tools: list[Any]):
             return primary.with_fallbacks(bound_llms[1:])
         return primary
 
+    openai_key = (
+        settings.openai_api_key.get_secret_value().strip()
+        if settings.openai_api_key
+        else ""
+    )
     return ChatOpenAI(
         model=settings.openai_model,
-        api_key=settings.openai_api_key.strip(),
+        api_key=openai_key,
         temperature=0.1,
     ).bind_tools(tools)
 

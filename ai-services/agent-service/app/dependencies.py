@@ -13,9 +13,14 @@ _qdrant_client: AsyncQdrantClient | None = None
 async def get_qdrant() -> AsyncQdrantClient:
     global _qdrant_client
     if _qdrant_client is None:
+        qdrant_key = (
+            settings.qdrant_api_key.get_secret_value().strip()
+            if settings.qdrant_api_key
+            else None
+        )
         _qdrant_client = AsyncQdrantClient(
             url=settings.qdrant_url,
-            api_key=settings.qdrant_api_key or None,
+            api_key=qdrant_key,
             timeout=3,
         )
     return _qdrant_client

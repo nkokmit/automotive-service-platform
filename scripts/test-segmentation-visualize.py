@@ -23,7 +23,7 @@ def main():
     detector = YoloOnnxDetector(model_path)
 
     # Tìm một số ảnh test trong CarDD có phát hiện hư hỏng đa dạng
-    test_images = sorted(CARDD_TEST_DIR.glob("*.jpg"))[:25]
+    test_images = sorted(CARDD_TEST_DIR.glob("*.jpg"))[25:50] 
     saved_count = 0
 
     print("================================================================================")
