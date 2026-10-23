@@ -1,0 +1,13 @@
+# Dev profile: tắt JWT, mọi request đều public
+# Dùng khi chưa có user-service / chưa có JWT public key
+# Kích hoạt: SPRING_PROFILES_ACTIVE=dev
+
+gateway:
+  security:
+    disabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.autocare.gateway: DEBUG
+    reactor.netty.http.client: DEBUG   # Log mỗi upstream call

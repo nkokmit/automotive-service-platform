@@ -1,0 +1,12 @@
+# Prod profile: bật JWT, public key phải tồn tại
+# Dùng khi đã có user-service (TV2)
+# Kích hoạt: SPRING_PROFILES_ACTIVE=prod
+
+gateway:
+  security:
+    disabled: false
+
+logging:
+  level:
+    root: INFO
+    com.autocare.gateway: INFO

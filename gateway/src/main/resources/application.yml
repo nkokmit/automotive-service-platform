@@ -1,0 +1,71 @@
+server:
+  port: 4000
+  forward-headers-strategy: native
+
+spring:
+  application:
+    name: automotive-gateway
+  main:
+    web-application-type: reactive
+
+  # =====================================================
+  # CORS — whitelist frontend dev/demo
+  # =====================================================
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:5173"
+              - "http://localhost:3000"
+              - "http://localhost:8080"
+              - "https://demo.autocare.vn"
+              - "https://autocare.vn"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            exposedHeaders:
+              - X-Request-Id
+              - X-User-Id
+              - X-User-Role
+            allowCredentials: true
+            maxAge: 3600
+
+      # =====================================================
+      # ROUTES — Programmatic config trong RouteConfig.java
+      # =====================================================
+      # (routes được config bằng Java DSL — dễ debug, có comment, dễ thêm filter)
+      discovery:
+        locator:
+          enabled: false   # Tắt auto-discovery, dùng config tĩnh
+
+  # =====================================================
+  # Security: JWT resource server
+  # =====================================================
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          public-key-location: ${JWT_PUBLIC_KEY_LOCATION:classpath:jwt-public.pem}
+
+# =====================================================
+# SpringDoc / Swagger UI (gộp từ nhiều service)
+# =====================================================
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+# =====================================================
+# Logging
+# =====================================================
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: INFO
+    com.autocare.gateway: DEBUG

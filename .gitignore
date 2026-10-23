@@ -112,6 +112,10 @@ yarn-error.log*
 out/
 .next/
 
+# TypeScript incremental build cache (created wherever tsc is run)
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
 # ── IDEs & Operating Systems ──────────────────────────────────────────────────
 .vscode/*
 !.vscode/settings.json
