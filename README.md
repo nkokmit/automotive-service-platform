@@ -67,7 +67,19 @@ discovery-server (healthy) ─────┘    damage-detection ────> 
 
 ---
 
-## Địa chỉ truy cập & Tài liệu API
+| Mục đích              | URL                                              |
+| --------------------- | ------------------------------------------------ |
+| API Gateway           | http://localhost:8000                            |
+| Swagger UI            | http://localhost:8000/swagger-ui.html           |
+| OpenAPI user-service  | http://localhost:8000/v3/api-docs/user-service   |
+| Eureka dashboard      | http://localhost:8761                            |
+| User service (nội bộ) | http://localhost:8081                            |
+| Customer vehicle svc   | http://localhost:8082                            |
+| Staff service (nội bộ) | http://localhost:8083                            |
+| OpenAPI customer vehicle | http://localhost:8000/v3/api-docs/customer-vehicle-service |
+| OpenAPI staff service | http://localhost:8000/v3/api-docs/staff-service |
+| MySQL                 | localhost:3306 (`user_service`, `customer_vehicle_service`, `staff_service`) |
+| Kafka broker          | localhost:9092 (PLAINTEXT, không auth)                |
 
 | Mục đích | URL truy cập |
 |---|---|

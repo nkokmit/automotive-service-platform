@@ -7,6 +7,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-user_service}
       CUSTOMER_VEHICLE_MYSQL_DATABASE: ${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}
+      STAFF_MYSQL_DATABASE: ${STAFF_MYSQL_DATABASE:-staff_service}
       MYSQL_USER: ${MYSQL_USER:-app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
     ports:
@@ -176,6 +177,41 @@ services:
       retries: 12
       start_period: 90s
 
+  staff-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE_PATH: services/staff-service
+    restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8083
+      DB_URL: jdbc:mysql://mysql:3306/${STAFF_MYSQL_DATABASE:-staff_service}
+      DB_USERNAME: ${MYSQL_USER:-app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 JWT_SECRET (at least 32 decoded bytes) in .env}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
+      EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
+      SCHEDULE_ZONE_ID: ${SCHEDULE_ZONE_ID:?Set SCHEDULE_ZONE_ID (IANA timezone) in .env}
+    ports:
+      - "${STAFF_SERVICE_PORT:-8083}:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8083/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
   # ── Backend: Spring Cloud API Gateway ───────────────────────────────────────
   api-gateway:
     build:
@@ -199,6 +235,8 @@ services:
       user-service:
         condition: service_healthy
       customer-vehicle-service:
+        condition: service_healthy
+      staff-service:
         condition: service_healthy
     networks:
       - platform

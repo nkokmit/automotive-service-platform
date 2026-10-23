@@ -331,3 +331,53 @@ architecture decision exists.
 Use events for eventual consistency.
 
 Use synchronous calls when immediate validation/data is required.
+
+## 16. Cấu trúc thư mục mẫu
+
+```text
+customer-vehicle-service/
+├── .mvn/
+│   └── wrapper/             # Maven Wrapper
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/example/
+│   │   │       ├── common/      # Thành phần dùng chung
+│   │   │       ├── config/      # Cấu hình ứng dụng, Spring và các thành phần liên quan
+│   │   │       ├── controller/  # REST API endpoints
+│   │   │       ├── dto/         # Data Transfer Objects
+│   │   │       ├── entity/      # JPA entities ánh xạ với database
+│   │   │       ├── enums/       # Các kiểu enum dùng trong nghiệp vụ
+│   │   │       ├── exception/   # Exception và xử lý lỗi
+│   │   │       ├── mapper/      # Chuyển đổi giữa Entity, DTO và các model khác
+│   │   │       ├── messaging/   # Xử lý thông điệp và tích hợp event-driven
+│   │   │       ├── repository/  # Truy vấn và thao tác dữ liệu
+│   │   │       ├── security/    # Cấu hình bảo mật và xác thực, phân quyền
+│   │   │       ├── service/     # Xử lý nghiệp vụ
+│   │   │       └── CustomerVehicleServiceApplication.java
+│   │   └── resources/
+│   │       ├── application.yml     # Cấu hình ứng dụng
+│   │       └── db/migration/       # Các migration Flyway (nếu có)
+│   └── test/
+│       └── java/com/example/       # Unit test và integration test
+├── target/                         # Thư mục build output của Maven
+├── pom.xml                         # Khai báo dependencies và cấu hình build
+└── .gitignore                      # Các tệp và thư mục không đưa lên Git
+```
+
+### Trách nhiệm của các package
+
+- **common:** Chứa các thành phần dùng chung như hằng số hoặc tiện ích chung.
+- **config:** Chứa cấu hình Spring Boot, Kafka, CORS và các thành phần tích hợp khác.
+- **controller:** Tiếp nhận HTTP request, gọi service và trả về HTTP response.
+- **dto:** Định nghĩa request/response DTO, không sử dụng Entity trực tiếp làm dữ liệu trao đổi qua API.
+- **entity:** Định nghĩa các thực thể dữ liệu như Customer, Vehicle và VehicleServiceHistory.
+- **enums:** Chứa các giá trị enum dùng chung trong nghiệp vụ.
+- **exception:** Chứa exception tùy chỉnh và cơ chế xử lý lỗi tập trung.
+- **mapper:** Chuyển đổi dữ liệu giữa Entity, DTO và các đối tượng liên quan.
+- **messaging:** Chứa Kafka producer, consumer và các thành phần xử lý event giữa các microservice.
+- **repository:** Chứa các interface truy cập database thông qua Spring Data JPA hoặc cơ chế truy vấn tương ứng.
+- **security:** Chứa các thành phần liên quan đến JWT, xác thực và phân quyền ở cấp service.
+- **service:** Chứa logic nghiệp vụ, điều phối repository và các thành phần tích hợp bên ngoài.
+- **resources:** Chứa cấu hình và tài nguyên ứng dụng; các migration Flyway được đặt trong `db/migration/`.
+- **test:** Chứa unit test, integration test và các kiểm thử liên quan đến nghiệp vụ.
