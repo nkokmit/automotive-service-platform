@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +34,9 @@ public interface WorkShiftRepository extends JpaRepository<WorkShift, UUID> {
 
     @Query(value = "SELECT * FROM work_shifts WHERE id = :id", nativeQuery = true)
     Optional<WorkShift> findByIdIncludingDeleted(@Param("id") String id);
+
+    @Query(value = "SELECT * FROM work_shifts WHERE id IN (:ids)", nativeQuery = true)
+    List<WorkShift> findAllByIdIncludingDeleted(@Param("ids") Collection<String> ids);
 
     @Query("""
             SELECT s FROM WorkShift s

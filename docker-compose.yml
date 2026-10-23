@@ -186,6 +186,7 @@ services:
       EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
       JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
+      SCHEDULE_ZONE_ID: ${SCHEDULE_ZONE_ID:?Set SCHEDULE_ZONE_ID (IANA timezone) in .env}
     ports:
       - "${STAFF_SERVICE_PORT:-8083}:8083"
     depends_on:

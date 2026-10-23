@@ -321,12 +321,19 @@ Work Order khác sử dụng.
 -   Implement đọc và ghi lịch định kỳ.
 -   Implement request DTO hỗ trợ nhiều ngày và nhiều ca trong một
     request.
--   Thực hiện cập nhật hàng loạt trong transaction.
+-   `PUT /api/staff/{staffId}/recurring-schedules` thay thế cấu hình
+    trong khoảng hiệu lực được gửi; các lịch nằm ngoài khoảng phải được
+    bảo toàn. Nếu một lịch cũ giao với khoảng request, tách và lưu lại
+    phần trước/sau khoảng đó, rồi thay phần giao bằng cấu hình request.
+    Ngày/ca không có trong payload được xem là không làm trong khoảng
+    thay thế; danh sách rỗng dùng để xóa lịch trong khoảng.
+-   Thực hiện thao tác cắt/thay lịch trong một transaction; lỗi validation
+    phải rollback toàn bộ.
 -   Kiểm tra ngày trong tuần, ca tồn tại/đang hoạt động, ngày bắt
     đầu/kết thúc và các khoảng hiệu lực bị chồng lấn.
 -   Viết test cho nhân viên làm một ca, nhiều ca trong một ngày, nhiều
-    ngày trong tuần, thay đổi lịch từ một ngày hiệu lực mới và request
-    không hợp lệ.
+    ngày trong tuần, thay đổi lịch trong một khoảng có bảo toàn phần
+    trước/sau, khoảng kết thúc mở và request không hợp lệ.
 
 ### Giai đoạn 5 --- Nghỉ phép và ngoại lệ
 
@@ -339,22 +346,26 @@ Work Order khác sử dụng.
 
 ### Giai đoạn 6 --- Bộ tính lịch tổng hợp
 
--   Implement component tổng hợp lịch theo khoảng ngày.
+-   Implement component tổng hợp lịch theo khoảng ngày, sử dụng timezone
+    garage cấu hình tại `SCHEDULE_ZONE_ID`.
 -   Loại nhân viên `isActive = FALSE` hoặc đã xóa mềm, sau đó áp dụng:
     lịch định kỳ → ngoại lệ → nghỉ phép. Ca không hoạt động không được
     dùng để tạo lịch mới; lịch đã tồn tại phải giữ khả năng diễn giải.
--   Trả về các khoảng thời gian làm việc cuối cùng.
+-   Trả về các khoảng thời gian làm việc cuối cùng; khoảng ngày tính cả
+    hai đầu và giới hạn tối đa 31 ngày mỗi request.
 -   Viết test biên cho khoảng thời gian liền kề, giao nhau, nhiều ca
     trong ngày, khoảng ngày qua nhiều tuần và không có lịch.
 
 ### Giai đoạn 7 --- Availability API và tích hợp
 
--   Implement `GET /api/staff/availability`.
--   Chốt DTO/contract với Booking Service.
+-   Implement `GET /api/staff/availability` với semantics yêu cầu lịch
+    bao phủ toàn bộ khoảng `[startAt, endAt)`.
+-   Implement API lịch nhân viên và toàn garage trong phần 5.3.
+-   Dùng DTO timestamp ISO-8601 theo timezone garage đã cấu hình.
 -   Đảm bảo response phân biệt được không có lịch làm việc và nhân viên
     không hoạt động nếu nghiệp vụ cần phân biệt.
--   Thêm timeout/error handling cho caller; không để lỗi phụ thuộc bị
-    biến thành kết quả "không có nhân viên" một cách âm thầm.
+-   Booking Service chưa được tích hợp trong phạm vi này; caller cần đặt
+    timeout và xử lý lỗi rõ ràng khi bắt đầu gọi availability API.
 -   Kiểm tra API qua Gateway và Swagger theo convention của project.
 
 ### Giai đoạn 8 --- Hoàn thiện

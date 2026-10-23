@@ -1,13 +1,16 @@
 package com.example.staff_service.repository;
 
 import com.example.staff_service.entity.StaffMember;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,6 +37,12 @@ public interface StaffMemberRepository extends JpaRepository<StaffMember, UUID> 
 
     @Query(value = "SELECT * FROM staff_members WHERE id = :id", nativeQuery = true)
     Optional<StaffMember> findByIdIncludingDeleted(@Param("id") String id);
+
+    List<StaffMember> findByIsActiveTrueOrderByEmployeeCodeAsc();
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM StaffMember s WHERE s.id = :id")
+    Optional<StaffMember> findByIdForUpdate(@Param("id") UUID id);
 
     @Query("""
             SELECT s FROM StaffMember s

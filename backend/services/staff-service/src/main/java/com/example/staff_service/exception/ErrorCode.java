@@ -20,7 +20,11 @@ public enum ErrorCode {
     // WorkShift (31xx)
     WORK_SHIFT_NOT_FOUND(3101, "Không tìm thấy ca làm việc"),
     WORK_SHIFT_ALREADY_EXISTS(3102, "Mã ca làm việc đã tồn tại"),
-    WORK_SHIFT_IN_USE(3103, "Ca làm việc đã được dùng trong lịch và không thể xóa");
+    WORK_SHIFT_IN_USE(3103, "Ca làm việc đã được dùng trong lịch và không thể xóa"),
+
+    // Schedule records (32xx)
+    STAFF_ABSENCE_NOT_FOUND(3201, "Không tìm thấy khoảng nghỉ"),
+    STAFF_SCHEDULE_EXCEPTION_NOT_FOUND(3202, "Không tìm thấy ngoại lệ lịch");
 
     private final int code;
     private final String message;
