@@ -21,8 +21,10 @@ class DamageRegion(BaseModel):
     class_id: int
     confidence: float
     bbox: list[float] = Field(..., description="[x1, y1, x2, y2] normalized 0-1")
-    area_ratio: float = Field(..., description="Fraction of image area covered by mask")
-    severity: str = Field(..., description="low | medium | high based on area_ratio")
+    bbox_area_ratio: float = Field(0.0, description="Fraction of image area covered by bounding box")
+    mask_area_px: int = Field(0, description="Exact pixel count of the segmentation mask")
+    area_ratio: float = Field(..., description="True fraction of image area covered by segmentation mask")
+    severity: str = Field(..., description="low | medium | high based on true mask area_ratio")
 
 
 class DetectionResponse(BaseModel):
@@ -35,3 +37,7 @@ class DetectionResponse(BaseModel):
     image_width: int
     image_height: int
     processing_time_ms: float
+    annotated_image_base64: Optional[str] = Field(
+        None,
+        description="Base64-encoded JPEG image with segmentation masks, contours, and bounding boxes drawn",
+    )
