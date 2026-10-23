@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +40,7 @@ public class StaffController {
     private final StaffService staffService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('STAFF_READ')")
     public ApiResponse<PageResponse<StaffResponse>> getStaff(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
@@ -53,17 +55,20 @@ public class StaffController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('STAFF_READ')")
     public ApiResponse<StaffResponse> getStaffById(@PathVariable UUID id) {
         return ApiResponse.success(staffService.getStaffById(id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('STAFF_CREATE')")
     public ApiResponse<StaffResponse> createStaff(@Valid @RequestBody StaffCreateRequest request) {
         return ApiResponse.success("Tạo hồ sơ nhân viên thành công", staffService.createStaff(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('STAFF_UPDATE')")
     public ApiResponse<StaffResponse> updateStaff(
             @PathVariable UUID id,
             @Valid @RequestBody StaffUpdateRequest request
@@ -72,6 +77,7 @@ public class StaffController {
     }
 
     @PatchMapping("/{id}/is-active")
+    @PreAuthorize("hasAuthority('STAFF_UPDATE')")
     public ApiResponse<StaffResponse> updateStaffIsActive(
             @PathVariable UUID id,
             @Valid @RequestBody IsActiveUpdateRequest request
@@ -82,6 +88,7 @@ public class StaffController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('STAFF_DELETE')")
     public void deleteStaff(@PathVariable UUID id) {
         staffService.deleteStaff(id);
     }

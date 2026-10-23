@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,6 +34,7 @@ public class StaffScheduleExceptionController {
     private final StaffScheduleExceptionService exceptionService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('STAFF_SCHEDULE_EXCEPTION_READ')")
     public ApiResponse<List<StaffScheduleExceptionResponse>> getExceptions(
             @PathVariable UUID staffId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -43,6 +45,7 @@ public class StaffScheduleExceptionController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('STAFF_SCHEDULE_EXCEPTION_CREATE')")
     public ApiResponse<StaffScheduleExceptionResponse> createException(
             @PathVariable UUID staffId,
             @Valid @RequestBody StaffScheduleExceptionRequest request
@@ -52,6 +55,7 @@ public class StaffScheduleExceptionController {
     }
 
     @PutMapping("/{exceptionId}")
+    @PreAuthorize("hasAuthority('STAFF_SCHEDULE_EXCEPTION_UPDATE')")
     public ApiResponse<StaffScheduleExceptionResponse> updateException(
             @PathVariable UUID staffId,
             @PathVariable UUID exceptionId,
@@ -63,6 +67,7 @@ public class StaffScheduleExceptionController {
 
     @DeleteMapping("/{exceptionId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('STAFF_SCHEDULE_EXCEPTION_DELETE')")
     public void deleteException(
             @PathVariable UUID staffId,
             @PathVariable UUID exceptionId

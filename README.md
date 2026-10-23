@@ -12,11 +12,12 @@ Gateway, Eureka và MySQL.
 | `user-service`             | User / role / permission, đăng nhập | 8081        |
 | `mysql`                    | MySQL cho các microservice       | 3306        |
 | `customer-vehicle-service` | Customer / vehicle / lịch sử bảo dưỡng | 8082        |
+| `staff-service`            | Hồ sơ nhân viên, ca làm và lịch làm việc | 8083        |
 | `kafka`                    | Kafka                            | 9092        |
 
 
-Các service còn lại trong `backend/automotive-ai-context/ARCHITECTURE.md` chưa được
-cài đặt trong Compose.
+Các service còn lại trong `backend/automotive-ai-context/ARCHITECTURE.md` chưa
+được cài đặt trong Compose.
 
 ## Chạy bằng Docker Compose
 
@@ -31,7 +32,11 @@ Mở `.env` và điền 3 giá trị bắt buộc:
 - `MYSQL_ROOT_PASSWORD`
 - `MYSQL_PASSWORD`
 - `JWT_SECRET` — chuỗi Base64 hợp lệ, giải mã ra **tối thiểu 32 byte**
-  (dùng chung cho `api-gateway`, `user-service` và `customer-vehicle-service`)
+- `SCHEDULE_ZONE_ID` — múi giờ IANA dùng để tính lịch nhân viên (ví dụ
+  `Asia/Ho_Chi_Minh`)
+
+`JWT_SECRET` được dùng chung cho `api-gateway`, `user-service`,
+`customer-vehicle-service` và `staff-service`.
 
 Sinh `JWT_SECRET`:
 
@@ -52,8 +57,9 @@ docker compose up --build
 ```
 
 MySQL tự tạo database `user_service` (qua `MYSQL_DATABASE`) và tạo database
-`customer_vehicle_service` kèm quyền cho `MYSQL_USER` qua script init. Có thể
-đổi database thứ hai bằng `CUSTOMER_VEHICLE_MYSQL_DATABASE` trong `.env`.
+`customer_vehicle_service`, `staff_service` kèm quyền cho `MYSQL_USER` qua
+script init. Có thể đổi tên hai database này bằng `CUSTOMER_VEHICLE_MYSQL_DATABASE`
+và `STAFF_MYSQL_DATABASE` trong `.env`.
 
 **Volume đã tồn tại:** script init chỉ chạy khi volume còn trống. Không cần xóa
 volume để bổ sung database; chạy script một lần trên MySQL đang hoạt động:
@@ -69,8 +75,9 @@ Thứ tự khởi động được điều khiển bằng healthcheck:
 ``` text
 mysql (healthy)               ─┐
 kafka (healthy)               ─┼─┐
-discovery-server (healthy) ────┼─┴─> user-service (healthy) ─> api-gateway
-                              └───> customer-vehicle-service (healthy)
+discovery-server (healthy) ────┼─┬─> user-service (healthy) ─┐
+                              ├─┴─> customer-vehicle-service ├─> api-gateway
+                              └────> staff-service (healthy) ┘
 ```
 
 ### 3. Địa chỉ
@@ -83,8 +90,10 @@ discovery-server (healthy) ────┼─┴─> user-service (healthy) ─>
 | Eureka dashboard      | http://localhost:8761                            |
 | User service (nội bộ) | http://localhost:8081                            |
 | Customer vehicle svc   | http://localhost:8082                            |
+| Staff service (nội bộ) | http://localhost:8083                            |
 | OpenAPI customer vehicle | http://localhost:8000/v3/api-docs/customer-vehicle-service |
-| MySQL                 | localhost:3306 (db `user_service`, `customer_vehicle_service`) |
+| OpenAPI staff service | http://localhost:8000/v3/api-docs/staff-service |
+| MySQL                 | localhost:3306 (`user_service`, `customer_vehicle_service`, `staff_service`) |
 | Kafka broker          | localhost:9092 (PLAINTEXT, không auth)                |
 
 ### 4. Đăng nhập thử
@@ -112,6 +121,12 @@ curl http://localhost:8000/api/users \
   -H "Authorization: Bearer <accessToken>"
 ```
 
+Staff Service kiểm tra quyền trên claim JWT `authorities` cho từng API.
+Migration V9 của User Service cấp toàn quyền quản lý hồ sơ và lịch cho
+`ADMIN`/`MANAGER`; `MECHANIC` chỉ được đọc hồ sơ nhân viên, ca làm và lịch.
+`CUSTOMER` không có quyền Staff Service. Cần đăng nhập lại sau khi thay đổi
+quyền của role để token có authorities mới.
+
 ### 5. Kiểm tra nhanh
 
 ```bash
@@ -129,9 +144,9 @@ Chỉ `health` được expose; `readiness` dùng cho healthcheck của Docker:
 /actuator/health/readiness
 ```
 
-Trong `api-gateway`, `user-service` và `customer-vehicle-service`, chỉ
-`/actuator/health/**` được permit —
-các Actuator endpoint khác vẫn yêu cầu xác thực.
+Trong `api-gateway`, `user-service`, `customer-vehicle-service` và
+`staff-service`, chỉ `/actuator/health/**` được permit — các Actuator endpoint
+khác vẫn yêu cầu xác thực.
 
 Lưu ý: `readiness` phản ánh trạng thái ứng dụng, **không** tự chứng minh kết nối
 DB hay route qua gateway đang hoạt động.
@@ -155,6 +170,13 @@ Cho `customer-vehicle-service`, thay `DB_URL` bằng database của service:
 DB_URL=jdbc:mysql://localhost:3306/customer_vehicle_service
 ```
 
+Cho `staff-service`, dùng database riêng và thêm múi giờ lịch:
+
+```text
+DB_URL=jdbc:mysql://localhost:3306/staff_service
+SCHEDULE_ZONE_ID=Asia/Ho_Chi_Minh
+```
+
 Service đang dùng Kafka thì thêm:
 
 ``` text
@@ -168,13 +190,11 @@ service nào phát hoặc nhận event, nên topic sẽ không tự xuất hiệ
 
 Ngoài ra:
 
-- `user-service` **không** được khởi động nếu chưa có `JWT_SECRET`, `DB_USERNAME`,
-  `DB_PASSWORD` — ứng dụng sẽ fail fast. `customer-vehicle-service` yêu cầu
-  tương tự.
-- `customer-vehicle-service` chưa có entity hoặc migration nghiệp vụ. Khung cấu
-  hình có thể khởi động khi database, quyền truy cập và các biến bắt buộc đã sẵn
-  sàng; Hibernate chưa có bảng entity nào để validate. Khi bổ sung entity, cần
-  migration `V1` tương ứng trước khi khởi động với `ddl-auto: validate`.
+- `user-service`, `customer-vehicle-service` và `staff-service` yêu cầu
+  `JWT_SECRET`, `DB_USERNAME`, `DB_PASSWORD`; `staff-service` cũng yêu cầu
+  `SCHEDULE_ZONE_ID`. Ứng dụng sẽ fail fast khi thiếu cấu hình bắt buộc.
+- Các service dùng Flyway để tạo schema và Hibernate `ddl-auto: validate` để
+  xác nhận schema khi khởi động.
 - Test `contextLoads` cần MySQL sẵn sàng; chạy MySQL qua
   `docker compose up mysql` rồi mới chạy test.
 - Warm-up: sau khi `user-service` healthy, gateway cần vài giây để registry đồng bộ.
@@ -190,7 +210,8 @@ backend/
 │   └── mysql/init/         # Script entrypoint MySQL, chỉ chạy khi volume trống
 ├── services/
 │   ├── user-service/
-│   └── customer-vehicle-service/
+│   ├── customer-vehicle-service/
+│   └── staff-service/
 └── automotive-ai-context/  # Quy ước kiến trúc (GLOBAL_RULES, ARCHITECTURE)
 ```
 
@@ -212,8 +233,8 @@ docker compose down -v
 ## Lưu ý vận hành
 
 - Đổi `JWT_SECRET` sẽ làm mất hiệu lực các token đang chạy.
-- Actuator đã được giới hạn, nhưng `/swagger-ui.html` vẫn được permit ở gateway,
-  user-service và customer-vehicle-service để phục vụ tài liệu API.
-- `user-service` và `customer-vehicle-service` được expose ở host port chỉ để phục
-  vụ dev/debug; gateway là entry point theo kiến trúc. Không expose port các
-  microservice ra ngoài trong production.
+- Actuator đã được giới hạn, nhưng Swagger UI và OpenAPI vẫn được permit để phục
+  vụ tài liệu API.
+- `user-service`, `customer-vehicle-service` và `staff-service` được expose ở
+  host port chỉ để phục vụ dev/debug; gateway là entry point theo kiến trúc.
+  Không expose port các microservice ra ngoài trong production.

@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +40,7 @@ public class WorkShiftController {
     private final WorkShiftService workShiftService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('WORK_SHIFT_READ')")
     public ApiResponse<PageResponse<WorkShiftResponse>> getWorkShifts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
@@ -53,17 +55,20 @@ public class WorkShiftController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('WORK_SHIFT_READ')")
     public ApiResponse<WorkShiftResponse> getWorkShiftById(@PathVariable UUID id) {
         return ApiResponse.success(workShiftService.getWorkShiftById(id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('WORK_SHIFT_CREATE')")
     public ApiResponse<WorkShiftResponse> createWorkShift(@Valid @RequestBody WorkShiftCreateRequest request) {
         return ApiResponse.success("Tạo ca làm việc thành công", workShiftService.createWorkShift(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('WORK_SHIFT_UPDATE')")
     public ApiResponse<WorkShiftResponse> updateWorkShift(
             @PathVariable UUID id,
             @Valid @RequestBody WorkShiftUpdateRequest request
@@ -73,6 +78,7 @@ public class WorkShiftController {
     }
 
     @PatchMapping("/{id}/is-active")
+    @PreAuthorize("hasAuthority('WORK_SHIFT_UPDATE')")
     public ApiResponse<WorkShiftResponse> updateWorkShiftIsActive(
             @PathVariable UUID id,
             @Valid @RequestBody IsActiveUpdateRequest request
@@ -83,6 +89,7 @@ public class WorkShiftController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('WORK_SHIFT_DELETE')")
     public void deleteWorkShift(@PathVariable UUID id) {
         workShiftService.deleteWorkShift(id);
     }

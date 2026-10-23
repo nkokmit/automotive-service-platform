@@ -36,6 +36,27 @@ The Gateway routes `/api/staff/**`, `/api/work-shifts/**`, and
 `/api/schedules/**` to this service and includes its OpenAPI document in the
 Swagger dropdown.
 
+## Authorization
+
+The service verifies the shared JWT and reads the `authorities` claim issued
+by User Service. Every API operation requires a specific permission; missing
+permissions return `403 Forbidden`, while missing or invalid tokens return
+`401 Unauthorized`.
+
+| Permission group | APIs | Permissions |
+| --- | --- | --- |
+| Staff profiles | `/api/staff` | `STAFF_READ`, `STAFF_CREATE`, `STAFF_UPDATE`, `STAFF_DELETE` |
+| Work shifts | `/api/work-shifts` | `WORK_SHIFT_READ`, `WORK_SHIFT_CREATE`, `WORK_SHIFT_UPDATE`, `WORK_SHIFT_DELETE` |
+| Recurring schedules and aggregation | schedule and availability GET APIs; recurring schedule PUT | `STAFF_SCHEDULE_READ`, `STAFF_SCHEDULE_UPDATE` |
+| Absences | `/api/staff/{staffId}/absences` | `STAFF_ABSENCE_READ`, `STAFF_ABSENCE_CREATE`, `STAFF_ABSENCE_UPDATE`, `STAFF_ABSENCE_DELETE` |
+| Schedule exceptions | `/api/staff/{staffId}/schedule-exceptions` | `STAFF_SCHEDULE_EXCEPTION_READ`, `STAFF_SCHEDULE_EXCEPTION_CREATE`, `STAFF_SCHEDULE_EXCEPTION_UPDATE`, `STAFF_SCHEDULE_EXCEPTION_DELETE` |
+
+User Service migration `V9__seed_staff_service_permissions.sql` creates these
+permissions and grants all of them to `ADMIN` and `MANAGER`. `MECHANIC` receives
+only `STAFF_READ`, `WORK_SHIFT_READ`, and `STAFF_SCHEDULE_READ`; `CUSTOMER`
+receives none. Existing tokens must be refreshed after permissions are assigned
+so their `authorities` claim includes the new permissions.
+
 Staff and work-shift CRUD are available under `/api/staff` and
 `/api/work-shifts`. List endpoints accept an optional `isActive` filter;
 without it, both active and inactive records are returned. `DELETE` performs

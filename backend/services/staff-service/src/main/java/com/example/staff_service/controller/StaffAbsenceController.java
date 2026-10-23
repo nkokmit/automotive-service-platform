@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,6 +34,7 @@ public class StaffAbsenceController {
     private final StaffAbsenceService absenceService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('STAFF_ABSENCE_READ')")
     public ApiResponse<List<StaffAbsenceResponse>> getAbsences(
             @PathVariable UUID staffId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
@@ -43,6 +45,7 @@ public class StaffAbsenceController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('STAFF_ABSENCE_CREATE')")
     public ApiResponse<StaffAbsenceResponse> createAbsence(
             @PathVariable UUID staffId,
             @Valid @RequestBody StaffAbsenceRequest request
@@ -52,6 +55,7 @@ public class StaffAbsenceController {
     }
 
     @PutMapping("/{absenceId}")
+    @PreAuthorize("hasAuthority('STAFF_ABSENCE_UPDATE')")
     public ApiResponse<StaffAbsenceResponse> updateAbsence(
             @PathVariable UUID staffId,
             @PathVariable UUID absenceId,
@@ -63,6 +67,7 @@ public class StaffAbsenceController {
 
     @DeleteMapping("/{absenceId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('STAFF_ABSENCE_DELETE')")
     public void deleteAbsence(
             @PathVariable UUID staffId,
             @PathVariable UUID absenceId
