@@ -15,7 +15,7 @@ Booking Service **không phân công kỹ thuật viên cụ thể** khi khách 
 - Tính sức chứa dựa trên lịch làm việc thực tế của kỹ thuật viên và nhu cầu nhân sự của từng dịch vụ.
 - Lưu snapshot thông tin dịch vụ tại thời điểm đặt lịch.
 - Hỗ trợ quy trình tiếp nhận xe tại garage, liên kết booking với xe chính thức và Work Order.
-- Tích hợp với Catalog Service, Staff Service, Customer-Vehicle Service và Work Order Service.
+- Tích hợp với Inventory Service, Staff Service, Customer-Vehicle Service và Work Order Service.
 
 ### Ngoài phạm vi
 
@@ -119,24 +119,25 @@ Không suy luận quyền sở hữu xe từ việc một khách hàng đặt bo
 
 ## 3. Tích hợp với các service
 
-### 3.1. Catalog Service
+### 3.1. Inventory Service (Catalog dịch vụ)
 
-Catalog Service là nguồn dữ liệu chuẩn về dịch vụ.
+`inventory-service` là nguồn dữ liệu chuẩn về dịch vụ (project không có
+service tên riêng "Catalog Service").
 
 Booking Service cần lấy tối thiểu:
 
 - ID dịch vụ.
 - Tên dịch vụ.
 - Trạng thái có được cung cấp hay không.
-- `estimated_duration_minutes`.
-- `required_technicians`.
+- `duration_minutes`.
+- `required_techs`.
 
 Ý nghĩa:
 
-- `estimated_duration_minutes`: thời lượng ước tính để thực hiện một dịch vụ.
-- `required_technicians`: số kỹ thuật viên cần đồng thời thực hiện dịch vụ đó theo mô hình ước tính của Catalog Service.
+- `duration_minutes`: thời lượng ước tính để thực hiện một dịch vụ.
+- `required_techs`: số kỹ thuật viên cần đồng thời thực hiện dịch vụ đó theo mô hình ước tính của Inventory Service.
 
-Không tự đặt thời lượng mặc định hoặc tự suy diễn số kỹ thuật viên khi Catalog Service không trả về dữ liệu hợp lệ.
+Không tự đặt thời lượng mặc định hoặc tự suy diễn số kỹ thuật viên khi Inventory Service không trả về dữ liệu hợp lệ.
 
 Khi tạo booking, lưu snapshot của tên dịch vụ, thời lượng và nhu cầu kỹ thuật viên để bảo toàn cơ sở tính toán tại thời điểm đặt lịch.
 
@@ -219,17 +220,17 @@ Lưu danh sách dịch vụ dự kiến theo thứ tự thực hiện.
 |---|---|
 | `id` | ID dòng dịch vụ |
 | `booking_id` | Booking sở hữu dòng dịch vụ |
-| `service_id` | ID dịch vụ bên Catalog Service |
+| `service_id` | ID dịch vụ bên Inventory Service |
 | `service_name_snapshot` | Tên dịch vụ tại thời điểm đặt |
-| `estimated_duration_minutes` | Thời lượng snapshot |
-| `required_technicians_snapshot` | Nhu cầu kỹ thuật viên snapshot |
+| `estimated_duration_minutes` | Thời lượng snapshot (copy từ `duration_minutes`) |
+| `required_technicians_snapshot` | Nhu cầu kỹ thuật viên snapshot (copy từ `required_techs`) |
 | `sequence_number` | Thứ tự thực hiện trong booking |
 
 `sequence_number` xác định thứ tự các dịch vụ nối tiếp nhau. Phải có quy tắc đảm bảo thứ tự ổn định và không mơ hồ.
 
-`booking_id` là quan hệ nội bộ của Booking Service. `service_id` là tham chiếu logic đến Catalog Service, không phải khóa ngoại liên service.
+`booking_id` là quan hệ nội bộ của Booking Service. `service_id` là tham chiếu logic đến Inventory Service, không phải khóa ngoại liên service.
 
-Snapshot là dữ liệu dùng để tái dựng kế hoạch ước tính ban đầu. Không tự động ghi đè snapshot lịch sử khi Catalog Service thay đổi thời lượng hoặc nhu cầu nhân sự.
+Snapshot là dữ liệu dùng để tái dựng kế hoạch ước tính ban đầu. Không tự động ghi đè snapshot lịch sử khi Inventory Service thay đổi thời lượng hoặc nhu cầu nhân sự.
 
 ### 4.3. `booking_status_histories` — tùy chọn
 
@@ -295,7 +296,7 @@ Mọi phép so sánh, truy vấn overlap và xử lý sự kiện phải tuân t
 - `reqStart`: thời điểm bắt đầu dự kiến.
 - `newBookingServices`: danh sách dịch vụ theo thứ tự khách chọn.
 
-Với mỗi dịch vụ, lấy snapshot hợp lệ từ Catalog Service và xác nhận:
+Với mỗi dịch vụ, lấy snapshot hợp lệ từ Inventory Service và xác nhận:
 
 - `duration > 0`.
 - `requiredTechnicians >= 1`.
@@ -593,7 +594,7 @@ Phải xử lý rõ các trường hợp:
 - Nhiều sự kiện trùng timestamp.
 - Các dịch vụ nối tiếp có điểm kết thúc trùng điểm bắt đầu.
 - Booking đi qua nửa đêm hoặc ranh giới ngày.
-- Catalog Service trả về dịch vụ không hợp lệ hoặc thiếu dữ liệu.
+- Inventory Service trả về dịch vụ không hợp lệ hoặc thiếu dữ liệu.
 - Staff Service không trả về được lịch hoặc dữ liệu lịch không hợp lệ.
 
 Không được diễn giải lỗi khi truy vấn lịch Staff Service thành nguồn cung bằng 0 rồi trả kết quả “không có slot” như thể đó là dữ liệu nghiệp vụ bình thường. Cần phân biệt không đủ sức chứa với lỗi phụ thuộc service.
@@ -640,7 +641,7 @@ Nếu thao tác tạo booking thất bại sau khi đã giữ reservation, phả
 Luồng nghiệp vụ:
 
 1. Nhận yêu cầu và danh sách dịch vụ theo thứ tự khách chọn.
-2. Lấy thông tin dịch vụ từ Catalog Service.
+2. Lấy thông tin dịch vụ từ Inventory Service.
 3. Kiểm tra dữ liệu và tạo snapshot.
 4. Tính tổng thời lượng và chuỗi nhu cầu nhân sự.
 5. Kiểm tra các điều kiện vận hành.
@@ -737,7 +738,7 @@ Các endpoint phục vụ tiếp nhận và liên kết Work Order cần có thi
 - Vehicle có thể chưa tồn tại khi khách đặt lịch; `vehicle_id` ban đầu nullable.
 - Biển số khách nhập được lưu dưới dạng snapshot.
 - Các dịch vụ trong booking được thực hiện nối tiếp theo thứ tự khách chọn.
-- Thời lượng và nhu cầu kỹ thuật viên được lấy từ Catalog Service và lưu snapshot.
+- Thời lượng và nhu cầu kỹ thuật viên được lấy từ Inventory Service và lưu snapshot.
 - Không phân công kỹ thuật viên cụ thể lúc đặt lịch.
 - Sức chứa được kiểm tra theo nhu cầu của từng dịch vụ và nguồn cung thay đổi theo thời gian.
 - Sweep Line kiểm tra điều kiện đủ nhân sự trên từng đoạn giữa hai mốc sự kiện.
@@ -749,7 +750,7 @@ Các endpoint phục vụ tiếp nhận và liên kết Work Order cần có thi
 
 ### Giai đoạn 1 — Chốt hợp đồng tích hợp
 
-- Xác nhận API Catalog Service cung cấp đủ dữ liệu dịch vụ.
+- Xác nhận API Inventory Service cung cấp đủ dữ liệu dịch vụ.
 - Xác nhận hợp đồng Staff Service cung cấp các khoảng làm việc thực tế của từng nhân viên.
 - Xác nhận hợp đồng với Customer-Vehicle Service cho tra cứu/tạo Vehicle.
 - Xác nhận quy trình tiếp nhận và tạo Work Order.
@@ -761,7 +762,7 @@ Các endpoint phục vụ tiếp nhận và liên kết Work Order cần có thi
 - Thiết kế `booking_services` và thứ tự dịch vụ.
 - Thiết kế index phục vụ truy vấn booking giao với khoảng thời gian.
 - Quyết định có cần `booking_status_histories` hay không.
-- Xác định quy tắc snapshot và tính tương thích khi Catalog Service thay đổi dữ liệu.
+- Xác định quy tắc snapshot và tính tương thích khi Inventory Service thay đổi dữ liệu.
 
 ### Giai đoạn 3 — Thuật toán sức chứa
 
@@ -803,7 +804,7 @@ Tập trung vào:
 - Hai booking bắt đầu khác nhau nhưng chồng lấn.
 - Hai request đồng thời cùng đặt vào sức chứa cuối cùng.
 - Hủy hoặc đổi lịch và ảnh hưởng tới sức chứa.
-- Lỗi Catalog Service hoặc Staff Service.
+- Lỗi Inventory Service hoặc Staff Service.
 - Tiếp nhận xe và tạo Work Order nhiều lần do retry.
 
 ## 10. Tiêu chí hoàn thành

@@ -60,6 +60,41 @@ spring:
               predicates:
                 - Path=/api/schedules/**
 
+            - id: inventory-service-service-categories
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/service-categories/**
+
+            - id: inventory-service-services
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/services/**
+
+            - id: inventory-service-part-categories
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/part-categories/**
+
+            - id: inventory-service-parts
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/parts/**
+
+            - id: inventory-service-suppliers
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/suppliers/**
+
+            - id: inventory-service-purchase-orders
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/purchase-orders/**
+
+            - id: inventory-service-inventory-transactions
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/inventory-transactions/**
+
 eureka:
   client:
     service-url:
