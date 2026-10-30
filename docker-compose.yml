@@ -1,4 +1,5 @@
 services:
+  # ── Infrastructure: MySQL ───────────────────────────────────────────────────
   mysql:
     image: mysql:9.7
     restart: unless-stopped
@@ -15,21 +16,17 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      # Chỉ chạy khi volume trống: tạo database cho các service ngoài user_service.
       - ./backend/infra/mysql/init:/docker-entrypoint-initdb.d:ro
     networks:
       - platform
     healthcheck:
-      # TCP avoids the temporary bootstrap server; check the app's DB credentials.
       test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u\"$$MYSQL_USER\" -D\"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 30
       start_period: 120s
 
-  # Kafka ở chế độ KRaft single-node (không cần ZooKeeper).
-  # Hai listener: 9092 cho host/IDE (localhost), 19092 cho container trong
-  # cùng network `platform`.
+  # ── Infrastructure: Kafka (KRaft single-node) ───────────────────────────────
   kafka:
     image: apache/kafka:4.2.1
     restart: unless-stopped
@@ -43,10 +40,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:${KAFKA_PORT:-9092},PLAINTEXT://kafka:19092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      # Phải cố định và ổn định: đổi CLUSTER_ID khi volume đã có dữ liệu thì
-      # broker không khởi động lại được.
       CLUSTER_ID: ${KAFKA_CLUSTER_ID:-REd9mkeFMGNXMYId4xJDNA}
-      # Single-node không có replica nên các hệ số mặc định (>1) sẽ chặn tạo topic.
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -68,6 +62,24 @@ services:
       retries: 18
       start_period: 40s
 
+  # ── Infrastructure: Qdrant Vector Database (cho AI Agent) ───────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "6334:6334"
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend: Discovery Server (Eureka) ──────────────────────────────────────
   discovery-server:
     build:
       context: ./backend
@@ -90,6 +102,7 @@ services:
       retries: 12
       start_period: 60s
 
+  # ── Backend: User Service ───────────────────────────────────────────────────
   user-service:
     build:
       context: ./backend
@@ -108,7 +121,6 @@ services:
       JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-604800000}
       EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
       EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS_CONTAINER:-kafka:19092}
       JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
     ports:
@@ -117,8 +129,6 @@ services:
       mysql:
         condition: service_healthy
       discovery-server:
-        condition: service_healthy
-      kafka:
         condition: service_healthy
     networks:
       - platform
@@ -129,6 +139,7 @@ services:
       retries: 12
       start_period: 90s
 
+  # ── Backend: Customer Vehicle Service ───────────────────────────────────────
   customer-vehicle-service:
     build:
       context: ./backend
@@ -149,8 +160,6 @@ services:
       EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
       JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
-      # Trong compose dùng listener nội bộ; khi chạy service bằng IDE thì
-      # override thành localhost (xem README).
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS_CONTAINER:-kafka:19092}
     ports:
       - "${CUSTOMER_VEHICLE_SERVICE_PORT:-8082}:8082"
@@ -280,6 +289,7 @@ services:
       retries: 12
       start_period: 90s
 
+  # ── Backend: Spring Cloud API Gateway ───────────────────────────────────────
   api-gateway:
     build:
       context: ./backend
@@ -318,6 +328,58 @@ services:
       retries: 12
       start_period: 60s
 
+  # ── AI Service: Vehicle Damage Detection (YOLOv8s ONNX) ─────────────────────
+  damage-detection-service:
+    build:
+      context: ./ai-services/damage-detection-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ONNX_MODEL_PATH: /models/yolov8s-seg.onnx
+      CONF_THRESHOLD: ${CONF_THRESHOLD:-0.25}
+      IOU_THRESHOLD: ${IOU_THRESHOLD:-0.45}
+    volumes:
+      - ./ai-services/damage-detection-service/app/models:/models:ro
+    ports:
+      - "${DAMAGE_SERVICE_PORT:-8001}:8001"
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/v1/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ── AI Service: LangGraph ReAct Agent ───────────────────────────────────────
+  agent-service:
+    build:
+      context: ./ai-services/agent-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      QDRANT_URL: http://qdrant:6333
+      DAMAGE_SERVICE_URL: http://damage-detection-service:8001
+      API_GATEWAY_URL: http://api-gateway:8000
+      GARAGE_SERVICE_URL: http://api-gateway:8000
+    ports:
+      - "${AGENT_SERVICE_PORT:-8002}:8002"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      damage-detection-service:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/api/v1/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
 networks:
   platform:
     driver: bridge
@@ -325,3 +387,5 @@ networks:
 volumes:
   mysql-data:
   kafka-data:
+  qdrant-data:
+  onnx-models:

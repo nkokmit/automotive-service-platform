@@ -1,5 +1,405 @@
 openapi: 3.0.3
 info:
-  title: Commerce API
-  version: 0.1.0
-paths: {}
+  title: Commerce Service API
+  description: |
+    **SKELETON** — Bản nháp contract do Thành viên 1 (Gateway owner) đề xuất.
+    Thành viên 2 vui lòng review và phản hồi.
+  version: 0.1.0-draft
+  contact:
+    name: Thành viên 2
+servers:
+  - url: http://localhost:8083/api/v1
+    description: Local dev
+  - url: http://localhost:4000/api/v1
+    description: Qua API Gateway
+tags:
+  - name: Parts
+  - name: Cart
+  - name: Orders
+  - name: Admin
+
+paths:
+  /parts:
+    get:
+      tags: [Parts]
+      summary: Danh sách phụ kiện / phụ tùng
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string, example: 'BRakes' }
+        - in: query
+          name: brand
+          schema: { type: string }
+        - in: query
+          name: carModel
+          schema: { type: string, description: 'Lọc theo model xe tương thích' }
+        - in: query
+          name: minPrice
+          schema: { type: integer }
+        - in: query
+          name: maxPrice
+          schema: { type: integer }
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartPage' }
+    post:
+      tags: [Admin, Parts]
+      summary: Thêm phụ tùng
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PartCreateRequest' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Part' }
+
+  /parts/{slug}:
+    get:
+      tags: [Parts]
+      summary: Chi tiết phụ tùng
+      parameters:
+        - $ref: '#/components/parameters/SlugParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartDetail' }
+
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Giỏ hàng hiện tại của user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+    delete:
+      tags: [Cart]
+      summary: Xoá toàn bộ giỏ hàng
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: OK }
+
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Thêm sản phẩm vào giỏ
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [partId, quantity]
+              properties:
+                partId: { type: string }
+                quantity: { type: integer, minimum: 1, default: 1 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+
+  /cart/items/{itemId}:
+    patch:
+      tags: [Cart]
+      summary: Cập nhật số lượng
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: itemId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+    delete:
+      tags: [Cart]
+      summary: Xoá 1 item khỏi giỏ
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: itemId
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: OK }
+
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Lịch sử đơn hàng của user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/OrderStatus' }
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderPage' }
+    post:
+      tags: [Orders]
+      summary: Tạo đơn hàng từ giỏ
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderCreateRequest' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Chi tiết đơn hàng
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderDetail' }
+    patch:
+      tags: [Orders]
+      summary: Cập nhật trạng thái (cancel)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { $ref: '#/components/schemas/OrderStatus' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    SlugParam:
+      in: path
+      name: slug
+      required: true
+      schema: { type: string }
+    PageParam:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSizeParam:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  schemas:
+    OrderStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED, REFUNDED]
+
+    Part:
+      type: object
+      required: [id, slug, name, sku, priceVND, stock]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        sku: { type: string }
+        brand: { type: string }
+        category: { type: string }
+        priceVND: { type: integer, minimum: 0 }
+        originalPriceVND: { type: integer, nullable: true, description: 'Giá gốc nếu đang giảm' }
+        stock: { type: integer, minimum: 0 }
+        imageUrl: { type: string, format: uri, nullable: true }
+        rating: { type: number, format: float, minimum: 0, maximum: 5, nullable: true }
+        soldCount: { type: integer, minimum: 0 }
+        isActive: { type: boolean, default: true }
+
+    PartDetail:
+      allOf:
+        - $ref: '#/components/schemas/Part'
+        - type: object
+          properties:
+            description: { type: string }
+            specifications:
+              type: object
+              additionalProperties: { type: string }
+            compatibleCarModels:
+              type: array
+              items: { type: string }
+            images:
+              type: array
+              items: { type: string, format: uri }
+
+    PartCreateRequest:
+      type: object
+      required: [name, sku, priceVND, stock]
+      properties:
+        name: { type: string }
+        sku: { type: string }
+        brand: { type: string }
+        category: { type: string }
+        priceVND: { type: integer, minimum: 0 }
+        originalPriceVND: { type: integer, nullable: true }
+        stock: { type: integer, minimum: 0 }
+        imageUrl: { type: string, format: uri, nullable: true }
+        description: { type: string }
+        compatibleCarModels:
+          type: array
+          items: { type: string }
+
+    Cart:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              itemId: { type: string }
+              part: { $ref: '#/components/schemas/Part' }
+              quantity: { type: integer }
+              subtotalVND: { type: integer }
+        totalQuantity: { type: integer }
+        subtotalVND: { type: integer }
+        discountVND: { type: integer, default: 0 }
+        shippingFeeVND: { type: integer, default: 0 }
+        totalVND: { type: integer }
+
+    Order:
+      type: object
+      required: [id, status, totalVND, createdAt]
+      properties:
+        id: { type: string }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        totalVND: { type: integer }
+        paymentMethod: { type: string, example: 'COD' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    OrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  part: { $ref: '#/components/schemas/Part' }
+                  quantity: { type: integer }
+                  subtotalVND: { type: integer }
+            shippingAddress: { $ref: '#/components/schemas/Address' }
+            history:
+              type: array
+              items:
+                type: object
+                properties:
+                  status: { $ref: '#/components/schemas/OrderStatus' }
+                  changedAt: { type: string, format: date-time }
+
+    OrderCreateRequest:
+      type: object
+      required: [addressId, paymentMethod]
+      properties:
+        addressId: { type: string, description: 'ID địa chỉ giao hàng từ user-service' }
+        paymentMethod:
+          type: string
+          enum: [COD, BANKING, MOMO, VNPAY]
+        note: { type: string }
+
+    PartPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Part' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    OrderPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Order' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    Address:
+      type: object
+      description: 'Reference tới user-service, copy lại để dễ dùng'
+      properties:
+        id: { type: string }
+        fullAddress: { type: string }
+        recipientName: { type: string }
+        phone: { type: string }
+
+    ErrorResponse:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        timestamp: { type: string, format: date-time }

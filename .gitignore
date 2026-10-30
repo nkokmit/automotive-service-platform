@@ -1,20 +1,156 @@
-# Common build/dependency artifacts
-node_modules/
-dist/
-build/
-.venv/
+# ==============================================================================
+# Automotive Service Platform - .gitignore
+# Covers Python (FastAPI/LangGraph), AI/ML (YOLO/ONNX), Frontend & Infra
+# ==============================================================================
+
+# ── Python Bytecode & Cache ───────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Local secrets - KHÔNG BAO GIỜ commit
+# ── Virtual Environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+
+# ── Environment & Secrets ─────────────────────────────────────────────────────
+# Ignore actual secrets and environment configs, but keep examples
 .env
-.env.local
+.env.*
+!.env.example
+*.env
+!*.env.example
+*.pem
+*.key
+*.cert
+*.pfx
 
-# IDE
+# ── AI / ML Models & Heavy Binaries ───────────────────────────────────────────
+# Large model weights (prevent exceeding GitHub 100MB file limit)
+*.onnx
+*.pt
+*.pth
+*.bin
+*.weights
+*.safetensors
+*.engine
+*.tflite
+*.h5
+*.pkl
+*.joblib
+
+# Uncomment below if you intentionally want Git to track yolov8s-seg.onnx (<50MB):
+# !ai-services/damage-detection-service/app/models/yolov8s-seg.onnx
+
+# ── Datasets & Data Artifacts ─────────────────────────────────────────────────
+/data/*
+!/data/.gitkeep
+*.jsonl
+*.csv.gz
+*.parquet
+
+# ── Databases & Docker Volume Data ────────────────────────────────────────────
+postgres-data/
+qdrant-data/
+*.sqlite
+*.sqlite3
+*.db
+*.rdb
+
+# ── Testing, Coverage & Linters ───────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# ── Logs & Temporary Files ────────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+temp/
+*.swp
+*.swo
+*~
+
+# ── Frontend (React / Vite / Next.js / Node) ──────────────────────────────────
+node_modules/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.turbo/
+out/
+.next/
+
+# TypeScript incremental build cache (created wherever tsc is run)
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# ── IDEs & Operating Systems ──────────────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
-*.iml
-.vscode/
+*.sublime-project
+*.sublime-workspace
 
-# Maven build output
-target/
+# OS artifacts
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
 
+# ── Images & Media Artifacts ──────────────────────────────────────────────────
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+*.tiff
+*.ico
+*.svg
+
+uploads/
+runs/
+outputs/
+
+!frontend/public/**
+!frontend/src/assets/**
+!docs/**

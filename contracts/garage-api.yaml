@@ -1,5 +1,181 @@
-openapi: 3.0.3
+openapi: "3.1.0"
 info:
-  title: Garage API
-  version: 0.1.0
-paths: {}
+  title: Garage Service API
+  version: "1.0.0"
+  description: Garage slot availability and booking management
+
+servers:
+  - url: http://localhost/api/v1
+
+tags:
+  - name: garages
+  - name: bookings
+  - name: slots
+
+paths:
+  /garages:
+    get:
+      tags: [garages]
+      summary: List all active garages
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+          example: "Hà Nội"
+      responses:
+        "200":
+          description: List of garages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Garage"
+
+  /garages/{garage_id}/slots:
+    get:
+      tags: [slots]
+      summary: Get available time slots for a garage on a date
+      parameters:
+        - name: garage_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-10-20"
+      responses:
+        "200":
+          description: Available slots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  garage_id:
+                    type: string
+                  date:
+                    type: string
+                  slots:
+                    type: array
+                    items:
+                      type: string
+                    example: ["08:00", "09:00", "10:00", "14:00", "15:00"]
+
+  /bookings:
+    post:
+      tags: [bookings]
+      summary: Create a new booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingRequest"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+        "409":
+          description: Slot already taken
+
+  /bookings/{booking_id}:
+    get:
+      tags: [bookings]
+      summary: Get booking by ID
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+
+components:
+  schemas:
+    Garage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        phone:
+          type: string
+        rating:
+          type: number
+        services:
+          type: array
+          items:
+            type: string
+
+    CreateBookingRequest:
+      type: object
+      required: [garage_id, date, time_slot, service_type, customer_name, phone]
+      properties:
+        garage_id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        time_slot:
+          type: string
+          example: "09:00"
+        service_type:
+          type: string
+          enum: [oil_change, tire_rotation, full_inspection, brake_service, ac_service, glass_repair, other]
+        customer_name:
+          type: string
+        phone:
+          type: string
+        notes:
+          type: string
+          nullable: true
+
+    BookingResponse:
+      type: object
+      properties:
+        booking_id:
+          type: string
+          format: uuid
+        garage_id:
+          type: string
+        date:
+          type: string
+        time_slot:
+          type: string
+        service_type:
+          type: string
+        customer_name:
+          type: string
+        phone:
+          type: string
+        status:
+          type: string
+          enum: [confirmed, cancelled, completed, no_show]
+        created_at:
+          type: string
+          format: date-time
+
