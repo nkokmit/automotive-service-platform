@@ -6,6 +6,8 @@ import com.example.inventory_service.common.PageableFactory;
 import com.example.inventory_service.dto.request.SupplierRequest;
 import com.example.inventory_service.dto.response.SupplierResponse;
 import com.example.inventory_service.service.SupplierService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -31,6 +33,7 @@ import java.util.UUID;
 @RequestMapping("/api/suppliers")
 @RequiredArgsConstructor
 @Validated
+@Tag(name = "Nhà cung cấp", description = "Nhà cung cấp phụ tùng cho đơn nhập hàng")
 public class SupplierController {
 
     private static final Set<String> SORT_FIELDS = Set.of("code", "name", "createdAt");
@@ -39,6 +42,10 @@ public class SupplierController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('SUPPLIER_READ')")
+    @Operation(summary = "Danh sách nhà cung cấp",
+            description = "Phân trang và lọc theo keyword hoặc trạng thái hoạt động.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về một trang kết quả nhà cung cấp.")
     public ApiResponse<PageResponse<SupplierResponse>> getSuppliers(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
@@ -53,6 +60,11 @@ public class SupplierController {
 
     @GetMapping("/{supplierId}")
     @PreAuthorize("hasAuthority('SUPPLIER_READ')")
+    @Operation(summary = "Chi tiết nhà cung cấp")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về chi tiết nhà cung cấp.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Không tìm thấy nhà cung cấp.")
     public ApiResponse<SupplierResponse> getSupplier(@PathVariable UUID supplierId) {
         return ApiResponse.success(supplierService.getSupplierById(supplierId));
     }
@@ -60,12 +72,22 @@ public class SupplierController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('SUPPLIER_WRITE')")
+    @Operation(summary = "Tạo nhà cung cấp")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201",
+            description = "Nhà cung cấp đã được tạo.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Mã nhà cung cấp đã tồn tại.")
     public ApiResponse<SupplierResponse> createSupplier(@Valid @RequestBody SupplierRequest request) {
         return ApiResponse.success("Tạo nhà cung cấp thành công", supplierService.createSupplier(request));
     }
 
     @PutMapping("/{supplierId}")
     @PreAuthorize("hasAuthority('SUPPLIER_WRITE')")
+    @Operation(summary = "Cập nhật nhà cung cấp")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Nhà cung cấp đã được cập nhật.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Mã nhà cung cấp đã tồn tại hoặc nhà cung cấp không tồn tại.")
     public ApiResponse<SupplierResponse> updateSupplier(@PathVariable UUID supplierId,
                                                         @Valid @RequestBody SupplierRequest request) {
         return ApiResponse.success("Cập nhật nhà cung cấp thành công",
@@ -75,6 +97,12 @@ public class SupplierController {
     @DeleteMapping("/{supplierId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('SUPPLIER_WRITE')")
+    @Operation(summary = "Xóa nhà cung cấp",
+            description = "Không xóa được nếu nhà cung cấp đang có đơn nhập hàng.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204",
+            description = "Nhà cung cấp đã bị xóa.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Nhà cung cấp đang được sử dụng.")
     public void deleteSupplier(@PathVariable UUID supplierId) {
         supplierService.deleteSupplier(supplierId);
     }

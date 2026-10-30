@@ -277,7 +277,7 @@ Tên cột trong API phải khớp đúng tên cột trong schema (`duration_min
 - [ ] **4.2. Kafka Producers (Phát sự kiện của Inventory Service)**
   * **`StockDeducted` Producer:** Phát event khi xuất kho phụ tùng thành công.
   * **`InsufficientStock` Producer:** Phát event báo thiếu hàng khi không đủ tồn kho phục vụ lệnh.
-- [ ] **4.3. REST API Sync Endpoints (Cho các Service khác gọi đồng bộ)**
+- [x] **4.3. REST API Sync Endpoints (Cho các Service khác gọi đồng bộ)**
   * Endpoint kiểm tra tồn kho tức thời: `POST /api/parts/check-availability`
   * Endpoint lấy đơn giá phụ tùng phục vụ lập Báo giá: `POST /api/parts/pricing`
   * Các endpoint này được service khác gọi đồng bộ, nên trả về
@@ -286,14 +286,17 @@ Tên cột trong API phải khớp đúng tên cột trong schema (`duration_min
 ---
 
 ### 📌 Pha 5: Kiểm Thử, Swagger Docs & Docker
-- [ ] **5.1. Unit Testing & Integration Testing**
+- [x] **5.1. Unit Testing & Integration Testing**
   * Write Unit Test cho thuật toán tính Giá vốn bình quân.
-  * Write Integration Test với `Testcontainers` (MySQL & Kafka). Test này cũng
-    là nơi kiểm chứng `ddl-auto=validate` khớp với migration — Hibernate sẽ
-    fail sớm nếu cột/kiểu trong entity lệch schema.
-- [ ] **5.2. OpenAPI / Swagger Documentation**
+  * ~~Write Integration Test với `Testcontainers` (MySQL & Kafka)~~ — thay bằng
+    unit test thuần Mockito/AssertJ cho nghiệp vụ kho, đơn nhập hàng và hai
+    API đồng bộ §4.3 (giống `staff-service` / `customer-vehicle-service`):
+    không cần MySQL/Kafka, build nhanh và chạy được mọi máy.
+  * Test cũng là nơi kiểm chứng `ddl-auto=validate` khớp với migration — Hibernate
+    sẽ fail sớm nếu cột/kiểu trong entity lệch schema.
+- [x] **5.2. OpenAPI / Swagger Documentation**
   * Thêm Swagger annotations (`@Operation`, `@ApiResponse`) cho tất cả API Endpoints.
-- [ ] **5.3. Dockerization**
+- [x] **5.3. Dockerization**
   * Tạo `Dockerfile` Multi-stage build cho `inventory-service`.
   * Service đã có sẵn entry trong `docker-compose.yml` (port 8084, biến môi
     trường `DB_URL` / `INVENTORY_MYSQL_DATABASE`) — không sửa lại hạ tầng

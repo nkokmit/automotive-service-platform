@@ -6,6 +6,8 @@ import com.example.inventory_service.common.PageableFactory;
 import com.example.inventory_service.dto.request.CategoryRequest;
 import com.example.inventory_service.dto.response.CategoryResponse;
 import com.example.inventory_service.service.PartCategoryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -31,6 +33,7 @@ import java.util.UUID;
 @RequestMapping("/api/part-categories")
 @RequiredArgsConstructor
 @Validated
+@Tag(name = "Nhóm phụ tùng", description = "Phân loại phụ tùng trong catalog")
 public class PartCategoryController {
 
     private static final Set<String> SORT_FIELDS = Set.of("code", "name", "createdAt");
@@ -39,6 +42,10 @@ public class PartCategoryController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('PART_READ')")
+    @Operation(summary = "Danh sách nhóm phụ tùng",
+            description = "Phân trang và lọc theo keyword trong mã hoặc tên nhóm.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về một trang kết quả nhóm phụ tùng.")
     public ApiResponse<PageResponse<CategoryResponse>> getCategories(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -52,6 +59,11 @@ public class PartCategoryController {
 
     @GetMapping("/{categoryId}")
     @PreAuthorize("hasAuthority('PART_READ')")
+    @Operation(summary = "Chi tiết nhóm phụ tùng")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về chi tiết nhóm phụ tùng.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Không tìm thấy nhóm phụ tùng.")
     public ApiResponse<CategoryResponse> getCategory(@PathVariable UUID categoryId) {
         return ApiResponse.success(partCategoryService.getCategoryById(categoryId));
     }
@@ -59,12 +71,22 @@ public class PartCategoryController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('PART_WRITE')")
+    @Operation(summary = "Tạo nhóm phụ tùng")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201",
+            description = "Nhóm phụ tùng đã được tạo.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Mã nhóm phụ tùng đã tồn tại.")
     public ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
         return ApiResponse.success("Tạo nhóm phụ tùng thành công", partCategoryService.createCategory(request));
     }
 
     @PutMapping("/{categoryId}")
     @PreAuthorize("hasAuthority('PART_WRITE')")
+    @Operation(summary = "Cập nhật nhóm phụ tùng")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Nhóm phụ tùng đã được cập nhật.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Mã nhóm phụ tùng đã tồn tại hoặc nhóm không tồn tại.")
     public ApiResponse<CategoryResponse> updateCategory(@PathVariable UUID categoryId,
                                                         @Valid @RequestBody CategoryRequest request) {
         return ApiResponse.success("Cập nhật nhóm phụ tùng thành công",
@@ -74,6 +96,12 @@ public class PartCategoryController {
     @DeleteMapping("/{categoryId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('PART_WRITE')")
+    @Operation(summary = "Xóa nhóm phụ tùng",
+            description = "Không xóa được nếu nhóm đang có phụ tùng.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204",
+            description = "Nhóm phụ tùng đã bị xóa.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Nhóm phụ tùng đang được sử dụng.")
     public void deleteCategory(@PathVariable UUID categoryId) {
         partCategoryService.deleteCategory(categoryId);
     }

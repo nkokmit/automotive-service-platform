@@ -7,6 +7,8 @@ import com.example.inventory_service.dto.response.InventoryTransactionResponse;
 import com.example.inventory_service.enums.ReferenceType;
 import com.example.inventory_service.enums.TransactionType;
 import com.example.inventory_service.service.InventoryTransactionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import java.util.UUID;
 @RequestMapping("/api/inventory-transactions")
 @RequiredArgsConstructor
 @Validated
+@Tag(name = "Sổ nhật ký kho", description = "Tra cứu mọi biến động tồn kho để audit")
 public class InventoryTransactionController {
 
     private static final Set<String> SORT_FIELDS = Set.of("createdAt", "type", "quantity");
@@ -34,6 +37,11 @@ public class InventoryTransactionController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('INVENTORY_TRANSACTION_READ')")
+    @Operation(summary = "Tra cứu sổ nhật ký kho",
+            description = "Lọc theo phụ tùng, loại giao dịch, loại tham chiếu, mã tham chiếu "
+                    + "và khoảng thời gian. Mọi biến động tồn kho đều có bản ghi tại đây.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về một trang kết quả sổ nhật ký kho.")
     public ApiResponse<PageResponse<InventoryTransactionResponse>> getTransactions(
             @RequestParam(required = false) UUID partId,
             @RequestParam(required = false) TransactionType type,

@@ -9,6 +9,8 @@ import com.example.inventory_service.dto.request.ServiceRequest;
 import com.example.inventory_service.dto.response.ServiceBomResponse;
 import com.example.inventory_service.dto.response.ServiceResponse;
 import com.example.inventory_service.service.ServiceCatalogService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -35,6 +37,7 @@ import java.util.UUID;
 @RequestMapping("/api/services")
 @RequiredArgsConstructor
 @Validated
+@Tag(name = "Dịch vụ", description = "Catalog dịch vụ và định mức phụ tùng (BOM)")
 public class ServiceController {
 
     private static final Set<String> SORT_FIELDS = Set.of("code", "name", "baseLaborPrice", "createdAt");
@@ -43,6 +46,10 @@ public class ServiceController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @Operation(summary = "Danh sách dịch vụ",
+            description = "Phân trang và lọc theo keyword, nhóm dịch vụ hoặc trạng thái hoạt động.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về một trang kết quả dịch vụ.")
     public ApiResponse<PageResponse<ServiceResponse>> getServices(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) UUID categoryId,
@@ -58,6 +65,13 @@ public class ServiceController {
 
     @GetMapping("/{serviceId}")
     @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @Operation(summary = "Chi tiết dịch vụ",
+            description = "Trả về chi tiết dịch vụ kèm thời lượng và số kỹ thuật viên yêu cầu "
+                    + "(contract với booking-service).")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về chi tiết dịch vụ.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Không tìm thấy dịch vụ.")
     public ApiResponse<ServiceResponse> getService(@PathVariable UUID serviceId) {
         return ApiResponse.success(serviceCatalogService.getServiceById(serviceId));
     }
@@ -65,12 +79,22 @@ public class ServiceController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
+    @Operation(summary = "Tạo dịch vụ")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201",
+            description = "Dịch vụ đã được tạo.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Mã dịch vụ đã tồn tại hoặc nhóm dịch vụ không hợp lệ.")
     public ApiResponse<ServiceResponse> createService(@Valid @RequestBody ServiceRequest request) {
         return ApiResponse.success("Tạo dịch vụ thành công", serviceCatalogService.createService(request));
     }
 
     @PutMapping("/{serviceId}")
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
+    @Operation(summary = "Cập nhật dịch vụ")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Dịch vụ đã được cập nhật.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Mã dịch vụ đã tồn tại hoặc dịch vụ không tồn tại.")
     public ApiResponse<ServiceResponse> updateService(@PathVariable UUID serviceId,
                                                       @Valid @RequestBody ServiceRequest request) {
         return ApiResponse.success("Cập nhật dịch vụ thành công",
@@ -80,12 +104,21 @@ public class ServiceController {
     @DeleteMapping("/{serviceId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
+    @Operation(summary = "Xóa dịch vụ")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204",
+            description = "Dịch vụ đã bị xóa.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Dịch vụ đang được sử dụng.")
     public void deleteService(@PathVariable UUID serviceId) {
         serviceCatalogService.deleteService(serviceId);
     }
 
     @GetMapping("/{serviceId}/bom")
     @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @Operation(summary = "Định mức phụ tùng của dịch vụ",
+            description = "Trả về danh sách phụ tùng mặc định kèm theo dịch vụ (BOM).")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về danh sách định mức phụ tùng.")
     public ApiResponse<List<ServiceBomResponse>> getBom(@PathVariable UUID serviceId) {
         return ApiResponse.success(serviceCatalogService.getBom(serviceId));
     }
@@ -93,6 +126,11 @@ public class ServiceController {
     @PostMapping("/{serviceId}/bom")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
+    @Operation(summary = "Thêm phụ tùng vào định mức")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201",
+            description = "Đã thêm phụ tùng vào định mức.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Phụ tùng đã có trong định mức của dịch vụ.")
     public ApiResponse<ServiceBomResponse> addBomItem(@PathVariable UUID serviceId,
                                                       @Valid @RequestBody ServiceBomRequest request) {
         return ApiResponse.success("Thêm phụ tùng vào định mức thành công",
@@ -101,9 +139,14 @@ public class ServiceController {
 
     @PutMapping("/{serviceId}/bom/{bomId}")
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
+    @Operation(summary = "Cập nhật dòng định mức")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Dòng định mức đã được cập nhật.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Không tìm thấy dòng định mức hoặc phụ tùng đã có trong định mức.")
     public ApiResponse<ServiceBomResponse> updateBomItem(@PathVariable UUID serviceId,
-                                                         @PathVariable UUID bomId,
-                                                         @Valid @RequestBody ServiceBomUpdateRequest request) {
+                                                        @PathVariable UUID bomId,
+                                                        @Valid @RequestBody ServiceBomUpdateRequest request) {
         return ApiResponse.success("Cập nhật định mức thành công",
                 serviceCatalogService.updateBomItem(serviceId, bomId, request));
     }
@@ -111,6 +154,11 @@ public class ServiceController {
     @DeleteMapping("/{serviceId}/bom/{bomId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
+    @Operation(summary = "Xóa dòng định mức")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204",
+            description = "Dòng định mức đã bị xóa.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Không tìm thấy dòng định mức.")
     public void deleteBomItem(@PathVariable UUID serviceId, @PathVariable UUID bomId) {
         serviceCatalogService.deleteBomItem(serviceId, bomId);
     }
