@@ -23,7 +23,8 @@
   `work-order-service`                Full repair-order lifecycle; core
                                       business service
 
-  `inventory-service`                 Parts and stock
+  `inventory-service`                 Service catalog, parts catalog and
+                                      stock
 
   `billing-service`                   Invoice and payment
 
@@ -236,6 +237,14 @@ Because approval can be partial:
 
 Work Order Service must not directly modify Inventory Service's
 database.
+
+### 10.1. Service catalog rule
+
+Inventory Service is also the source of truth for the service catalog
+(duration and technician requirement). There is no separate catalog service.
+
+Booking Service reads `duration_minutes` and `required_techs` and stores a
+snapshot on the booking. Catalog changes must not rewrite booking history.
 
 ## 11. Billing rule
 
