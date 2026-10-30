@@ -1,20 +1,17 @@
 /**
- * Endpoint cho customer-vehicle-service.
- *
- * Chỉ những route mà role CUSTOMER thực sự gọi được. Các route quản trị
- * (GET /api/customers, GET /api/vehicles, ...) cần authority tương ứng và sẽ trả
- * 403 nếu role hiện tại không có — xem `hasAuthority()` trong ../types.
+ * Endpoint cho user-service & customer-vehicle-service.
  */
 import client from "../client";
 import type { CustomerResponse, PageResponse, UserResponse } from "../types";
+import { customerVehicleApi } from "./customerVehicle";
 
 export const userApi = {
   me: (): Promise<UserResponse> => client.request<UserResponse>("/api/users/me"),
 };
 
 export const customerApi = {
-  /** Hồ sơ khách hàng của chính người đang đăng nhập. Trả 403 nếu chưa có hồ sơ. */
-  me: (): Promise<CustomerResponse> => client.request<CustomerResponse>("/api/customers/me"),
+  /** Hồ sơ khách hàng của chính người đang đăng nhập (kèm fallback sang MySQL bridge). */
+  me: (): Promise<CustomerResponse> => customerVehicleApi.getMyProfile(),
 };
 
 export const adminApi = {
@@ -24,5 +21,7 @@ export const adminApi = {
 
   /** Cần authority `CUSTOMER_READ`. Trang 0-based. */
   listCustomers: (page = 0, size = 20) =>
-    client.request<PageResponse<CustomerResponse>>(`/api/customers?page=${page}&size=${size}`),
+    customerVehicleApi.listCustomers({ page, size }),
 };
+
+export { customerVehicleApi };

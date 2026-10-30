@@ -20,6 +20,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ai/, "/api/v1"),
       },
+      "/ai/customer-vehicles": {
+        target: process.env.VITE_AGENT_PROXY_TARGET ?? "http://localhost:8002",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ai/, "/api/v1"),
+      },
       "/ai/detect": {
         target: process.env.VITE_DAMAGE_PROXY_TARGET ?? "http://localhost:8001",
         changeOrigin: true,

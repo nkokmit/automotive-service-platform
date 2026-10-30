@@ -47,106 +47,101 @@ import AdminServices from "./modules/admin/AdminServices";
 import AdminParts from "./modules/admin/AdminParts";
 import AdminOrders from "./modules/admin/AdminOrders";
 import AdminUsers from "./modules/admin/AdminUsers";
+import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
 // và RequireAuth chuyển hướng về /login.
 hydrateUser().finally(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <ErrorBoundary
-      onError={(error, info) => {
-        // eslint-disable-next-line no-console
-        console.error("[Top-level ErrorBoundary]", error, info);
-        // TODO: gửi lên Sentry / log server khi tích hợp
-      }}
-    >
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<App />}>
-            <Route index element={<Home />} />
+    <React.StrictMode>
+      <ErrorBoundary
+        onError={(error, info) => {
+          // eslint-disable-next-line no-console
+          console.error("[Top-level ErrorBoundary]", error, info);
+        }}
+      >
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<App />}>
+              <Route index element={<Home />} />
 
-            {/* ============ AUTH module ============ */}
-            <Route path="login" element={<Login />} />
+              {/* ============ AUTH module ============ */}
+              <Route path="login" element={<Login />} />
+              <Route
+                path="profile"
+                element={
+                  <RequireAuth>
+                    <Profile />
+                  </RequireAuth>
+                }
+              />
+
+              {/* ============ COMMERCE module ============ */}
+              <Route path="cars" element={<CarsList />} />
+              <Route path="cars/:slug" element={<CarDetail />} />
+              <Route path="parts" element={<PartsList />} />
+              <Route path="parts/:slug" element={<PartDetail />} />
+              <Route path="cart" element={<Cart />} />
+              <Route path="checkout" element={<Checkout />} />
+              <Route path="services" element={<ServicesList />} />
+              <Route path="services/:slug" element={<ServiceDetail />} />
+
+              {/* ============ AI module ============ */}
+              <Route path="ai/damage" element={<DamageUpload />} />
+              <Route path="ai/assistant" element={<ChatAssistant />} />
+
+              {/* ============ CONTENT module ============ */}
+              <Route path="news" element={<NewsList />} />
+              <Route path="news/:slug" element={<ArticleDetail />} />
+
+              {/* Demo pages — sẽ xoá ở production */}
+              <Route path="foundation" element={<FoundationDemo />} />
+              <Route path="boom-demo" element={<BoomDemo />} />
+
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+
+            {/* ============= Admin module (separate layout) ============= */}
             <Route
-              path="profile"
+              path="/admin"
               element={
-                <RequireAuth>
-                  <Profile />
-                </RequireAuth>
+                <ToastProvider>
+                  <AdminLayout />
+                </ToastProvider>
               }
-            />
-
-            {/* ============ COMMERCE module ============ */}
-            <Route path="cars" element={<CarsList />} />
-            <Route path="cars/:slug" element={<CarDetail />} />
-            <Route path="parts" element={<PartsList />} />
-            <Route path="parts/:slug" element={<PartDetail />} />
-            <Route path="cart" element={<Cart />} />
-            <Route path="checkout" element={<Checkout />} />
-            <Route path="services" element={<ServicesList />} />
-            <Route path="services/:slug" element={<ServiceDetail />} />
-
-            {/* ============ AI module ============ */}
-            <Route path="ai/damage" element={<DamageUpload />} />
-            <Route path="ai/assistant" element={<ChatAssistant />} />
-
-            {/* ============ CONTENT module ============ */}
-            <Route path="news" element={<NewsList />} />
-            <Route path="news/:slug" element={<ArticleDetail />} />
-
-            {/* Demo pages — sẽ xoá ở production */}
-            <Route
-              path="foundation"
-              element={<FoundationDemo />}
-            />
-            <Route
-              path="boom-demo"
-              element={<BoomDemo />}
-            />
-
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-
-          {/* ============= Admin module (separate layout) ============= */}
-          <Route
-            path="/admin"
-            element={
-              <ToastProvider>
-                <AdminLayout />
-              </ToastProvider>
-            }
-          >
-            <Route index element={<AdminDashboard />} />
-            <Route path="garages" element={<AdminGarages />} />
-            <Route path="services" element={<AdminServices />} />
-            <Route path="parts" element={<AdminParts />} />
-            <Route path="orders" element={<AdminOrders />} />
-            <Route path="users" element={<AdminUsers />} />
-            <Route
-              path="reports"
-              element={
-                <ComingSoon
-                  title="Báo cáo & Thống kê"
-                  desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo garage, hiệu suất dịch vụ, cohort khách hàng..."
-                />
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <ComingSoon
-                  title="Cài đặt hệ thống"
-                  desc="Cấu hình chung: thông tin công ty, email templates, payment gateway, backup..."
-                />
-              }
-            />
-            <Route path="*" element={<AdminNotFound />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </ErrorBoundary>
-  </React.StrictMode>,
+            >
+              <Route index element={<AdminDashboard />} />
+              <Route path="garages" element={<AdminGarages />} />
+              <Route path="services" element={<AdminServices />} />
+              <Route path="parts" element={<AdminParts />} />
+              <Route path="orders" element={<AdminOrders />} />
+              <Route path="vehicles" element={<AdminCustomerVehicles />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route
+                path="reports"
+                element={
+                  <ComingSoon
+                    title="Báo cáo & Thống kê"
+                    desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo garage, hiệu suất dịch vụ, cohort khách hàng..."
+                  />
+                }
+              />
+              <Route
+                path="settings"
+                element={
+                  <ComingSoon
+                    title="Cài đặt hệ thống"
+                    desc="Cấu hình chung: thông tin công ty, email templates, payment gateway, backup..."
+                  />
+                }
+              />
+              <Route path="*" element={<AdminNotFound />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ErrorBoundary>
+    </React.StrictMode>,
   );
 });
 

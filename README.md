@@ -143,3 +143,4 @@ docker compose logs -f agent-service   # Theo dõi log service
 docker compose down                    # Dừng hệ thống (giữ nguyên volumes)
 docker compose down -v                 # Dừng và xóa toàn bộ dữ liệu database/volume
 ```
+powershell -ExecutionPolicy Bypass -File .\scripts\run-all.ps1 # chạy script sơm

@@ -40,6 +40,7 @@ _MOCK_ARTICLES = [
 ]
 
 _dense_model = None
+_sparse_model = None
 
 
 def _encode_dense(query: str) -> list[float]:
@@ -58,30 +59,40 @@ def _encode_dense(query: str) -> list[float]:
 
 
 def _encode_sparse(text: str) -> SparseVector:
-    """Encode text into a Qdrant SparseVector using FastEmbed BM25 or deterministic lexical TF fallback."""
-    try:
-        from fastembed import SparseTextEmbedding
-        bm25_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-        sparse_embedding = list(bm25_model.embed([text]))[0]
-        return SparseVector(
-            indices=sparse_embedding.indices.tolist(),
-            values=sparse_embedding.values.tolist(),
-        )
-    except Exception:
-        import math
-        import re
-        import zlib
-        from collections import Counter
+    """Encode text into a Qdrant SparseVector using cached FastEmbed BM25 or deterministic lexical TF fallback."""
+    global _sparse_model
+    if _sparse_model is None:
+        try:
+            from fastembed import SparseTextEmbedding
+            _sparse_model = ("bm25", SparseTextEmbedding(model_name="Qdrant/bm25"))
+        except Exception:
+            _sparse_model = ("crc32", None)
 
-        tokens = re.findall(r"\w+", text.lower())
-        counts = Counter(
-            zlib.crc32(t.encode("utf-8")) % 1_000_000
-            for t in tokens
-            if len(t) > 1
-        )
-        indices = sorted(counts.keys())
-        values = [round(1.0 + math.log(counts[i]), 4) for i in indices]
-        return SparseVector(indices=indices, values=values)
+    kind, model = _sparse_model
+    if kind == "bm25" and model is not None:
+        try:
+            sparse_embedding = list(model.embed([text]))[0]
+            return SparseVector(
+                indices=sparse_embedding.indices.tolist(),
+                values=sparse_embedding.values.tolist(),
+            )
+        except Exception:
+            pass
+
+    import math
+    import re
+    import zlib
+    from collections import Counter
+
+    tokens = re.findall(r"\w+", text.lower())
+    counts = Counter(
+        zlib.crc32(t.encode("utf-8")) % 1_000_000
+        for t in tokens
+        if len(t) > 1
+    )
+    indices = sorted(counts.keys())
+    values = [round(1.0 + math.log(counts[i]), 4) for i in indices]
+    return SparseVector(indices=indices, values=values)
 
 
 async def _hybrid_search(
@@ -90,12 +101,12 @@ async def _hybrid_search(
     query: str,
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Run Qdrant hybrid search combining dense and BM25/lexical sparse vectors."""
-    # Fast check that Qdrant is reachable and collection exists before loading encoders
+    """Run Qdrant hybrid search combining dense and BM25/lexical sparse vectors (auto-seeds if missing)."""
     collections_resp = await client.get_collections()
     existing = [c.name for c in collections_resp.collections]
     if collection not in existing:
-        raise RuntimeError(f"Qdrant collection '{collection}' does not exist yet")
+        from app.seed import ensure_qdrant_seeded
+        await ensure_qdrant_seeded(client, collection)
 
     dense_vector = _encode_dense(query)
     sparse_vec = _encode_sparse(query)
@@ -141,7 +152,7 @@ async def _hybrid_search(
 def make_search_car_news_tool(qdrant_client: AsyncQdrantClient):
     """Factory that closes over the Qdrant client."""
 
-    @tool(args_schema=SearchCarNewsInput) 
+    @tool(args_schema=SearchCarNewsInput)
     async def search_car_news(query: str, limit: int = 5, collection: str = "car_news") -> str:
         """Search automotive news, maintenance tips, and recall information using hybrid semantic + keyword search.
 
@@ -168,7 +179,7 @@ def make_search_car_news_tool(qdrant_client: AsyncQdrantClient):
         lines = []
         for i, h in enumerate(hits, 1):
             title = h.get("title", "Untitled")
-            content = h.get("content", h.get("text", ""))[:300]
+            content = h.get("content", h.get("text", ""))[:350]
             source = h.get("source", "")
             url = h.get("url", "")
             lines.append(

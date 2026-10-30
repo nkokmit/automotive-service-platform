@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import {
   IconDashboard,
   IconBuilding,
@@ -46,6 +46,7 @@ const navGroups: NavGroup[] = [
     label: "Quản lý",
     items: [
       { to: "/admin/orders", label: "Đơn hàng", icon: IconShoppingBag, badge: "24" },
+      { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
       { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
       { to: "/admin/services", label: "Dịch vụ", icon: IconWrench },
       { to: "/admin/garages", label: "Garage", icon: IconBuilding },
@@ -64,10 +65,6 @@ const navGroups: NavGroup[] = [
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
-  const location = useLocation();
-
-  // Close mobile menu when navigate
-  const currentPath = location.pathname;
 
   return (
     <div className="min-h-screen bg-bgsoft/50 flex">

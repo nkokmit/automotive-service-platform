@@ -44,7 +44,7 @@ class Settings(BaseSettings):
 
     # ── Qdrant Vector Database ────────────────────────────────────────────────
     qdrant_url: str = Field(
-        default="http://qdrant:6333",
+        default="http://localhost:6333",
         description="Qdrant service URL",
     )
     qdrant_api_key: Optional[SecretStr] = Field(
@@ -59,20 +59,32 @@ class Settings(BaseSettings):
         default="sentence-transformers/all-MiniLM-L6-v2",
         description="Dense embedding model name",
     )
+    auto_seed_on_startup: bool = Field(
+        default=True,
+        description="Automatically seed Qdrant (car_news) and MySQL (used_cars) on service startup if empty",
+    )
 
-    # ── Relational Database ───────────────────────────────────────────────────
-    postgres_dsn: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@postgres:5432/automotive",
-        description="Async database connection DSN",
+    # ── Relational Database (MySQL Primary) ───────────────────────────────────
+    mysql_dsn: str = Field(
+        default="mysql+aiomysql://app:apppassword123@localhost:3306/customer_vehicle_service?charset=utf8mb4",
+        description="Async MySQL connection DSN (primary database)",
+    )
+    database_url: Optional[str] = Field(
+        default=None,
+        description="Optional unified database connection DSN override",
+    )
+    postgres_dsn: Optional[str] = Field(
+        default=None,
+        description="Legacy database DSN (automatically migrated to MySQL if still set to default Postgres)",
     )
 
     # ── Microservice Endpoints (Validated URLs) ───────────────────────────────
     garage_service_url: str = Field(
-        default="http://garage-service:8000",
-        description="Garage appointment booking service URL",
+        default="http://localhost:8080",
+        description="Garage appointment booking / API Gateway service URL",
     )
     damage_service_url: str = Field(
-        default="http://damage-detection-service:8001",
+        default="http://localhost:8001",
         description="YOLOv8 damage detection service URL",
     )
 
@@ -81,6 +93,20 @@ class Settings(BaseSettings):
     port: int = Field(default=8002, ge=1, le=65535, description="Server port")
     debug: bool = Field(default=False, description="Debug mode flag")
 
+    @property
+    def effective_database_url(self) -> str:
+        """Return the active async SQLAlchemy URL (preferring MySQL over legacy Postgres placeholders)."""
+        for candidate in (self.database_url, self.mysql_dsn, self.postgres_dsn):
+            if candidate and candidate.strip():
+                val = candidate.strip()
+                # If a legacy default postgres URL was left over in an old .env, use mysql_dsn instead
+                if val.startswith("postgresql") and "postgres:postgres@" in val:
+                    continue
+                if val.startswith("mysql://"):
+                    val = "mysql+aiomysql://" + val[len("mysql://"):]
+                return val
+        return "mysql+aiomysql://app:apppassword123@localhost:3306/customer_vehicle_service?charset=utf8mb4"
+
     # ── Fail-Fast Validators ──────────────────────────────────────────────────
     @field_validator("qdrant_url", "garage_service_url", "damage_service_url")
     @classmethod
@@ -88,7 +114,6 @@ class Settings(BaseSettings):
         """Fail-fast: Kiểm tra định dạng HTTP/HTTPS URL ngay khi ứng dụng khởi động."""
         if not v or not v.strip():
             raise ValueError("URL endpoint không được để trống.")
-        # HttpUrl will validate scheme and syntax, raising ValidationError if malformed
         HttpUrl(v.strip())
         return v.strip().rstrip("/")
 
