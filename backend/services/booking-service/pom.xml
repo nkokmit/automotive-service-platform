@@ -79,6 +79,12 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
 		</dependency>
+		<!-- OpenFeign: gọi đồng bộ inventory-service / staff-service để tính sức chứa
+		     (GLOBAL_RULES §4). Version do spring-cloud-dependencies quản lý. -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-openfeign</artifactId>
+		</dependency>
 
 		<!-- Kafka: event-driven giữa các service (ARCHITECTURE.md §3). Version
 		     do spring-boot-starter-parent quản lý, không khai báo ở đây. -->

@@ -5,9 +5,9 @@ app:
   api-gateway-url: ${API_GATEWAY_URL:http://localhost:8000}
   schedule-zone-id: ${SCHEDULE_ZONE_ID:Asia/Ho_Chi_Minh}
   integration:
-    inventory-service-url: ${INVENTORY_SERVICE_URL:http://inventory-service:8083}
-    staff-service-url: ${STAFF_SERVICE_URL:http://staff-service:8082}
-    customer-vehicle-service-url: ${CUSTOMER_VEHICLE_SERVICE_URL:http://customer-vehicle-service:8084}
+    inventory-service-url: ${INVENTORY_SERVICE_URL:http://inventory-service:8084}
+    staff-service-url: ${STAFF_SERVICE_URL:http://staff-service:8083}
+    customer-vehicle-service-url: ${CUSTOMER_VEHICLE_SERVICE_URL:http://customer-vehicle-service:8082}
 
 spring:
   application:
@@ -56,6 +56,15 @@ spring:
     enabled: true
     baseline-on-migrate: false
     locations: classpath:db/migration
+
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: ${FEIGN_CONNECT_TIMEOUT_MS:2000}
+            read-timeout: ${FEIGN_READ_TIMEOUT_MS:5000}
+
 
 eureka:
   client:
