@@ -232,11 +232,21 @@ Lưu danh sách dịch vụ dự kiến theo thứ tự thực hiện.
 
 Snapshot là dữ liệu dùng để tái dựng kế hoạch ước tính ban đầu. Không tự động ghi đè snapshot lịch sử khi Inventory Service thay đổi thời lượng hoặc nhu cầu nhân sự.
 
-### 4.3. `booking_status_histories` — tùy chọn
+### 4.3. `booking_status_histories`
 
-Có thể sử dụng để ghi nhận lịch sử chuyển trạng thái nếu nghiệp vụ cần audit hoặc tra cứu diễn biến booking.
+Bảng bắt buộc dùng để ghi nhận lịch sử chuyển trạng thái booking phục vụ audit và tra cứu diễn biến.
 
-Không bắt buộc triển khai nếu chưa có yêu cầu sử dụng rõ ràng và dự án đã có cơ chế ghi nhận phù hợp.
+| Trường | Ý nghĩa |
+|---|---|
+| `id` | ID bản ghi lịch sử |
+| `booking_id` | Booking nội bộ sở hữu bản ghi lịch sử |
+| `from_status` | Trạng thái trước chuyển đổi, nullable khi ghi trạng thái khởi tạo |
+| `to_status` | Trạng thái sau chuyển đổi |
+| `changed_at` | Thời điểm chuyển trạng thái |
+| `reason` | Lý do chuyển trạng thái, nullable |
+| `changed_by` | ID người thực hiện, nullable, chỉ là tham chiếu logic sang service khác |
+
+`booking_id` là quan hệ nội bộ với cascade delete. `changed_by` không tạo khóa ngoại cross-service. Bản ghi khởi tạo dùng `from_status = NULL` và `to_status = CONFIRMED`.
 
 ### 4.4. Trạng thái booking
 
@@ -348,8 +358,6 @@ Dữ liệu nguồn cung cần có dạng các khoảng làm việc của từng
 Các khoảng này phải phản ánh kết quả tổng hợp lịch làm việc của Staff Service, bao gồm lịch định kỳ, ngoại lệ và thời gian nghỉ theo quy tắc của service đó.
 
 **Yêu cầu hợp đồng API:** Booking Service cần một API hoặc cơ chế đọc lịch tổng hợp cho phép lấy các khoảng làm việc thực tế của từng nhân viên trong `[reqStart, reqEnd)`. Dữ liệu phải xác định được từng nhân viên và các khoảng không chồng lấn của người đó.
-
-API hiện tại chỉ trả về danh sách nhân viên có thể làm việc liên tục trong toàn bộ khoảng được hỏi không đủ để tái dựng nguồn cung biến đổi theo thời gian. Không được dùng số lượng nhân viên của API đó làm nguồn cung cố định cho toàn booking.
 
 Nếu Staff Service chưa cung cấp dữ liệu phù hợp, phải bổ sung hợp đồng API trước khi triển khai thuật toán này. Không tự tính lại toàn bộ lịch định kỳ, ngoại lệ và nghỉ phép ở Booking Service.
 
