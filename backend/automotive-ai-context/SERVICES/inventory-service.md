@@ -27,6 +27,10 @@ and staffing. It reads `id`, `name`, `is_active`, `duration_minutes` and
 `required_techs`, then stores a snapshot on the booking so later catalog
 changes do not rewrite booking history.
 
+The read uses the internal `GET /internal/services/{id}` endpoint with
+booking-service's own service token (authority `INTERNAL_SERVICE_CATALOG_READ`);
+Customer JWTs are not forwarded, so Customers do not need `SERVICE_READ`.
+
 This read must be synchronous — the caller needs the values immediately to
 create the booking.
 

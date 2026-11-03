@@ -1,5 +1,6 @@
 package com.example.booking_service.entity;
 
+import com.example.booking_service.enums.BookingSource;
 import com.example.booking_service.enums.BookingStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -61,6 +62,15 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 30, nullable = false)
     private BookingStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source", length = 20, nullable = false)
+    @Builder.Default
+    private BookingSource source = BookingSource.ONLINE;
+
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "created_by", length = 36, updatable = false)
+    private UUID createdBy;
 
     @Column(name = "customer_note", length = 1000)
     private String customerNote;

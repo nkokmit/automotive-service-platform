@@ -55,6 +55,9 @@ class StaffAuthorizationTest {
                 "getStaffSchedule", "STAFF_SCHEDULE_READ",
                 "getGarageSchedule", "STAFF_SCHEDULE_READ",
                 "findAvailableStaff", "STAFF_SCHEDULE_READ"));
+
+        assertAuthorityRules(InternalStaffCapacityController.class, Map.of(
+                "getCapacity", "INTERNAL_STAFF_CAPACITY_READ"));
     }
 
     private void assertAuthorityRules(Class<?> controller, Map<String, String> expectedPermissions) {

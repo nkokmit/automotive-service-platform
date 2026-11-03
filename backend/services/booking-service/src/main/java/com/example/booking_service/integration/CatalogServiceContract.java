@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /**
  * Phần catalog dịch vụ mà booking-service đọc từ inventory-service
- * ({@code GET /api/services/{id}}). Tên {@code duration_minutes} / {@code required_techs}
+ * ({@code GET /internal/services/{id}}). Tên {@code duration_minutes} / {@code required_techs}
  * giữ snake_case theo contract của inventory-service.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

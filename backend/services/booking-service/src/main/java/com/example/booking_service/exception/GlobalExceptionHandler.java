@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -21,7 +22,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<Void>> handleApiException(ApiException ex) {
         log.warn("Business exception [{}]: {}", ex.getErrorCode().getCode(), ex.getMessage());
-        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
+        return ResponseEntity.status(statusFor(ex.getErrorCode()))
+                .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
+    }
+
+    private HttpStatus statusFor(ErrorCode errorCode) {
+        return switch (errorCode) {
+            case UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
+            case UNAUTHORIZED -> HttpStatus.FORBIDDEN;
+            case BOOKING_NOT_FOUND, SERVICE_NOT_FOUND, CUSTOMER_NOT_FOUND, VEHICLE_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case INSUFFICIENT_TECHNICIAN_CAPACITY, VEHICLE_ALREADY_LINKED, VEHICLE_PLATE_MISMATCH,
+                 CHECK_IN_REQUIREMENTS_NOT_MET -> HttpStatus.CONFLICT;
+            case INTEGRATION_SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            default -> HttpStatus.BAD_REQUEST;
+        };
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -45,6 +59,15 @@ public class GlobalExceptionHandler {
         String requiredType = ex.getRequiredType() == null ? "hợp lệ" : ex.getRequiredType().getSimpleName();
         String message = "Tham số '" + ex.getName() + "' phải là " + requiredType;
         log.warn("Type mismatch: {}", message);
+        return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.INVALID_REQUEST, message));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingRequestParameter(
+            MissingServletRequestParameterException ex
+    ) {
+        String message = "Thiếu tham số '" + ex.getParameterName() + "'";
+        log.warn("Missing request parameter: {}", message);
         return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.INVALID_REQUEST, message));
     }
 

@@ -8,14 +8,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 
 /**
- * Gọi staff-service qua Eureka. Dùng {@code /api/schedules} (khoảng làm việc thật của từng
- * nhân viên), không dùng {@code /api/staff/availability} vì endpoint đó gộp cả cửa sổ
- * thành một khoảng và làm mất các quãng nghỉ giữa ca.
+ * Gọi API nội bộ của staff-service qua Eureka bằng token dịch vụ (không forward JWT của khách,
+ * nên khách không cần STAFF_SCHEDULE_READ). Endpoint chỉ trả khoảng làm việc theo staffId,
+ * không có tên/mã nhân viên và đã trừ nghỉ phép/ngoại lệ, giữ nguyên các quãng nghỉ giữa ca.
  */
-@FeignClient(name = "staff-service", contextId = "staffScheduleClient")
+@FeignClient(name = "staff-service", contextId = "staffScheduleClient",
+        configuration = StaffScheduleClientConfig.class)
 public interface StaffScheduleClient {
 
-    @GetMapping("/api/schedules")
+    @GetMapping("/internal/schedules")
     ApiResponse<List<StaffScheduleContract>> getGarageSchedule(
             @RequestParam("from") String from,
             @RequestParam("to") String to);

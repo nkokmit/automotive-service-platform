@@ -31,6 +31,13 @@ public enum ErrorCode {
     INSUFFICIENT_TECHNICIAN_CAPACITY(5201, "Không đủ kỹ thuật viên khả dụng"),
     INTEGRATION_SERVICE_UNAVAILABLE(5202, "Dịch vụ tích hợp tạm thời không khả dụng"),
 
+    // Khách hàng & xe (53xx)
+    CUSTOMER_NOT_FOUND(5301, "Không tìm thấy hồ sơ khách hàng hợp lệ"),
+    VEHICLE_NOT_FOUND(5302, "Không tìm thấy hồ sơ xe hợp lệ"),
+    VEHICLE_PLATE_MISMATCH(5303, "Biển số xe không khớp với biển số trong lịch hẹn"),
+    VEHICLE_ALREADY_LINKED(5304, "Lịch hẹn đã được liên kết với xe khác"),
+    CHECK_IN_REQUIREMENTS_NOT_MET(5305, "Chưa đủ điều kiện tiếp nhận xe"),
+
     // Authentication & Authorization (14xx)
     UNAUTHENTICATED(1401, "Chưa đăng nhập hoặc token không hợp lệ"),
     UNAUTHORIZED(1403, "Bạn không có quyền");

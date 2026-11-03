@@ -2,6 +2,7 @@ package com.example.booking_service.service;
 
 import com.example.booking_service.capacity.CapacityCheckResult;
 import com.example.booking_service.capacity.ServiceSlot;
+import com.example.booking_service.capacity.SupplyInterval;
 import com.example.booking_service.common.ApiResponse;
 import com.example.booking_service.entity.Booking;
 import com.example.booking_service.entity.BookingService;
@@ -10,6 +11,7 @@ import com.example.booking_service.exception.ApiException;
 import com.example.booking_service.exception.ErrorCode;
 import com.example.booking_service.integration.CatalogServiceContract;
 import com.example.booking_service.integration.InventoryServiceClient;
+import com.example.booking_service.integration.IntegrationCallRetrier;
 import com.example.booking_service.integration.StaffScheduleClient;
 import com.example.booking_service.integration.StaffScheduleContract;
 import com.example.booking_service.repository.BookingRepository;
@@ -37,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,7 +61,7 @@ class CapacityCheckServiceImplTest {
         bookings = mock(BookingRepository.class);
         bookingServices = mock(BookingServiceRepository.class);
         service = new CapacityCheckServiceImpl(inventory, staff, bookings, bookingServices,
-                ZoneId.of("Asia/Ho_Chi_Minh"));
+                ZoneId.of("Asia/Ho_Chi_Minh"), new IntegrationCallRetrier());
     }
 
     private ServiceSlot slot(int minutes, int technicians) {
@@ -121,6 +124,21 @@ class CapacityCheckServiceImplTest {
     }
 
     @Test
+    void rescheduleCapacityCheckExcludesTheCurrentBooking() {
+        UUID bookingId = UUID.randomUUID();
+        List<SupplyInterval> supply = List.of(
+                new SupplyInterval(UUID.randomUUID(), START, START.plusSeconds(3600)));
+        when(bookings.findCapacityBookingsOverlappingExcluding(
+                any(), any(), anyList(), eq(bookingId))).thenReturn(List.of());
+
+        CapacityCheckResult result = service.check(START, List.of(slot(60, 1)), supply, bookingId);
+
+        assertTrue(result.feasible());
+        verify(bookings).findCapacityBookingsOverlappingExcluding(any(), any(), anyList(), eq(bookingId));
+        verify(bookings, never()).findCapacityBookingsOverlapping(any(), any(), anyList());
+    }
+
+    @Test
     void inventoryServerErrorIsIntegrationError() {
         UUID id = UUID.randomUUID();
         when(inventory.getService(eq(id))).thenThrow(feign(500));
@@ -149,6 +167,17 @@ class CapacityCheckServiceImplTest {
         ApiException exception = assertThrows(ApiException.class, () -> service.resolveServiceSlots(List.of(id)));
 
         assertEquals(ErrorCode.SERVICE_UNAVAILABLE, exception.getErrorCode());
+    }
+
+    @Test
+    void invalidServiceSnapshotNameIsRejected() {
+        UUID id = UUID.randomUUID();
+        when(inventory.getService(eq(id))).thenReturn(ApiResponse.success(
+                new CatalogServiceContract(id, " ", 30, 1, true)));
+
+        ApiException exception = assertThrows(ApiException.class, () -> service.resolveServiceSlots(List.of(id)));
+
+        assertEquals(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE, exception.getErrorCode());
     }
 
     @Test

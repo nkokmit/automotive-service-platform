@@ -4,6 +4,10 @@ server:
 app:
   api-gateway-url: ${API_GATEWAY_URL:http://localhost:8000}
   schedule-zone-id: ${SCHEDULE_ZONE_ID:Asia/Ho_Chi_Minh}
+  booking:
+    availability:
+      slot-interval-minutes: ${BOOKING_SLOT_INTERVAL_MINUTES:30}
+      max-days: ${BOOKING_AVAILABILITY_MAX_DAYS:14}
   integration:
     inventory-service-url: ${INVENTORY_SERVICE_URL:http://inventory-service:8084}
     staff-service-url: ${STAFF_SERVICE_URL:http://staff-service:8083}

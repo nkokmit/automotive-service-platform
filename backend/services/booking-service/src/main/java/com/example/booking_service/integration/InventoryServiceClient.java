@@ -7,10 +7,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.UUID;
 
-/** Gọi inventory-service qua Eureka (load balancer), chuyển tiếp JWT của người gọi. */
-@FeignClient(name = "inventory-service", contextId = "inventoryServiceClient")
+/**
+ * Gọi API nội bộ của inventory-service qua Eureka bằng token dịch vụ (không forward JWT của khách,
+ * nên khách không cần SERVICE_READ).
+ */
+@FeignClient(name = "inventory-service", contextId = "inventoryServiceClient",
+        configuration = InventoryServiceClientConfig.class)
 public interface InventoryServiceClient {
 
-    @GetMapping("/api/services/{serviceId}")
+    @GetMapping("/internal/services/{serviceId}")
     ApiResponse<CatalogServiceContract> getService(@PathVariable("serviceId") UUID serviceId);
 }

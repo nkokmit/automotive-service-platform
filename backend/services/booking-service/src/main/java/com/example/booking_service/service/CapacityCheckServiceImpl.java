@@ -2,6 +2,7 @@ package com.example.booking_service.service;
 
 import com.example.booking_service.capacity.CapacityCheckResult;
 import com.example.booking_service.capacity.CapacitySweepLineCalculator;
+import com.example.booking_service.capacity.CapacityWindow;
 import com.example.booking_service.capacity.DemandInterval;
 import com.example.booking_service.capacity.ExistingDemandReconstructor;
 import com.example.booking_service.capacity.SequentialDemandBuilder;
@@ -15,6 +16,7 @@ import com.example.booking_service.enums.BookingStatus;
 import com.example.booking_service.exception.ApiException;
 import com.example.booking_service.exception.ErrorCode;
 import com.example.booking_service.integration.CatalogServiceContract;
+import com.example.booking_service.integration.IntegrationCallRetrier;
 import com.example.booking_service.integration.InventoryServiceClient;
 import com.example.booking_service.integration.StaffScheduleClient;
 import com.example.booking_service.integration.StaffScheduleContract;
@@ -35,9 +37,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Điều phối một lần kiểm tra sức chứa (PLAN §5.9). Không đặt {@code @Transactional} ở đây
- * để không giữ kết nối DB trong lúc chờ Inventory/Staff; mỗi lần đọc repository tự chạy
- * trong transaction riêng. Việc chống đặt trùng đồng thời thuộc Giai đoạn 4.
+ * Điều phối kiểm tra sức chứa (PLAN §5.9). Không khai báo transaction ở đây để tránh giữ
+ * kết nối DB trong lúc chờ Inventory/Staff. Các thao tác ghi gọi phương thức kiểm tra sau khi
+ * lấy khóa ngày để truy vấn tải hiện tại trong cùng transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -49,6 +51,7 @@ public class CapacityCheckServiceImpl implements CapacityCheckService {
     private final BookingRepository bookingRepository;
     private final BookingServiceRepository bookingServiceRepository;
     private final ZoneId scheduleZoneId;
+    private final IntegrationCallRetrier integrationCallRetrier;
 
     @Override
     public List<ServiceSlot> resolveServiceSlots(List<UUID> serviceIds) {
@@ -76,10 +79,68 @@ public class CapacityCheckServiceImpl implements CapacityCheckService {
         List<DemandInterval> newDemand = SequentialDemandBuilder.build(start, slots);
         Instant end = newDemand.get(newDemand.size() - 1).end();
 
-        List<SupplyInterval> supply = SupplyNormalizer.normalize(fetchSupply(start, end), start, end);
-        List<DemandInterval> existingDemand = loadExistingDemand(start, end);
+        return evaluate(start, end, newDemand, fetchSupply(start, end), loadExistingDemand(start, end));
+    }
 
-        CapacityCheckResult result = CapacitySweepLineCalculator.check(start, end, supply, existingDemand, newDemand);
+    @Override
+    public CapacityCheckResult check(Instant start, List<ServiceSlot> slots, List<SupplyInterval> supply) {
+        List<DemandInterval> newDemand = SequentialDemandBuilder.build(start, slots);
+        Instant end = newDemand.get(newDemand.size() - 1).end();
+        return evaluate(start, end, newDemand, supply, loadExistingDemand(start, end));
+    }
+
+    @Override
+    public CapacityCheckResult check(
+            Instant start,
+            List<ServiceSlot> slots,
+            List<SupplyInterval> supply,
+            UUID excludedBookingId
+    ) {
+        if (excludedBookingId == null) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "Thiếu booking cần loại trừ khi đổi lịch");
+        }
+        List<DemandInterval> newDemand = SequentialDemandBuilder.build(start, slots);
+        Instant end = newDemand.get(newDemand.size() - 1).end();
+        return evaluate(start, end, newDemand, supply, loadExistingDemand(start, end, excludedBookingId));
+    }
+
+    @Override
+    public CapacityWindow prepareWindow(Instant start, Instant end) {
+        if (start == null || end == null || !start.isBefore(end)) {
+            throw new ApiException(ErrorCode.INVALID_BOOKING_TIME, "Khoảng tìm kiếm không hợp lệ");
+        }
+        return new CapacityWindow(start, end, fetchSupply(start, end), loadExistingDemand(start, end));
+    }
+
+    @Override
+    public CapacityCheckResult check(Instant start, List<ServiceSlot> slots, CapacityWindow window) {
+        List<DemandInterval> newDemand = SequentialDemandBuilder.build(start, slots);
+        Instant end = newDemand.get(newDemand.size() - 1).end();
+        if (window == null || !window.contains(start, end)) {
+            throw new ApiException(ErrorCode.INVALID_BOOKING_TIME,
+                    "Khoảng kiểm tra nằm ngoài cửa sổ capacity đã chuẩn bị");
+        }
+        return evaluate(start, end, newDemand, window.supply(), window.existingDemand());
+    }
+
+    @Override
+    public List<SupplyInterval> prepareSupply(Instant start, Instant end) {
+        if (start == null || end == null || !start.isBefore(end)) {
+            throw new ApiException(ErrorCode.INVALID_BOOKING_TIME, "Khoảng kiểm tra capacity không hợp lệ");
+        }
+        return fetchSupply(start, end);
+    }
+
+    private CapacityCheckResult evaluate(
+            Instant start,
+            Instant end,
+            List<DemandInterval> newDemand,
+            List<SupplyInterval> supply,
+            List<DemandInterval> existingDemand
+    ) {
+        List<SupplyInterval> normalizedSupply = SupplyNormalizer.normalize(supply, start, end);
+        CapacityCheckResult result = CapacitySweepLineCalculator.check(
+                start, end, normalizedSupply, existingDemand, newDemand);
         if (!result.feasible()) {
             log.info("Không đủ sức chứa trong [{}, {}): {} đoạn thiếu", start, end, result.deficits().size());
         }
@@ -89,7 +150,8 @@ public class CapacityCheckServiceImpl implements CapacityCheckService {
     private ServiceSlot fetchSlot(UUID serviceId) {
         CatalogServiceContract service;
         try {
-            service = unwrap(inventoryServiceClient.getService(serviceId), "inventory-service");
+            service = unwrap(integrationCallRetrier.execute(
+                    "inventory-service", () -> inventoryServiceClient.getService(serviceId)), "inventory-service");
         } catch (FeignException.NotFound | FeignException.BadRequest exception) {
             // inventory-service trả HTTP 400 kèm mã 4101 khi không có dịch vụ.
             throw new ApiException(ErrorCode.SERVICE_NOT_FOUND, "Không tìm thấy dịch vụ: " + serviceId);
@@ -99,6 +161,11 @@ public class CapacityCheckServiceImpl implements CapacityCheckService {
 
         if (!Boolean.TRUE.equals(service.isActive())) {
             throw new ApiException(ErrorCode.SERVICE_UNAVAILABLE, "Dịch vụ không còn được cung cấp: " + serviceId);
+        }
+        if (!serviceId.equals(service.id()) || service.name() == null || service.name().isBlank()
+                || service.name().length() > 150) {
+            throw new ApiException(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE,
+                    "Inventory Service trả snapshot thiếu hoặc không khớp mã/tên dịch vụ: " + serviceId);
         }
         Integer duration = service.durationMinutes();
         Integer technicians = service.requiredTechs();
@@ -115,7 +182,9 @@ public class CapacityCheckServiceImpl implements CapacityCheckService {
         LocalDate to = end.minusNanos(1).atZone(scheduleZoneId).toLocalDate();
         List<StaffScheduleContract> schedules;
         try {
-            schedules = unwrap(staffScheduleClient.getGarageSchedule(from.toString(), to.toString()),
+            schedules = unwrap(integrationCallRetrier.execute(
+                            "staff-service",
+                            () -> staffScheduleClient.getGarageSchedule(from.toString(), to.toString())),
                     "staff-service");
         } catch (FeignException exception) {
             throw integrationFailure("staff-service", exception);
@@ -148,8 +217,15 @@ public class CapacityCheckServiceImpl implements CapacityCheckService {
     }
 
     private List<DemandInterval> loadExistingDemand(Instant start, Instant end) {
-        List<Booking> bookings = bookingRepository.findCapacityBookingsOverlapping(
-                start, end, BookingStatus.capacityHoldingStatuses());
+        return loadExistingDemand(start, end, null);
+    }
+
+    private List<DemandInterval> loadExistingDemand(Instant start, Instant end, UUID excludedBookingId) {
+        List<Booking> bookings = excludedBookingId == null
+                ? bookingRepository.findCapacityBookingsOverlapping(
+                        start, end, BookingStatus.capacityHoldingStatuses())
+                : bookingRepository.findCapacityBookingsOverlappingExcluding(
+                    start, end, BookingStatus.capacityHoldingStatuses(), excludedBookingId);
         if (bookings.isEmpty()) {
             return List.of();
         }
