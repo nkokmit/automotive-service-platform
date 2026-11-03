@@ -7,8 +7,7 @@ import com.example.booking_service.dto.request.BookingRescheduleRequest;
 import com.example.booking_service.dto.response.AvailabilitySlotResponse;
 import com.example.booking_service.dto.response.BookingResponse;
 import com.example.booking_service.service.BookingAvailabilityService;
-import com.example.booking_service.service.BookingCreationService;
-import com.example.booking_service.service.BookingManagementService;
+import com.example.booking_service.service.CustomerBookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,8 +35,7 @@ import java.util.UUID;
 public class BookingController {
 
     private final BookingAvailabilityService availabilityService;
-    private final BookingCreationService creationService;
-    private final BookingManagementService managementService;
+    private final CustomerBookingService customerBookingService;
 
     @GetMapping("/availability")
     public ApiResponse<List<AvailabilitySlotResponse>> findAvailability(
@@ -54,12 +52,12 @@ public class BookingController {
             @Valid @RequestBody BookingCreateRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        return ApiResponse.success("Tạo lịch hẹn thành công", creationService.create(request, jwt));
+        return ApiResponse.success("Tạo lịch hẹn thành công", customerBookingService.create(request, jwt));
     }
 
     @GetMapping("/me")
     public ApiResponse<List<BookingResponse>> findMyBookings(@AuthenticationPrincipal Jwt jwt) {
-        return ApiResponse.success(managementService.findMine(jwt));
+        return ApiResponse.success(customerBookingService.findMine(jwt));
     }
 
     @GetMapping("/{bookingId}")
@@ -67,7 +65,7 @@ public class BookingController {
             @PathVariable UUID bookingId,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        return ApiResponse.success(managementService.findMine(bookingId, jwt));
+        return ApiResponse.success(customerBookingService.findMine(bookingId, jwt));
     }
 
     @PostMapping("/{bookingId}/cancel")
@@ -77,7 +75,7 @@ public class BookingController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         String reason = request == null ? null : request.reason();
-        return ApiResponse.success("Hủy lịch hẹn thành công", managementService.cancel(bookingId, reason, jwt));
+        return ApiResponse.success("Hủy lịch hẹn thành công", customerBookingService.cancel(bookingId, reason, jwt));
     }
 
     @PatchMapping("/{bookingId}/reschedule")
@@ -87,6 +85,6 @@ public class BookingController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         return ApiResponse.success("Đổi lịch hẹn thành công",
-                managementService.reschedule(bookingId, request.startAt(), jwt));
+                customerBookingService.reschedule(bookingId, request.startAt(), jwt));
     }
 }

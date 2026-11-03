@@ -9,8 +9,7 @@ import com.example.booking_service.exception.CustomAuthenticationEntryPoint;
 import com.example.booking_service.exception.GlobalExceptionHandler;
 import com.example.booking_service.security.SecurityConfig;
 import com.example.booking_service.service.BookingAvailabilityService;
-import com.example.booking_service.service.BookingCreationService;
-import com.example.booking_service.service.BookingManagementService;
+import com.example.booking_service.service.CustomerBookingService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,9 +53,7 @@ class BookingControllerTest {
     @MockitoBean
     private BookingAvailabilityService availabilityService;
     @MockitoBean
-    private BookingCreationService creationService;
-    @MockitoBean
-    private BookingManagementService managementService;
+    private CustomerBookingService customerBookingService;
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
@@ -121,7 +118,7 @@ class BookingControllerTest {
         BookingResponse response = new BookingResponse(
                 UUID.randomUUID(), CUSTOMER_ID, null, "51A-12345", start, start.plusSeconds(1800),
                 BookingStatus.CONFIRMED, null, List.of(), start, start);
-        given(creationService.create(any(BookingCreateRequest.class), any())).willReturn(response);
+        given(customerBookingService.create(any(BookingCreateRequest.class), any())).willReturn(response);
 
         mvc.perform(post("/api/bookings")
                         .with(jwt()
@@ -143,7 +140,7 @@ class BookingControllerTest {
 
         ArgumentCaptor<BookingCreateRequest> request = ArgumentCaptor.forClass(BookingCreateRequest.class);
         ArgumentCaptor<Jwt> token = ArgumentCaptor.forClass(Jwt.class);
-        verify(creationService).create(request.capture(), token.capture());
+        verify(customerBookingService).create(request.capture(), token.capture());
         org.junit.jupiter.api.Assertions.assertEquals(List.of(SERVICE_ID), request.getValue().serviceIds());
         org.junit.jupiter.api.Assertions.assertEquals("51A-12345", request.getValue().licensePlate());
         org.junit.jupiter.api.Assertions.assertEquals(USER_ID.toString(),
@@ -156,8 +153,8 @@ class BookingControllerTest {
         Instant start = Instant.now().plusSeconds(3600);
         BookingResponse response = new BookingResponse(bookingId, CUSTOMER_ID, null, "51A-12345",
                 start, start.plusSeconds(1800), BookingStatus.CONFIRMED, null, List.of(), start, start);
-        given(managementService.findMine(any())).willReturn(List.of(response));
-        given(managementService.findMine(eq(bookingId), any())).willReturn(response);
+        given(customerBookingService.findMine(any())).willReturn(List.of(response));
+        given(customerBookingService.findMine(eq(bookingId), any())).willReturn(response);
 
         mvc.perform(get("/api/bookings/me")
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
@@ -178,8 +175,8 @@ class BookingControllerTest {
                 start, start.plusSeconds(1800), BookingStatus.CONFIRMED, null, List.of(), start, start);
         BookingResponse cancelled = new BookingResponse(bookingId, CUSTOMER_ID, null, "51A-12345",
                 start, start.plusSeconds(1800), BookingStatus.CANCELLED, null, List.of(), start, start);
-        given(managementService.cancel(eq(bookingId), eq("Customer request"), any())).willReturn(cancelled);
-        given(managementService.reschedule(eq(bookingId), any(), any())).willReturn(response);
+        given(customerBookingService.cancel(eq(bookingId), eq("Customer request"), any())).willReturn(cancelled);
+        given(customerBookingService.reschedule(eq(bookingId), any(), any())).willReturn(response);
 
         mvc.perform(post("/api/bookings/{id}/cancel", bookingId)
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
@@ -196,7 +193,7 @@ class BookingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.id").value(bookingId.toString()));
 
-        verify(managementService).cancel(eq(bookingId), eq("Customer request"), any());
-        verify(managementService).reschedule(eq(bookingId), eq(start.plusSeconds(3600)), any());
+        verify(customerBookingService).cancel(eq(bookingId), eq("Customer request"), any());
+        verify(customerBookingService).reschedule(eq(bookingId), eq(start.plusSeconds(3600)), any());
     }
 }
