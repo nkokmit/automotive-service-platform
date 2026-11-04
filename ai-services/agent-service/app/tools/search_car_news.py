@@ -18,27 +18,6 @@ from app.tools.schemas import SearchCarNewsInput
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_MOCK_ARTICLES = [
-    {
-        "title": "Lịch bảo dưỡng định kỳ xe ô tô theo mốc km khuyến nghị",
-        "content": "Các mốc bảo dưỡng quan trọng: 5.000km (thay dầu nhớt, kiểm tra gầm), 10.000km (đảo lốp, vệ sinh lọc gió), 20.000km (thay lọc gió, lọc nhiên liệu), 40.000km (thay dầu hộp số, dầu phanh, bugi). Giữ đúng lịch bảo dưỡng giúp xe bền bỉ và tiết kiệm nhiên liệu.",
-        "source": "AutoService Vietnam",
-        "url": "https://autoservice.vn/bao-duong-dinh-ky",
-    },
-    {
-        "title": "Cách phát hiện và xử lý sớm vết xước, móp và nứt kính chắn gió",
-        "content": "Vết xước nông bề mặt có thể xử lý bằng dung dịch xóa xước (paste đánh bóng). Vết móp sâu cần hút chân không hoặc gò nắn PDR (Paintless Dent Repair). Kính bị nứt dạng mắt bò nhỏ hơn 2cm nên hàn kính sớm tránh nứt lan.",
-        "source": "Vietnam Car Care",
-        "url": "https://vietnamcarcare.com/xu-ly-vet-xuc",
-    },
-    {
-        "title": "Cẩm nang chăm sóc lốp xe: Áp suất lốp chuẩn và dấu hiệu cần thay",
-        "content": "Kiểm tra áp suất lốp 2 tuần/lần khi lốp nguội (thường 2.2 - 2.5 bar tùy xe). Thay lốp mới khi gai mòn còn dưới 1.6mm hoặc xuất hiện phồng, nứt chân chim, rách hông lốp.",
-        "source": "TireCare VN",
-        "url": "https://tirecare.vn/cam-nang-lop",
-    },
-]
-
 _dense_model = None
 _sparse_model = None
 
@@ -101,7 +80,7 @@ async def _hybrid_search(
     query: str,
     limit: int,
 ) -> list[dict[str, Any]]:
-    """Run Qdrant hybrid search combining dense and BM25/lexical sparse vectors (auto-seeds if missing)."""
+    """Run Qdrant hybrid search combining dense and BM25/lexical sparse vectors."""
     collections_resp = await client.get_collections()
     existing = [c.name for c in collections_resp.collections]
     if collection not in existing:
@@ -165,16 +144,11 @@ def make_search_car_news_tool(qdrant_client: AsyncQdrantClient):
         try:
             hits = await _hybrid_search(qdrant_client, collection, query, limit)
         except Exception as exc:
-            logger.info("Qdrant unavailable (%s), falling back to offline knowledge base", exc)
-            q_lower = query.lower()
-            matched = [
-                a for a in _MOCK_ARTICLES
-                if any(w in a["title"].lower() or w in a["content"].lower() for w in q_lower.split())
-            ]
-            hits = matched[:limit] if matched else _MOCK_ARTICLES[:limit]
+            logger.error("Qdrant hybrid search failed: %s", exc)
+            return f"Hiện chưa thể kết nối tới cơ sở dữ liệu Vector Qdrant ({exc})."
 
         if not hits:
-            return "Không tìm thấy thông tin phù hợp."
+            return "Không tìm thấy bài viết phù hợp trong Qdrant."
 
         lines = []
         for i, h in enumerate(hits, 1):

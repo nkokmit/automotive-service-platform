@@ -69,7 +69,7 @@ def make_search_used_cars_tool(db_session_factory):
                 rows = result.mappings().all()
 
             if not rows:
-                return "Không tìm thấy xe cũ phù hợp với tiêu chí tìm kiếm trong hệ thống MySQL."
+                return "Không tìm thấy xe cũ phù hợp với tiêu chí tìm kiếm trong cơ sở dữ liệu MySQL."
 
             lines = []
             for r in rows:
@@ -86,37 +86,7 @@ def make_search_used_cars_tool(db_session_factory):
             return f"Tìm thấy {len(rows)} xe trong cơ sở dữ liệu MySQL:\n" + "\n".join(lines)
 
         except Exception as exc:
-            logger.warning("MySQL database query failed (%s), returning fallback mock data", exc)
-            from app.seed import SEED_USED_CARS
-
-            filtered = list(SEED_USED_CARS)
-            if brand:
-                b_low = brand.strip().lower()
-                filtered = [
-                    c for c in filtered
-                    if b_low in c["brand"].lower() or b_low in c["model"].lower()
-                ]
-            if min_price is not None:
-                filtered = [c for c in filtered if c["price"] >= min_price]
-            if max_price is not None:
-                filtered = [c for c in filtered if c["price"] <= max_price]
-            if year_from is not None:
-                filtered = [c for c in filtered if c["year"] >= year_from]
-            if year_to is not None:
-                filtered = [c for c in filtered if c["year"] <= year_to]
-
-            if not filtered:
-                return "Không tìm thấy xe cũ phù hợp với tiêu chí tìm kiếm."
-
-            lines = []
-            for r in filtered[:limit]:
-                price_fmt = f"{r['price']:,.0f} VNĐ"
-                mileage_fmt = f"{r['mileage']:,} km"
-                lines.append(
-                    f"• **{r['brand']} {r['model']} ({r['year']})** | "
-                    f"Giá: **{price_fmt}** | ODO: {mileage_fmt} | "
-                    f"Màu: {r['color']} | Khu vực: {r['location']}"
-                )
-            return f"Tìm thấy {len(lines)} xe (dữ liệu dự phòng):\n" + "\n".join(lines)
+            logger.error("MySQL `used_cars` query failed: %s", exc)
+            return f"Hiện chưa thể truy vấn bảng `used_cars` từ MySQL ({exc})."
 
     return search_used_cars

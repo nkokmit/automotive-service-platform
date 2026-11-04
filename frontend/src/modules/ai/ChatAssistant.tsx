@@ -185,18 +185,49 @@ let sessionId: string = randomUUID();
 const SOURCES: Array<{ title: string; url: string }> = [];
 
 const DEFAULT_IMAGE_QUESTION =
-  "Phân tích ảnh xe này, lấy ra diện tích bị hư hỏng (cm², %, px) và đưa ra đánh giá kèm giá tiền sửa chữa tương ứng.";
+  "Kiểm tra tình trạng xe trong ảnh này giúp tôi: có hư hỏng gì không, mức độ ra sao và chi phí sửa chữa dự kiến.";
+
+/** Các nhóm năng lực chính của trợ lý — hiển thị ở màn hình chào. */
+const CAPABILITIES: Array<{ icon: React.ReactNode; title: string; desc: string; ask: string }> = [
+  {
+    icon: <IconWrench size={16} />,
+    title: "Bảo dưỡng & chăm sóc xe",
+    desc: "Lịch bảo dưỡng, dầu nhớt, lốp, ắc quy, điều hoà…",
+    ask: "Xe chạy 40.000 km thì cần bảo dưỡng những hạng mục gì?",
+  },
+  {
+    icon: <IconCar size={16} />,
+    title: "Tra cứu xe & lịch sử dịch vụ",
+    desc: "Theo biển số hoặc số điện thoại khách hàng",
+    ask: "Tra cứu lịch sử bảo dưỡng của xe biển số 51H-123.45",
+  },
+  {
+    icon: <IconSparkles size={16} />,
+    title: "Tư vấn mua xe cũ",
+    desc: "Lọc theo hãng, ngân sách, đời xe",
+    ask: "Tìm giúp tôi xe Toyota cũ giá dưới 800 triệu",
+  },
+  {
+    icon: <IconCamera size={16} />,
+    title: "Kiểm tra hư hỏng qua ảnh",
+    desc: "Gửi ảnh xe để nhận đánh giá và chi phí sửa chữa",
+    ask: "",
+  },
+];
+
+const WELCOME_MESSAGE =
+  "Xin chào! Tôi là **trợ lý AI của AutoCare**. Tôi có thể giúp bạn giải đáp kiến thức về xe, hướng dẫn bảo dưỡng – chăm sóc xe, tra cứu thông tin và lịch sử dịch vụ của xe, tư vấn mua xe cũ, đặt lịch tại garage, hoặc kiểm tra hư hỏng khi bạn gửi ảnh xe. Bạn cần hỗ trợ gì hôm nay?";
 
 export default function ChatAssistant() {
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
-      content:
-        "Xin chào! Tôi là trợ lý AI của AutoCare. Bạn có thể hỏi đáp bảo dưỡng, tìm xe cũ, đặt lịch hẹn hoặc **gửi trực tiếp ảnh xe kèm tên dòng xe** (VD: *Kia Morning, Toyota Vios, Mazda CX-5, Mercedes C200...*) để tôi đo **diện tích hư hỏng thực tế ($\\text{cm}^2$, %, pixel)**, áp dụng **hệ số giá theo phân khúc xe** và báo giá sửa chữa tương ứng ngay lập tức!",
+      content: WELCOME_MESSAGE,
     },
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [typingWithImage, setTypingWithImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
@@ -290,8 +321,7 @@ export default function ChatAssistant() {
 
     const vehicleTag = effectiveBrand ? ` [Dòng xe: ${effectiveBrand}]` : "";
     const displayContent =
-      (rawText ||
-        "📷 Phân tích diện tích hư hỏng (cm², %, px) trên ảnh xe này và báo giá sửa chữa tương ứng.") +
+      (rawText || "📷 Kiểm tra tình trạng xe trong ảnh này giúp tôi.") +
       (currentFile && vehicleTag ? vehicleTag : "");
     const effectiveMessage = rawText || DEFAULT_IMAGE_QUESTION;
 
@@ -306,6 +336,7 @@ export default function ChatAssistant() {
     setAttachedFile(null);
     setAttachedPreview(null);
     setError(null);
+    setTypingWithImage(Boolean(currentFile));
     setTyping(true);
 
     try {
@@ -342,7 +373,7 @@ export default function ChatAssistant() {
         {
           role: "assistant",
           content:
-            "Xin lỗi, hiện tại không thể xử lý yêu cầu phân tích. Vui lòng kiểm tra kết nối AI Service và thử lại.",
+            "Xin lỗi, hiện tại tôi chưa xử lý được yêu cầu này. Vui lòng kiểm tra kết nối AI Service và thử lại.",
         },
       ]);
     } finally {
@@ -361,10 +392,10 @@ export default function ChatAssistant() {
             </div>
             <div>
               <h1 className="font-bold text-xl">
-                Trợ lý AI & Định giá Hư hỏng theo Dòng xe & Diện tích
+                Trợ lý AI AutoCare
               </h1>
               <p className="text-xs text-ink-muted">
-                Đo diện tích hư hỏng thực tế (cm², %, pixel) bằng YOLOv8-seg kết hợp hệ số phân khúc dòng xe & chiết khấu combo
+                Hỏi đáp kiến thức xe, bảo dưỡng – chăm sóc xe, tra cứu lịch sử dịch vụ, tư vấn xe cũ và kiểm tra hư hỏng qua ảnh
               </p>
             </div>
           </div>
@@ -375,7 +406,7 @@ export default function ChatAssistant() {
             disabled={typing}
           >
             <IconCamera size={16} />
-            <span>Tải ảnh xe cần báo giá</span>
+            <span>Gửi ảnh xe</span>
           </Button>
         </div>
 
@@ -393,7 +424,7 @@ export default function ChatAssistant() {
               <div className="absolute inset-3 z-20 rounded-2xl border-2 border-dashed border-primary bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center pointer-events-none">
                 <IconCamera size={42} className="text-primary mb-2" />
                 <p className="font-bold text-base text-primary">
-                  Thả ảnh xe vào đây để đo diện tích hư hỏng (cm²) & báo giá theo dòng xe
+                  Thả ảnh xe vào đây để AI kiểm tra tình trạng xe
                 </p>
                 <p className="text-xs text-ink-muted mt-1">
                   Hỗ trợ JPG, PNG, WEBP (tối đa 10MB)
@@ -405,27 +436,25 @@ export default function ChatAssistant() {
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {messages.length === 1 && (
                 <div className="mb-3 space-y-3">
-                  <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/15 flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        <IconCamera size={18} />
-                      </div>
-                      <div className="text-xs">
-                        <div className="font-semibold text-ink">
-                          Báo giá chính xác theo Diện tích (cm²) & Phân khúc dòng xe
+                  <div className="grid sm:grid-cols-2 gap-2.5">
+                    {CAPABILITIES.map((c) => (
+                      <button
+                        key={c.title}
+                        type="button"
+                        onClick={() =>
+                          c.ask ? send(c.ask) : fileInputRef.current?.click()
+                        }
+                        className="text-left p-3 rounded-xl border border-ink/10 bg-white hover:border-primary/40 hover:bg-primary/5 transition-colors flex items-start gap-2.5"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          {c.icon}
                         </div>
-                        <div className="text-ink-muted">
-                          Gửi ảnh kèm tên xe (VD: &ldquo;Xe Mazda CX-5 bị móp cửa&rdquo; hoặc chọn phân khúc bên dưới) để AI tự nhân hệ số giá tương ứng.
+                        <div className="text-xs">
+                          <div className="font-semibold text-ink">{c.title}</div>
+                          <div className="text-ink-muted">{c.desc}</div>
                         </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
-                    >
-                      + Chọn ảnh xe
-                    </button>
+                      </button>
+                    ))}
                   </div>
 
                   <div>
@@ -472,7 +501,9 @@ export default function ChatAssistant() {
                         ))}
                       </div>
                       <span className="text-xs text-ink-muted">
-                        AI đang đo diện tích phân đoạn (cm²) & tính giá theo dòng xe...
+                        {typingWithImage
+                          ? "AI đang phân tích ảnh xe..."
+                          : "AI đang suy nghĩ..."}
                       </span>
                     </div>
                   </div>
@@ -508,7 +539,7 @@ export default function ChatAssistant() {
                         </span>
                       </div>
                       <p className="text-xs text-primary font-medium mt-0.5">
-                        ✨ Sẵn sàng trích xuất diện tích (cm², %, px) & định giá theo dòng xe
+                        Ảnh đã sẵn sàng — chọn dòng xe (tuỳ chọn) để ước tính chi phí sát hơn
                       </p>
                     </div>
                   </div>
@@ -566,7 +597,7 @@ export default function ChatAssistant() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={typing}
-                title="Đính kèm ảnh xe để phân tích diện tích hư hỏng & báo giá"
+                title="Đính kèm ảnh xe"
                 className={`h-11 px-3 rounded-xl border flex items-center gap-1.5 text-xs font-medium transition-colors shrink-0 ${
                   attachedFile
                     ? "border-primary bg-primary/10 text-primary"
@@ -584,8 +615,8 @@ export default function ChatAssistant() {
                 onKeyDown={(e) => e.key === "Enter" && !typing && send()}
                 placeholder={
                   attachedFile
-                    ? "Nhập thêm ghi chú (VD: Xe tôi là Mazda CX-5 bị móp cửa sau) hoặc bấm Phân tích ngay..."
-                    : "Nhập câu hỏi hoặc nhấn 'Gửi ảnh' / dán ảnh (Ctrl+V) để đo diện tích & báo giá..."
+                    ? "Mô tả thêm (VD: Xe Mazda CX-5 bị móp cửa sau) hoặc bấm Gửi..."
+                    : "Hỏi bất cứ điều gì về xe: bảo dưỡng, chăm sóc, tra cứu biển số, xe cũ…"
                 }
                 className="flex-1 h-11 px-4 rounded-xl border border-ink/15 bg-white outline-none text-sm focus:border-primary"
               />
@@ -594,16 +625,14 @@ export default function ChatAssistant() {
                 disabled={typing || (!input.trim() && !attachedFile)}
               >
                 <IconSend size={16} />
-                <span className="hidden sm:inline">
-                  {attachedFile ? "Phân tích & Báo giá" : "Gửi"}
-                </span>
+                <span className="hidden sm:inline">Gửi</span>
               </Button>
             </div>
           </div>
         </Card>
 
         <p className="text-xs text-ink-muted text-center mt-4">
-          Định giá tự động kết hợp diện tích phân đoạn thực tế (cm², %, px) từ YOLOv8-seg và hệ số phân khúc dòng xe (Hạng A 0.85x · Hạng B-C 1.0x · SUV/CUV 1.3x · Xe sang 2.2x).
+          Thông tin do AI cung cấp mang tính tham khảo. Chi phí sửa chữa thực tế cần được kỹ thuật viên kiểm tra trực tiếp tại garage.
         </p>
       </div>
     </div>
