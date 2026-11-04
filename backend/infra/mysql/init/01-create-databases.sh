@@ -1,32 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PRIMARY_DB="${MYSQL_DATABASE:-user_service}"
-SECONDARY_DB="${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}"
+CUSTOMER_VEHICLE_DB="${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}"
+STAFF_DB="${STAFF_MYSQL_DATABASE:-staff_service}"
+INVENTORY_DB="${INVENTORY_MYSQL_DATABASE:-inventory_service}"
+BOOKING_DB="${BOOKING_MYSQL_DATABASE:-booking_service}"
 APP_USER="${MYSQL_USER:-app}"
 
-mysql --protocol=socket -uroot -p"${MYSQL_ROOT_PASSWORD}" <<SQL
-CREATE DATABASE IF NOT EXISTS \`${PRIMARY_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS \`${SECONDARY_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-GRANT ALL PRIVILEGES ON \`${PRIMARY_DB}\`.* TO '${APP_USER}'@'%';
-GRANT ALL PRIVILEGES ON \`${SECONDARY_DB}\`.* TO '${APP_USER}'@'%';
-FLUSH PRIVILEGES;
+# user_service do MYSQL_DATABASE của container tạo sẵn; script này chỉ bổ sung
+# các database còn lại.
+MYSQL_PWD="${MYSQL_ROOT_PASSWORD}" mysql --protocol=socket -uroot <<-EOSQL
+	CREATE DATABASE IF NOT EXISTS \`${CUSTOMER_VEHICLE_DB}\`;
+	GRANT ALL PRIVILEGES ON \`${CUSTOMER_VEHICLE_DB}\`.* TO '${APP_USER}'@'%';
+	CREATE DATABASE IF NOT EXISTS \`${STAFF_DB}\`;
+	GRANT ALL PRIVILEGES ON \`${STAFF_DB}\`.* TO '${APP_USER}'@'%';
+	CREATE DATABASE IF NOT EXISTS \`${INVENTORY_DB}\`;
+	GRANT ALL PRIVILEGES ON \`${INVENTORY_DB}\`.* TO '${APP_USER}'@'%';
+	CREATE DATABASE IF NOT EXISTS \`${BOOKING_DB}\`;
+	GRANT ALL PRIVILEGES ON \`${BOOKING_DB}\`.* TO '${APP_USER}'@'%';
+	FLUSH PRIVILEGES;
+EOSQL
 
-USE \`${SECONDARY_DB}\`;
-CREATE TABLE IF NOT EXISTS used_cars (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    brand       VARCHAR(100) NOT NULL,
-    model       VARCHAR(100) NOT NULL,
-    year        INT NOT NULL,
-    price       DECIMAL(15, 0) NOT NULL,
-    mileage     INT DEFAULT 0,
-    color       VARCHAR(50),
-    location    VARCHAR(100),
-    description TEXT,
-    image_url   TEXT,
-    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_used_cars_brand (brand),
-    INDEX idx_used_cars_price (price),
-    INDEX idx_used_cars_year (year)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-SQL
+echo "Initialized databases '${CUSTOMER_VEHICLE_DB}', '${STAFF_DB}', '${INVENTORY_DB}', and '${BOOKING_DB}' for user '${APP_USER}'."
