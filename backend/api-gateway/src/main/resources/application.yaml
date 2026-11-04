@@ -50,6 +50,12 @@ spring:
               predicates:
                 - Path=/api/bookings,/api/bookings/**
 
+            # Phải đứng trước staff-service-staff để /api/staff/bookings không bị /api/staff/** bắt.
+            - id: booking-service-staff-bookings
+              uri: lb://booking-service
+              predicates:
+                - Path=/api/staff/bookings,/api/staff/bookings/**
+
             - id: staff-service-staff
               uri: lb://staff-service
               predicates:

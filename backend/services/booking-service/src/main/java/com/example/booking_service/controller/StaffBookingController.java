@@ -34,12 +34,12 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/staff/bookings")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyAuthority('ROLE_STAFF', 'ROLE_MANAGER', 'ROLE_ADMIN')")
 public class StaffBookingController {
 
     private final StaffBookingService staffBookingService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('BOOKING_READ')")
     public ApiResponse<StaffBookingPageResponse> search(
             @RequestParam(required = false) BookingStatus status,
             @RequestParam(required = false) BookingSource source,
@@ -56,11 +56,13 @@ public class StaffBookingController {
     }
 
     @GetMapping("/{bookingId}")
+    @PreAuthorize("hasAuthority('BOOKING_READ')")
     public ApiResponse<StaffBookingResponse> get(@PathVariable UUID bookingId) {
         return ApiResponse.success(staffBookingService.get(bookingId));
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('BOOKING_CREATE')")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<StaffBookingResponse> create(
             @Valid @RequestBody StaffBookingCreateRequest request,
@@ -70,6 +72,7 @@ public class StaffBookingController {
     }
 
     @PostMapping("/{bookingId}/cancel")
+    @PreAuthorize("hasAuthority('BOOKING_CANCEL')")
     public ApiResponse<StaffBookingResponse> cancel(
             @PathVariable UUID bookingId,
             @RequestBody(required = false) @Valid BookingCancelRequest request,
@@ -80,6 +83,7 @@ public class StaffBookingController {
     }
 
     @PatchMapping("/{bookingId}/reschedule")
+    @PreAuthorize("hasAuthority('BOOKING_RESCHEDULE')")
     public ApiResponse<StaffBookingResponse> reschedule(
             @PathVariable UUID bookingId,
             @Valid @RequestBody BookingRescheduleRequest request,
@@ -90,6 +94,7 @@ public class StaffBookingController {
     }
 
     @PatchMapping("/{bookingId}/status")
+    @PreAuthorize("hasAuthority('BOOKING_STATUS_UPDATE')")
     public ApiResponse<StaffBookingResponse> updateStatus(
             @PathVariable UUID bookingId,
             @Valid @RequestBody StaffBookingStatusRequest request,
@@ -100,6 +105,7 @@ public class StaffBookingController {
     }
 
     @PatchMapping("/{bookingId}/vehicle")
+    @PreAuthorize("hasAuthority('BOOKING_VEHICLE_LINK')")
     public ApiResponse<StaffBookingResponse> linkVehicle(
             @PathVariable UUID bookingId,
             @Valid @RequestBody StaffBookingVehicleRequest request
@@ -109,6 +115,7 @@ public class StaffBookingController {
     }
 
     @PostMapping("/{bookingId}/check-in")
+    @PreAuthorize("hasAuthority('BOOKING_CHECK_IN')")
     public ApiResponse<StaffBookingResponse> checkIn(
             @PathVariable UUID bookingId,
             @RequestBody(required = false) @Valid StaffBookingVehicleRequest request,

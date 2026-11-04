@@ -31,13 +31,13 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/bookings")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('ROLE_CUSTOMER')")
 public class BookingController {
 
     private final BookingAvailabilityService availabilityService;
     private final CustomerBookingService customerBookingService;
 
     @GetMapping("/availability")
+    @PreAuthorize("hasAuthority('BOOKING_AVAILABILITY_READ')")
     public ApiResponse<List<AvailabilitySlotResponse>> findAvailability(
             @RequestParam("from") LocalDate from,
             @RequestParam("to") LocalDate to,
@@ -47,6 +47,7 @@ public class BookingController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('CUSTOMER_BOOKING_CREATE')")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<BookingResponse> createBooking(
             @Valid @RequestBody BookingCreateRequest request,
@@ -56,11 +57,13 @@ public class BookingController {
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasAuthority('CUSTOMER_BOOKING_READ')")
     public ApiResponse<List<BookingResponse>> findMyBookings(@AuthenticationPrincipal Jwt jwt) {
         return ApiResponse.success(customerBookingService.findMine(jwt));
     }
 
     @GetMapping("/{bookingId}")
+    @PreAuthorize("hasAuthority('CUSTOMER_BOOKING_READ')")
     public ApiResponse<BookingResponse> getBooking(
             @PathVariable UUID bookingId,
             @AuthenticationPrincipal Jwt jwt
@@ -69,6 +72,7 @@ public class BookingController {
     }
 
     @PostMapping("/{bookingId}/cancel")
+    @PreAuthorize("hasAuthority('CUSTOMER_BOOKING_CANCEL')")
     public ApiResponse<BookingResponse> cancelBooking(
             @PathVariable UUID bookingId,
             @RequestBody(required = false) @Valid BookingCancelRequest request,
@@ -79,6 +83,7 @@ public class BookingController {
     }
 
     @PatchMapping("/{bookingId}/reschedule")
+    @PreAuthorize("hasAuthority('CUSTOMER_BOOKING_RESCHEDULE')")
     public ApiResponse<BookingResponse> rescheduleBooking(
             @PathVariable UUID bookingId,
             @Valid @RequestBody BookingRescheduleRequest request,

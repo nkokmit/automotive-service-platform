@@ -65,7 +65,7 @@ class BookingControllerTest {
                 .willReturn(List.of(new AvailabilitySlotResponse(start, start.plusSeconds(1800))));
 
         mvc.perform(get("/api/bookings/availability")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_AVAILABILITY_READ")))
                         .param("from", day.toString())
                         .param("to", day.toString())
                         .param("serviceIds", SERVICE_ID.toString()))
@@ -76,11 +76,11 @@ class BookingControllerTest {
     }
 
     @Test
-    void nonCustomerCannotUseCustomerBookingEndpoints() throws Exception {
+    void roleWithoutPermissionCannotUseCustomerBookingEndpoints() throws Exception {
         LocalDate day = LocalDate.now().plusDays(1);
 
         mvc.perform(get("/api/bookings/availability")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STAFF")))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
                         .param("from", day.toString())
                         .param("to", day.toString())
                         .param("serviceIds", SERVICE_ID.toString()))
@@ -105,7 +105,7 @@ class BookingControllerTest {
     @Test
     void missingAvailabilityParametersReturnBadRequest() throws Exception {
         mvc.perform(get("/api/bookings/availability")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_AVAILABILITY_READ"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(1000));
 
@@ -123,7 +123,7 @@ class BookingControllerTest {
         mvc.perform(post("/api/bookings")
                         .with(jwt()
                                 .jwt(token -> token.claim("userId", USER_ID.toString()))
-                                .authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
+                                .authorities(new SimpleGrantedAuthority("CUSTOMER_BOOKING_CREATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -157,12 +157,12 @@ class BookingControllerTest {
         given(customerBookingService.findMine(eq(bookingId), any())).willReturn(response);
 
         mvc.perform(get("/api/bookings/me")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("CUSTOMER_BOOKING_READ"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result[0].id").value(bookingId.toString()));
 
         mvc.perform(get("/api/bookings/{id}", bookingId)
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("CUSTOMER_BOOKING_READ"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.id").value(bookingId.toString()));
     }
@@ -179,7 +179,7 @@ class BookingControllerTest {
         given(customerBookingService.reschedule(eq(bookingId), any(), any())).willReturn(response);
 
         mvc.perform(post("/api/bookings/{id}/cancel", bookingId)
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("CUSTOMER_BOOKING_CANCEL")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"Customer request\"}"))
                 .andExpect(status().isOk())
@@ -187,7 +187,7 @@ class BookingControllerTest {
 
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
                         "/api/bookings/{id}/reschedule", bookingId)
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("CUSTOMER_BOOKING_RESCHEDULE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"startAt\":\"" + start.plusSeconds(3600) + "\"}"))
                 .andExpect(status().isOk())

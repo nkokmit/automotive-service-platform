@@ -51,9 +51,9 @@ class StaffBookingControllerTest {
     private JwtDecoder jwtDecoder;
 
     @Test
-    void customerCannotUseStaffEndpoints() throws Exception {
+    void roleWithoutPermissionCannotUseStaffEndpoints() throws Exception {
         mvc.perform(get("/api/staff/bookings/{id}", BOOKING_ID)
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
                 .andExpect(status().isForbidden());
 
         verify(staffBookingService, never()).get(any());
@@ -64,7 +64,7 @@ class StaffBookingControllerTest {
         given(staffBookingService.get(BOOKING_ID)).willReturn(response(BookingStatus.CONFIRMED));
 
         mvc.perform(get("/api/staff/bookings/{id}", BOOKING_ID)
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STAFF"))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_READ"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.source").value("PHONE"))
                 .andExpect(jsonPath("$.result.status").value("CONFIRMED"));
@@ -80,7 +80,7 @@ class StaffBookingControllerTest {
                 """.formatted(Instant.now().plusSeconds(86400), SERVICE_ID);
 
         mvc.perform(post("/api/staff/bookings")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STAFF")))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CREATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
@@ -94,7 +94,7 @@ class StaffBookingControllerTest {
                 """.formatted(Instant.now().plusSeconds(86400), SERVICE_ID, UUID.randomUUID());
 
         mvc.perform(post("/api/staff/bookings")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STAFF")))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CREATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
@@ -108,11 +108,52 @@ class StaffBookingControllerTest {
                 .willReturn(response(BookingStatus.NO_SHOW));
 
         mvc.perform(patch("/api/staff/bookings/{id}/status", BOOKING_ID)
-                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STAFF")))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_STATUS_UPDATE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"NO_SHOW\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.status").value("NO_SHOW"));
+    }
+
+    @Test
+    void staffOperationsRequireTheirOwnPermissions() throws Exception {
+        Instant nextStart = Instant.now().plusSeconds(7200);
+
+        mvc.perform(post("/api/staff/bookings/{id}/cancel", BOOKING_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CANCEL"))))
+                .andExpect(status().isOk());
+
+        mvc.perform(patch("/api/staff/bookings/{id}/reschedule", BOOKING_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_RESCHEDULE")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"startAt\":\"" + nextStart + "\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(patch("/api/staff/bookings/{id}/vehicle", BOOKING_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_VEHICLE_LINK")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"vehicleId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/staff/bookings/{id}/check-in", BOOKING_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CHECK_IN"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void readPermissionDoesNotGrantStaffBookingCreation() throws Exception {
+        String body = """
+                {"source":"PHONE","startAt":"%s","serviceIds":["%s"],"licensePlate":"51A-12345",
+                 "customer":{"fullName":"Nguyen Van A","phone":"0900000000"}}
+                """.formatted(Instant.now().plusSeconds(86400), SERVICE_ID);
+
+        mvc.perform(post("/api/staff/bookings")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_READ")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        verify(staffBookingService, never()).create(any(), any());
     }
 
     private StaffBookingResponse response(BookingStatus status) {
