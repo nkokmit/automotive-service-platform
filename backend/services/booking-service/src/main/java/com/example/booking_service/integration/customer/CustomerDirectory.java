@@ -29,32 +29,12 @@ public class CustomerDirectory {
         return customer.id();
     }
 
-    /** Tìm khách theo số điện thoại chính xác, chưa có thì tạo hồ sơ mới (không gắn tài khoản). */
-    public UUID findOrCreateByPhone(String fullName, String phone, String email) {
-        CustomerCreateCommand command = new CustomerCreateCommand(
-                fullName.strip(), normalizePhone(phone), blankToNull(email), true);
-        CustomerProfileContract customer;
-        try {
-            customer = unwrap(client.findOrCreateCustomer(command), null);
-        } catch (FeignException exception) {
-            throw translate(exception, null);
-        }
-        if (customer.id() == null || !Boolean.TRUE.equals(customer.isActive())) {
-            throw new ApiException(ErrorCode.CUSTOMER_NOT_FOUND, "Hồ sơ khách hàng không hoạt động");
-        }
-        return customer.id();
-    }
-
     public VehicleContract requireActiveVehicle(UUID vehicleId) {
         VehicleContract vehicle = read(() -> client.getVehicle(vehicleId), ErrorCode.VEHICLE_NOT_FOUND);
         if (!Boolean.FALSE.equals(vehicle.isActive()) && vehicle.id() != null) {
             return vehicle;
         }
         throw new ApiException(ErrorCode.VEHICLE_NOT_FOUND, "Hồ sơ xe không hoạt động");
-    }
-
-    public static String normalizePhone(String phone) {
-        return phone == null ? "" : phone.replaceAll("[\\s.\\-]", "");
     }
 
     public static String normalizePlate(String plate) {
@@ -87,9 +67,5 @@ public class CustomerDirectory {
         log.error("Gọi customer-vehicle-service thất bại (HTTP {}): {}", exception.status(), exception.getMessage());
         return new ApiException(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE,
                 "Không thể kết nối customer-vehicle-service, vui lòng thử lại sau");
-    }
-
-    private String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.strip();
     }
 }

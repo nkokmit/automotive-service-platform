@@ -751,7 +751,7 @@ Tất cả endpoint nằm dưới `/api/staff/bookings`, yêu cầu `ROLE_STAFF`
 Quyết định cho booking offline:
 
 - Booking offline dùng đúng thuật toán sức chứa và khóa theo ngày như booking online; không có cơ chế ép đặt khi hết sức chứa (v1).
-- `POST` nhận đúng một trong `customerId` hoặc `customer {fullName, phone, email}`. Với `customer`, tìm khách theo số điện thoại chính xác, chưa có thì tạo hồ sơ (không gắn tài khoản) qua customer-vehicle-service bằng token dịch vụ của booking-service.
+- `POST` bắt buộc `customerId` của Customer đã tồn tại (booking-service chỉ xác minh còn hoạt động, không tạo Customer). Nếu khách chưa có hồ sơ, FE tìm/tạo Customer qua customer-vehicle-service trước rồi mới gọi API này — cùng nguyên tắc với `vehicleId` ở check-in.
 - `PHONE` phải có `startAt` ở tương lai; `WALK_IN` cho phép lùi tối đa 15 phút.
 - Cột `bookings.source` (`ONLINE`/`PHONE`/`WALK_IN`) và `created_by` (staff user) phục vụ truy vết; lịch sử trạng thái ghi `changed_by` là nhân viên.
 - Check-in yêu cầu đã liên kết xe và đúng ngày hẹn; lặp lại trên booking đã `CHECKED_IN` trả kết quả hiện tại. Liên kết xe idempotent theo cùng `vehicleId`, xe khác trả `409`.

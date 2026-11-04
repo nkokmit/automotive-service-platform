@@ -1,7 +1,6 @@
 package com.example.customer_vehicle_service.service;
 
 import com.example.customer_vehicle_service.dto.request.CustomerCreateRequest;
-import com.example.customer_vehicle_service.dto.request.InternalCustomerFindOrCreateRequest;
 import com.example.customer_vehicle_service.dto.request.CustomerUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
@@ -29,11 +28,6 @@ public interface CustomerService {
     CustomerResponse getCustomerById(UUID id);
 
     CustomerResponse createCustomer(CustomerCreateRequest request);
-
-    /**
-     * Tìm khách theo số điện thoại (đã chuẩn hoá), chưa có thì tạo hồ sơ chưa gắn tài khoản.
-     */
-    CustomerResponse findOrCreateByPhone(InternalCustomerFindOrCreateRequest request);
 
     /**
      * Cập nhật một phần: field {@code null} trong request được giữ nguyên.

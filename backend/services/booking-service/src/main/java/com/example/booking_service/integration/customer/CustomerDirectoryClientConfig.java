@@ -19,7 +19,7 @@ public class CustomerDirectoryClientConfig {
     public RequestInterceptor customerDirectoryTokenInterceptor(@Value("${jwt.secret}") String secret) {
         ServiceTokenProvider provider = new ServiceTokenProvider(
                 secret, "booking-service",
-                List.of("INTERNAL_CUSTOMER_READ", "INTERNAL_CUSTOMER_WRITE", "INTERNAL_VEHICLE_READ"),
+                List.of("INTERNAL_CUSTOMER_READ", "INTERNAL_VEHICLE_READ"),
                 Clock.systemUTC());
         return template -> template.header("Authorization", "Bearer " + provider.getToken());
     }

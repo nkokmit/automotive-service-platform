@@ -47,7 +47,7 @@ public class StaffBookingServiceImpl implements StaffBookingService {
         validateSourceAndStart(request);
         ServiceSelectionValidator.validateUnique(request.serviceIds());
 
-        UUID customerId = resolveCustomer(request);
+        UUID customerId = customerDirectory.requireActiveCustomer(request.customerId());
         List<ServiceSlot> serviceSlots = capacityCheckService.resolveServiceSlots(request.serviceIds());
         List<DemandInterval> demand = SequentialDemandBuilder.build(request.startAt(), serviceSlots);
         Instant endAt = demand.get(demand.size() - 1).end();
@@ -136,20 +136,6 @@ public class StaffBookingServiceImpl implements StaffBookingService {
                             ? "Giờ bắt đầu walk-in không được sớm hơn 15 phút so với hiện tại"
                             : "Thời điểm bắt đầu phải nằm trong tương lai");
         }
-    }
-
-    private UUID resolveCustomer(StaffBookingCreateRequest request) {
-        boolean hasId = request.customerId() != null;
-        boolean hasInfo = request.customer() != null;
-        if (hasId == hasInfo) {
-            throw new ApiException(ErrorCode.INVALID_REQUEST,
-                    "Cung cấp đúng một trong customerId hoặc customer");
-        }
-        if (hasId) {
-            return customerDirectory.requireActiveCustomer(request.customerId());
-        }
-        return customerDirectory.findOrCreateByPhone(
-                request.customer().fullName(), request.customer().phone(), request.customer().email());
     }
 
     private UUID staffUserId(Jwt jwt) {

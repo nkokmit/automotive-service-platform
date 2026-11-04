@@ -76,8 +76,8 @@ class StaffBookingControllerTest {
                 .willReturn(response(BookingStatus.CONFIRMED));
         String body = """
                 {"source":"PHONE","startAt":"%s","serviceIds":["%s"],"licensePlate":"51A-12345",
-                 "customer":{"fullName":"Nguyen Van A","phone":"0900000000"}}
-                """.formatted(Instant.now().plusSeconds(86400), SERVICE_ID);
+                 "customerId":"%s"}
+                """.formatted(Instant.now().plusSeconds(86400), SERVICE_ID, UUID.randomUUID());
 
         mvc.perform(post("/api/staff/bookings")
                         .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CREATE")))
@@ -144,8 +144,8 @@ class StaffBookingControllerTest {
     void readPermissionDoesNotGrantStaffBookingCreation() throws Exception {
         String body = """
                 {"source":"PHONE","startAt":"%s","serviceIds":["%s"],"licensePlate":"51A-12345",
-                 "customer":{"fullName":"Nguyen Van A","phone":"0900000000"}}
-                """.formatted(Instant.now().plusSeconds(86400), SERVICE_ID);
+                 "customerId":"%s"}
+                """.formatted(Instant.now().plusSeconds(86400), SERVICE_ID, UUID.randomUUID());
 
         mvc.perform(post("/api/staff/bookings")
                         .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_READ")))

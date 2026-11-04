@@ -21,14 +21,6 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
      */
     Optional<Customer> findByUserId(UUID userId);
 
-    /** Khớp chính xác số điện thoại sau khi bỏ khoảng trắng, dấu chấm và gạch ngang. */
-    @Query("""
-            SELECT c FROM Customer c
-            WHERE REPLACE(REPLACE(REPLACE(c.phone, ' ', ''), '.', ''), '-', '') = :phone
-            ORDER BY c.createdAt ASC
-            """)
-    List<Customer> findByNormalizedPhone(@Param("phone") String phone);
-
     /**
      * Tìm kiếm + phân trang khách hàng (PLAN.md bước 3).
      *

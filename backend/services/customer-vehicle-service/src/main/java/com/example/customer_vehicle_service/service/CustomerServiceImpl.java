@@ -1,7 +1,6 @@
 package com.example.customer_vehicle_service.service;
 
 import com.example.customer_vehicle_service.dto.request.CustomerCreateRequest;
-import com.example.customer_vehicle_service.dto.request.InternalCustomerFindOrCreateRequest;
 import com.example.customer_vehicle_service.dto.request.CustomerUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
@@ -66,23 +65,6 @@ public class CustomerServiceImpl implements CustomerService {
 
         Customer saved = customerRepository.save(customer);
         log.info("Đã tạo khách hàng mới: {} ({})", saved.getFullName(), saved.getId());
-        return customerMapper.toCustomerResponse(saved);
-    }
-
-    @Override
-    public CustomerResponse findOrCreateByPhone(InternalCustomerFindOrCreateRequest request) {
-        String phone = request.phone().replaceAll("[\\s.\\-]", "");
-        Customer existing = customerRepository.findByNormalizedPhone(phone).stream().findFirst().orElse(null);
-        if (existing != null) {
-            return customerMapper.toCustomerResponse(existing);
-        }
-        Customer saved = customerRepository.save(Customer.builder()
-                .fullName(request.fullName().strip())
-                .phone(phone)
-                .email(request.email() == null || request.email().isBlank() ? null : request.email().strip())
-                .isActive(Boolean.TRUE)
-                .build());
-        log.info("Đã tạo khách hàng từ booking offline: {} ({})", saved.getFullName(), saved.getId());
         return customerMapper.toCustomerResponse(saved);
     }
 
