@@ -358,16 +358,20 @@ services:
     restart: unless-stopped
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3-flash-preview}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       QDRANT_URL: http://qdrant:6333
+      AUTO_SEED_ON_STARTUP: "true"
+      MYSQL_DSN: mysql+aiomysql://${MYSQL_USER:-app}:${MYSQL_PASSWORD:-apppassword123}@mysql:3306/${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}?charset=utf8mb4
       DAMAGE_SERVICE_URL: http://damage-detection-service:8001
       API_GATEWAY_URL: http://api-gateway:8000
       GARAGE_SERVICE_URL: http://api-gateway:8000
     ports:
       - "${AGENT_SERVICE_PORT:-8002}:8002"
     depends_on:
+      mysql:
+        condition: service_healthy
       qdrant:
         condition: service_healthy
       damage-detection-service:

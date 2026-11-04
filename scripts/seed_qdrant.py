@@ -18,8 +18,32 @@ from qdrant_client.models import (
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
-COLLECTION_NAME = "car_news"
+from typing import Optional
+from pydantic import Field, HttpUrl, SecretStr, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ROOT = Path(__file__).resolve().parent.parent
+
+class QdrantSeedSettings(BaseSettings):
+    """Configuration for seeding Qdrant loaded from .env via pydantic-settings."""
+    model_config = SettingsConfigDict(
+        env_file=[str(ROOT / ".env"), str(ROOT / "ai-services" / "agent-service" / ".env"), ".env"],
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+    qdrant_url: str = Field(default="http://localhost:6333", description="Qdrant endpoint")
+    qdrant_api_key: Optional[SecretStr] = Field(default=None, description="Qdrant API key")
+    qdrant_news_collection: str = Field(default="car_news", description="Collection name")
+
+    @field_validator("qdrant_url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        HttpUrl(v.strip())
+        return v.strip().rstrip("/")
+
+seed_settings = QdrantSeedSettings()
+QDRANT_URL = seed_settings.qdrant_url
+COLLECTION_NAME = seed_settings.qdrant_news_collection
 
 # 15 bài viết cẩm nang & tin tức ô tô tiếng Việt chi tiết
 ARTICLES = [

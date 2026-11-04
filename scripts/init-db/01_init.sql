@@ -1,108 +1,44 @@
--- ============================================================
--- Automotive Service Platform – Database Init Script
--- Runs automatically when PostgreSQL container starts fresh
--- ============================================================
+-- MySQL Initialization Script for Automotive Service Platform (customer_vehicle_service)
+USE customer_vehicle_service;
 
--- ── Extensions ──────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";  -- For LIKE optimization
-
--- ── Used Cars ───────────────────────────────────────────────
+-- Used Cars Listing Table (queried by agent-service -> search_used_cars tool)
 CREATE TABLE IF NOT EXISTS used_cars (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id          INT AUTO_INCREMENT PRIMARY KEY,
     brand       VARCHAR(100) NOT NULL,
-    model       VARCHAR(200) NOT NULL,
-    year        SMALLINT NOT NULL CHECK (year BETWEEN 1990 AND 2030),
-    price       NUMERIC(15,0) NOT NULL CHECK (price >= 0),
-    mileage     INTEGER CHECK (mileage >= 0),
+    model       VARCHAR(100) NOT NULL,
+    year        INT NOT NULL,
+    price       DECIMAL(15, 0) NOT NULL COMMENT 'Price in VND',
+    mileage     INT DEFAULT 0,
     color       VARCHAR(50),
-    fuel_type   VARCHAR(30) DEFAULT 'gasoline',  -- gasoline, diesel, electric, hybrid
-    transmission VARCHAR(20) DEFAULT 'automatic', -- automatic, manual, cvt
-    body_type   VARCHAR(30),                      -- sedan, suv, hatchback, truck, van
-    location    VARCHAR(200),
+    location    VARCHAR(100),
     description TEXT,
-    images      TEXT[],                           -- Array of image URLs
-    seller_id   UUID,
-    is_active   BOOLEAN DEFAULT TRUE,
-    created_at  TIMESTAMPTZ DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ DEFAULT NOW()
-);
+    image_url   TEXT,
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_used_cars_brand (brand),
+    INDEX idx_used_cars_price (price),
+    INDEX idx_used_cars_year (year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS idx_used_cars_brand   ON used_cars(LOWER(brand));
-CREATE INDEX IF NOT EXISTS idx_used_cars_price   ON used_cars(price);
-CREATE INDEX IF NOT EXISTS idx_used_cars_year    ON used_cars(year);
-CREATE INDEX IF NOT EXISTS idx_used_cars_active  ON used_cars(is_active);
-
--- ── Garages ──────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS garages (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name        VARCHAR(200) NOT NULL,
-    address     TEXT NOT NULL,
-    city        VARCHAR(100) NOT NULL DEFAULT 'Hà Nội',
-    phone       VARCHAR(20),
-    email       VARCHAR(200),
-    rating      NUMERIC(2,1) DEFAULT 5.0 CHECK (rating BETWEEN 0 AND 5),
-    services    TEXT[],
-    open_time   TIME DEFAULT '08:00',
-    close_time  TIME DEFAULT '18:00',
-    slot_duration_minutes INTEGER DEFAULT 60,
-    is_active   BOOLEAN DEFAULT TRUE,
-    created_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ── Bookings ─────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS bookings (
-    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    garage_id       UUID NOT NULL REFERENCES garages(id),
-    booking_date    DATE NOT NULL,
-    time_slot       TIME NOT NULL,
-    service_type    VARCHAR(100) NOT NULL,
-    customer_name   VARCHAR(200) NOT NULL,
-    phone           VARCHAR(20) NOT NULL,
-    notes           TEXT,
-    status          VARCHAR(20) DEFAULT 'confirmed'
-                    CHECK (status IN ('confirmed', 'cancelled', 'completed', 'no_show')),
-    created_at      TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (garage_id, booking_date, time_slot)
-);
-
-CREATE INDEX IF NOT EXISTS idx_bookings_garage_date ON bookings(garage_id, booking_date);
-
--- ── Damage Reports ───────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS damage_reports (
-    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id      VARCHAR(100),
-    image_url       TEXT,
-    overall_severity VARCHAR(20),
-    num_detections  INTEGER,
-    damages_json    JSONB,         -- Full detection payload
-    processing_ms   NUMERIC(8,2),
-    created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- ── Seed Data ────────────────────────────────────────────────
-
--- Sample garages
-INSERT INTO garages (id, name, address, city, phone, services)
-VALUES
-  ('11111111-1111-1111-1111-111111111111',
-   'AutoCare Garage Hà Nội', '123 Nguyễn Trãi, Thanh Xuân', 'Hà Nội',
-   '024-1234-5678', ARRAY['oil_change','tire_rotation','full_inspection','brake_service']),
-  ('22222222-2222-2222-2222-222222222222',
-   'Minh Tuấn Auto', '456 Lê Văn Lương, Cầu Giấy', 'Hà Nội',
-   '024-8765-4321', ARRAY['oil_change','ac_service','full_inspection','glass_repair'])
-ON CONFLICT DO NOTHING;
-
--- Sample used cars
-INSERT INTO used_cars (brand, model, year, price, mileage, color, location, fuel_type, transmission)
-VALUES
-  ('Toyota', 'Camry 2.5Q', 2022, 1180000000, 25000, 'Trắng ngọc trai', 'Hà Nội', 'gasoline', 'automatic'),
-  ('Honda',  'CR-V 1.5L', 2021, 920000000, 38000, 'Xanh titan', 'TP.HCM', 'gasoline', 'automatic'),
-  ('Hyundai','Tucson 2.0', 2020, 790000000, 52000, 'Đỏ garnet', 'Hà Nội', 'gasoline', 'automatic'),
-  ('Mazda',  'CX-5 2.0', 2023, 850000000, 12000, 'Trắng ngọc', 'Đà Nẵng', 'gasoline', 'automatic'),
-  ('Ford',   'Ranger XLS', 2021, 720000000, 65000, 'Xanh navy', 'TP.HCM', 'diesel', 'automatic'),
-  ('Kia',    'Sorento 2.2', 2022, 1050000000, 30000, 'Đen bóng', 'Hà Nội', 'diesel', 'automatic'),
-  ('VinFast','VF8 Plus', 2023, 1200000000, 8000, 'Trắng', 'Hà Nội', 'electric', 'automatic'),
-  ('Toyota', 'Fortuner 2.7', 2020, 1050000000, 55000, 'Bạc', 'TP.HCM', 'gasoline', 'automatic')
-ON CONFLICT DO NOTHING;
-
+-- Seed sample Vietnamese market used cars (idempotent)
+INSERT INTO used_cars (id, brand, model, year, price, mileage, color, location, description) VALUES
+(1, 'Toyota',    'Vios 1.5G CVT',         2022, 485000000,  28000, 'Trắng ngọc trai', 'TP. Hồ Chí Minh', 'Xe gia đình 1 chủ từ đầu, bảo dưỡng hãng đầy đủ, không đâm đụng ngập nước.'),
+(2, 'Toyota',    'Corolla Cross 1.8V',     2023, 760000000,  15000, 'Đỏ ánh kim',      'Hà Nội',          'Bản V full option, cam 360, cửa sổ trời, lốp sơ cua chưa hạ.'),
+(3, 'Toyota',    'Camry 2.5Q',             2022, 1180000000, 25000, 'Trắng ngọc trai', 'Hà Nội',          'Camry 2.5Q cao cấp nhất, nội thất da bò, bảo dưỡng chính hãng định kỳ.'),
+(4, 'Honda',     'City RS',                2022, 510000000,  31000, 'Xanh đậm',        'Đà Nẵng',         'Honda Sensing, lẫy chuyển số vô lăng, nội thất da lộn nguyên bản.'),
+(5, 'Honda',     'CR-V 1.5L Turbo',        2021, 835000000,  42000, 'Đen ánh',         'TP. Hồ Chí Minh', 'Xe 7 chỗ rộng rãi, cốp điện, bảo hiểm thân vỏ còn hạn đến 2026.'),
+(6, 'Mazda',     'CX-5 2.0 Premium',       2023, 790000000,  18000, 'Đỏ Soul Red',     'Hà Nội',          'Bản Premium có HUD, loa Bose 10 loa, cảnh báo điểm mù.'),
+(7, 'Mazda',     'Mazda3 1.5L Luxury',     2021, 565000000,  35000, 'Xám Polymetal',   'TP. Hồ Chí Minh', 'Form mới cực đẹp, tiết kiệm nhiên liệu 6L/100km.'),
+(8, 'Hyundai',   'Accent 1.4 AT Đặc biệt', 2022, 445000000,  29000, 'Bạc',             'Bình Dương',      'Cửa sổ trời, màn hình Apple CarPlay, đề nổ từ xa.'),
+(9, 'Hyundai',   'Tucson 1.6 Turbo',       2023, 875000000,  12000, 'Trắng',           'Hà Nội',          'Dẫn động HTRAC, cần số nút bấm, sưởi/làm mát ghế.'),
+(10, 'Ford',     'Ranger Wildtrak 2.0L',   2023, 895000000,  22000, 'Cam',             'TP. Hồ Chí Minh', 'Bi-Turbo 4x4, nắp thùng cuộn điện, màn hình dọc 12 inch.'),
+(11, 'VinFast',  'VF 8 Plus',              2023, 950000000,  14000, 'Xanh lục bảo',    'Hà Nội',          'Kèm pin mua đứt, ADAS cấp độ 2, bảo hành 10 năm.'),
+(12, 'Kia',      'Sorento 2.2D Signature', 2022, 1050000000, 30000, 'Đen',             'Hà Nội',          'Bản 6 ghế Captain, máy dầu tiết kiệm, full ADAS.')
+ON DUPLICATE KEY UPDATE
+    brand = VALUES(brand),
+    model = VALUES(model),
+    year = VALUES(year),
+    price = VALUES(price),
+    mileage = VALUES(mileage),
+    color = VALUES(color),
+    location = VALUES(location),
+    description = VALUES(description);

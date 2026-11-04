@@ -1545,10 +1545,12 @@ export const articles: Article[] = [
 ];
 
 export const chatSuggestions = [
-  "Cách chọn dầu nhớt cho xe máy?",
-  "Bao lâu nên bảo dưỡng định kỳ?",
-  "Dấu hiệu cần thay má phanh?",
-  "Chi phí sơn xe 4 chỗ khoảng bao nhiêu?",
+  "Cách bảo quản xe ô tô khi để lâu ngày không đi?",
+  "Nên chọn dầu nhớt 0W-20 hay 5W-30 cho ô tô?",
+  "Dấu hiệu nhận biết cần thay má phanh ô tô?",
+  "Điều hoà ô tô không mát hoặc có mùi chua thì xử lý sao?",
+  "Kinh nghiệm kiểm tra khi mua xe ô tô cũ?",
+  "Tra cứu lịch sử bảo dưỡng xe 30F-12345",
 ];
 
 // =========================

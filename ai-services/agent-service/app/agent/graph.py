@@ -21,6 +21,7 @@ from app.tools import (
     make_search_used_cars_tool,
     make_booking_tools,
     make_damage_analysis_tool,
+    make_customer_vehicle_tools,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,8 +30,13 @@ settings = get_settings()
 
 def _create_llm_with_tools(tools: list[Any]):
     """Instantiate Google Gemini (with multi-model fallbacks for 503/429 resilience) or OpenAI LLM."""
-    if settings.gemini_api_key:
-        api_key = settings.gemini_api_key.strip()
+    gemini_key = (
+        settings.gemini_api_key.get_secret_value().strip()
+        if settings.gemini_api_key
+        else ""
+    )
+    if gemini_key:
+        api_key = gemini_key
         candidate_models = [
             settings.gemini_model,
             "gemini-3-flash-preview",
@@ -38,11 +44,9 @@ def _create_llm_with_tools(tools: list[Any]):
             "gemini-flash-lite-latest",
             "gemini-flash-latest",
         ]
-        # Deduplicate while preserving order
-        # fromkeys là một cách để loại bỏ các phần tử trùng lặp trong danh sách, giữ nguyên thứ tự xuất hiện của chúng.
         unique_models = list(dict.fromkeys(candidate_models))
         bound_llms = [
-            ChatGoogleGenerativeAI( 
+            ChatGoogleGenerativeAI(
                 model=m,
                 google_api_key=api_key,
                 temperature=0.1,
@@ -55,9 +59,14 @@ def _create_llm_with_tools(tools: list[Any]):
             return primary.with_fallbacks(bound_llms[1:])
         return primary
 
+    openai_key = (
+        settings.openai_api_key.get_secret_value().strip()
+        if settings.openai_api_key
+        else ""
+    )
     return ChatOpenAI(
         model=settings.openai_model,
-        api_key=settings.openai_api_key.strip(),
+        api_key=openai_key,
         temperature=0.1,
     ).bind_tools(tools)
 
@@ -69,30 +78,36 @@ def build_agent_graph(
     checkpointer: Any | None = None,
     attached_image_url: str | None = None,
     attached_image_base64: str | None = None,
+    attached_vehicle_brand: str | None = None,
+    attached_vehicle_segment: str | None = None,
+    damage_capture: dict[str, Any] | None = None,
 ) -> Any:
-    """Build and compile the LangGraph ReAct agent with 5 tools."""
-    # ── Build tools ──────────────────────────────────────────────────────────
+    """Build and compile the LangGraph ReAct agent with 7 tools (including customer-vehicle-service)."""
     search_news = make_search_car_news_tool(qdrant_client)
     search_cars = make_search_used_cars_tool(db_session_factory)
     check_slots_tool, create_booking_tool = make_booking_tools(http_client)
+    lookup_vehicle_tool, record_history_tool = make_customer_vehicle_tools(db_session_factory)
     damage_tool = make_damage_analysis_tool(
         http_client,
         attached_image_url=attached_image_url,
         attached_image_base64=attached_image_base64,
+        attached_vehicle_brand=attached_vehicle_brand,
+        attached_vehicle_segment=attached_vehicle_segment,
+        damage_capture=damage_capture,
     )
 
     tools = [
         search_news,
         search_cars,
+        lookup_vehicle_tool,
+        record_history_tool,
         check_slots_tool,
         create_booking_tool,
         damage_tool,
     ]
 
-    # ── LLM ──────────────────────────────────────────────────────────────────
     llm = _create_llm_with_tools(tools)
 
-    # ── Nodes ─────────────────────────────────────────────────────────────────
     async def agent_node(state: AgentState) -> dict:
         """Call the LLM with current messages."""
         system = SystemMessage(
@@ -106,7 +121,6 @@ def build_agent_graph(
 
     tool_node = ToolNode(tools)
 
-    # ── Graph ─────────────────────────────────────────────────────────────────
     graph = StateGraph(AgentState)
     graph.add_node("agent", agent_node)
     graph.add_node("tools", tool_node)

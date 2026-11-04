@@ -41,6 +41,8 @@ export const ErrorCode = {
   PERMISSION_ALREADY_EXISTS: 1202,
   UNAUTHENTICATED: 1401,
   UNAUTHORIZED: 1403,
+  CUSTOMER_NOT_FOUND: 2001,
+  VEHICLE_NOT_FOUND: 2101,
 } as const;
 
 // ── User / Auth ───────────────────────────────────────────────────────────────
@@ -100,7 +102,7 @@ export interface RefreshTokenRequest {
   rawToken: string;
 }
 
-// ── Customer / Vehicle (customer-vehicle-service) ─────────────────────────────
+// ── Customer / Vehicle / ServiceHistory (customer-vehicle-service) ─────────────
 /** Khớp CustomerResponse.java — cố ý không có deletedAt. */
 export interface CustomerResponse {
   id: string;
@@ -114,6 +116,18 @@ export interface CustomerResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface CustomerCreateRequest {
+  fullName: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  userId?: string | null;
+  isActive?: boolean;
+}
+
+export type CustomerUpdateRequest = CustomerCreateRequest;
 
 /**
  * Khớp VehicleResponse.java.
@@ -139,13 +153,66 @@ export interface VehicleResponse {
   updatedAt: string;
 }
 
+export interface VehicleCreateRequest {
+  licensePlate: string;
+  vin?: string | null;
+  make: string;
+  model: string;
+  modelYear?: number | null;
+  trim?: string | null;
+  color?: string | null;
+  fuelType?: string | null;
+  transmission?: string | null;
+  odometerKm?: number | null;
+  notes?: string | null;
+  isActive?: boolean;
+}
+
+export type VehicleUpdateRequest = VehicleCreateRequest;
+
+/** Khớp ServiceRecordType.java */
+export type ServiceRecordType =
+  | "GARAGE_SERVICE"
+  | "EXTERNAL_SERVICE"
+  | "CUSTOMER_REPORTED";
+
+/** Khớp ServiceHistoryResponse.java */
+export interface ServiceHistoryResponse {
+  id: string;
+  vehicleId: string;
+  customerId: string | null;
+  workOrderId: string | null;
+  recordType: ServiceRecordType;
+  serviceDate: string;
+  odometerKm: number | null;
+  summary: string;
+  description: string | null;
+  garageName: string | null;
+  createdAt: string;
+  // Các trường mở rộng từ bridge MySQL giúp hiển thị nhanh biển số/tên xe
+  licensePlate?: string | null;
+  vehicleMake?: string | null;
+  vehicleModel?: string | null;
+  customerName?: string | null;
+}
+
+/** Khớp ServiceHistoryCreateRequest.java */
+export interface ServiceHistoryCreateRequest {
+  customerId?: string | null;
+  recordType: "EXTERNAL_SERVICE" | "CUSTOMER_REPORTED";
+  serviceDate: string;
+  odometerKm?: number | null;
+  summary: string;
+  description?: string | null;
+  garageName?: string | null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 /** Kiểm tra user có authority cụ thể không (role ADMIN ⇒ ROLE_ADMIN). */
 export function hasAuthority(user: UserResponse | null, authority: string): boolean {
   if (!user?.roles) return false;
   for (const role of user.roles) {
     if (role.name === authority) return true;
-    // Set không có .some() — phải chuyển sang mảng trước khi kiểm tra.
     const perms = role.permissions ? Array.from(role.permissions) : [];
     if (perms.some((p) => p.name === authority)) return true;
   }
