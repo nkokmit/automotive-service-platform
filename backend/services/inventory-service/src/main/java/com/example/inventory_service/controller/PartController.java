@@ -167,19 +167,6 @@ public class PartController {
         partService.deleteCompatibility(partId, compatibilityId);
     }
 
-    @PostMapping("/reserve")
-    @PreAuthorize("hasAuthority('STOCK_WRITE')")
-    @Operation(summary = "Giữ chỗ tồn kho",
-            description = "Giữ chỗ phụ tùng cho một Work Order. Tồn khả dụng = onHand - reserved.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
-            description = "Trả về các dòng sổ kho RESERVE đã ghi.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
-            description = "Không đủ tồn kho để giữ chỗ.")
-    public ApiResponse<List<InventoryTransactionResponse>> reserve(
-            @Valid @RequestBody StockOperationRequest request) {
-        return ApiResponse.success("Giữ chỗ tồn kho thành công", stockService.reserve(request));
-    }
-
     @PostMapping("/issue")
     @PreAuthorize("hasAuthority('STOCK_WRITE')")
     @Operation(summary = "Xuất kho",
@@ -191,19 +178,6 @@ public class PartController {
     public ApiResponse<List<InventoryTransactionResponse>> issue(
             @Valid @RequestBody StockOperationRequest request) {
         return ApiResponse.success("Xuất kho thành công", stockService.issue(request));
-    }
-
-    @PostMapping("/release")
-    @PreAuthorize("hasAuthority('STOCK_WRITE')")
-    @Operation(summary = "Giải phóng giữ chỗ",
-            description = "Giải phóng phụ tùng đã giữ chỗ cho một Work Order bị hủy.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
-            description = "Trả về các dòng sổ kho RELEASE đã ghi.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
-            description = "Không tìm thấy giữ chỗ tương ứng hoặc tồn giữ chỗ không đủ.")
-    public ApiResponse<List<InventoryTransactionResponse>> release(
-            @Valid @RequestBody StockOperationRequest request) {
-        return ApiResponse.success("Giải phóng giữ chỗ thành công", stockService.release(request));
     }
 
     @PostMapping("/check-availability")

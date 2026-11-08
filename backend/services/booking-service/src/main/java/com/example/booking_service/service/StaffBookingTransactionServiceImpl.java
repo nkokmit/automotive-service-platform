@@ -94,10 +94,7 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
         return toResponses(List.of(booking)).get(0);
     }
 
-    @Override
-    @Transactional
-    public StaffBookingResponse linkVehicle(UUID bookingId, UUID vehicleId, String verifiedPlate) {
-        Booking booking = lock(bookingId);
+    private void linkVehicle(Booking booking, UUID vehicleId, String verifiedPlate) {
         if (booking.getStatus() != BookingStatus.CONFIRMED && booking.getStatus() != BookingStatus.CHECKED_IN) {
             throw new ApiException(ErrorCode.INVALID_BOOKING_STATUS_TRANSITION,
                     "Chỉ liên kết xe cho lịch hẹn CONFIRMED hoặc CHECKED_IN");
@@ -107,35 +104,39 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
             throw new ApiException(ErrorCode.VEHICLE_PLATE_MISMATCH);
         }
         if (vehicleId.equals(booking.getVehicleId())) {
-            return respond(booking);
+            return;
         }
         if (booking.getVehicleId() != null) {
             throw new ApiException(ErrorCode.VEHICLE_ALREADY_LINKED);
         }
         booking.setVehicleId(vehicleId);
-        bookingRepository.saveAndFlush(booking);
-        return respond(booking);
     }
 
     @Override
     @Transactional
-    public StaffBookingResponse checkIn(UUID bookingId, UUID staffUserId) {
+    public StaffBookingResponse checkIn(UUID bookingId, UUID vehicleId, String verifiedPlate, UUID staffUserId) {
         Booking booking = lock(bookingId);
         if (booking.getStatus() == BookingStatus.CHECKED_IN) {
+            if (vehicleId != null) {
+                linkVehicle(booking, vehicleId, verifiedPlate);
+            }
             return respond(booking);
         }
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new ApiException(ErrorCode.INVALID_BOOKING_STATUS_TRANSITION,
                     "Chỉ tiếp nhận lịch hẹn CONFIRMED");
         }
-        if (booking.getVehicleId() == null) {
-            throw new ApiException(ErrorCode.CHECK_IN_REQUIREMENTS_NOT_MET,
-                    "Cần xác minh và liên kết xe chính thức trước khi tiếp nhận");
-        }
         if (!booking.getStartAt().atZone(scheduleZoneId).toLocalDate()
                 .equals(Instant.now().atZone(scheduleZoneId).toLocalDate())) {
             throw new ApiException(ErrorCode.CHECK_IN_REQUIREMENTS_NOT_MET,
                     "Chỉ tiếp nhận trong ngày hẹn");
+        }
+        if (vehicleId != null) {
+            linkVehicle(booking, vehicleId, verifiedPlate);
+        }
+        if (booking.getVehicleId() == null) {
+            throw new ApiException(ErrorCode.CHECK_IN_REQUIREMENTS_NOT_MET,
+                    "Cần xác minh và liên kết xe chính thức trước khi tiếp nhận");
         }
         booking.setCheckedInAt(Instant.now());
         bookingStatusHistoryService.recordTransition(

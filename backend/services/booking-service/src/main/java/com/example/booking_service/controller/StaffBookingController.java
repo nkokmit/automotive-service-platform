@@ -104,16 +104,6 @@ public class StaffBookingController {
                 staffBookingService.updateStatus(bookingId, request.status(), request.reason(), jwt));
     }
 
-    @PatchMapping("/{bookingId}/vehicle")
-    @PreAuthorize("hasAuthority('BOOKING_VEHICLE_LINK')")
-    public ApiResponse<StaffBookingResponse> linkVehicle(
-            @PathVariable UUID bookingId,
-            @Valid @RequestBody StaffBookingVehicleRequest request
-    ) {
-        return ApiResponse.success("Liên kết xe thành công",
-                staffBookingService.linkVehicle(bookingId, request.vehicleId()));
-    }
-
     @PostMapping("/{bookingId}/check-in")
     @PreAuthorize("hasAuthority('BOOKING_CHECK_IN')")
     public ApiResponse<StaffBookingResponse> checkIn(

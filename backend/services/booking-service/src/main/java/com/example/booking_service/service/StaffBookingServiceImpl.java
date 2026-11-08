@@ -103,19 +103,14 @@ public class StaffBookingServiceImpl implements StaffBookingService {
     }
 
     @Override
-    public StaffBookingResponse linkVehicle(UUID bookingId, UUID vehicleId) {
-        staffTransactionService.get(bookingId);
-        VehicleContract vehicle = customerDirectory.requireActiveVehicle(vehicleId);
-        return staffTransactionService.linkVehicle(bookingId, vehicleId, vehicle.licensePlate());
-    }
-
-    @Override
     public StaffBookingResponse checkIn(UUID bookingId, UUID vehicleId, Jwt jwt) {
         UUID staffUserId = staffUserId(jwt);
+        String verifiedPlate = null;
         if (vehicleId != null) {
-            linkVehicle(bookingId, vehicleId);
+            VehicleContract vehicle = customerDirectory.requireActiveVehicle(vehicleId);
+            verifiedPlate = vehicle.licensePlate();
         }
-        return staffTransactionService.checkIn(bookingId, staffUserId);
+        return staffTransactionService.checkIn(bookingId, vehicleId, verifiedPlate, staffUserId);
     }
 
     @Override

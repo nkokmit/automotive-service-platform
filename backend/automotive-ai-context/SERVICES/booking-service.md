@@ -35,8 +35,7 @@ grants these permissions through role-to-permission assignments:
   `CUSTOMER_BOOKING_CREATE`, `CUSTOMER_BOOKING_READ`,
   `CUSTOMER_BOOKING_CANCEL`, and `CUSTOMER_BOOKING_RESCHEDULE`.
 - Staff APIs: `BOOKING_READ`, `BOOKING_CREATE`, `BOOKING_CANCEL`,
-  `BOOKING_RESCHEDULE`, `BOOKING_STATUS_UPDATE`, `BOOKING_VEHICLE_LINK`,
-  and `BOOKING_CHECK_IN`.
+  `BOOKING_RESCHEDULE`, `BOOKING_STATUS_UPDATE`, and `BOOKING_CHECK_IN`.
 
 The role assignment is intentionally limited to `CUSTOMER` for customer
 permissions and `MANAGER` for staff permissions.

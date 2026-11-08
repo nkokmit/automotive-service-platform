@@ -745,8 +745,7 @@ Tất cả endpoint nằm dưới `/api/staff/bookings`, yêu cầu `ROLE_STAFF`
 | `POST` | `/api/staff/bookings/{id}/cancel` | Hủy hộ khách (cùng quy tắc `CONFIRMED`, chưa đến giờ hẹn, chưa tiếp nhận) |
 | `PATCH` | `/api/staff/bookings/{id}/reschedule` | Đổi lịch hộ khách (cùng quy tắc và kiểm tra sức chứa như khách) |
 | `PATCH` | `/api/staff/bookings/{id}/status` | Chỉ `CONFIRMED → NO_SHOW` (sau giờ hẹn) và `CHECKED_IN → FULFILLED` |
-| `PATCH` | `/api/staff/bookings/{id}/vehicle` | Liên kết `vehicle_id` sau khi đối chiếu biển số với customer-vehicle-service |
-| `POST` | `/api/staff/bookings/{id}/check-in` | Tiếp nhận (`CONFIRMED → CHECKED_IN`); body tùy chọn `vehicleId` để liên kết cùng lúc |
+| `POST` | `/api/staff/bookings/{id}/check-in` | Tiếp nhận (`CONFIRMED → CHECKED_IN`); body tùy chọn `vehicleId` để xác minh biển số, liên kết xe và tiếp nhận cùng lúc |
 
 Quyết định cho booking offline:
 
@@ -754,7 +753,7 @@ Quyết định cho booking offline:
 - `POST` bắt buộc `customerId` của Customer đã tồn tại (booking-service chỉ xác minh còn hoạt động, không tạo Customer). Nếu khách chưa có hồ sơ, FE tìm/tạo Customer qua customer-vehicle-service trước rồi mới gọi API này — cùng nguyên tắc với `vehicleId` ở check-in.
 - `PHONE` phải có `startAt` ở tương lai; `WALK_IN` cho phép lùi tối đa 15 phút.
 - Cột `bookings.source` (`ONLINE`/`PHONE`/`WALK_IN`) và `created_by` (staff user) phục vụ truy vết; lịch sử trạng thái ghi `changed_by` là nhân viên.
-- Check-in yêu cầu đã liên kết xe và đúng ngày hẹn; lặp lại trên booking đã `CHECKED_IN` trả kết quả hiện tại. Liên kết xe idempotent theo cùng `vehicleId`, xe khác trả `409`.
+- Check-in yêu cầu đúng ngày hẹn và xe đã được liên kết hoặc được xác minh qua `vehicleId`; lặp lại trên booking đã `CHECKED_IN` trả kết quả hiện tại. Gửi cùng `vehicleId` là idempotent, xe khác trả `409`.
 - Chưa tạo Work Order (chưa có Work Order Service): `work_order_id` vẫn `NULL`, sẽ nối ở giai đoạn 6.
 
 Các endpoint tiếp nhận cần giữ idempotency, xác thực chuyển trạng thái và kiểm tra trạng thái hiện tại. Không có endpoint tổng quát cho phép chuyển tùy ý giữa mọi trạng thái.

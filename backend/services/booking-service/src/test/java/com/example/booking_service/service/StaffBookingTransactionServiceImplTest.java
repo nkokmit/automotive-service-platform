@@ -61,7 +61,8 @@ class StaffBookingTransactionServiceImplTest {
     void checkInRequiresLinkedVehicle() {
         booking(BookingStatus.CONFIRMED, Instant.now(), null);
 
-        ApiException ex = assertThrows(ApiException.class, () -> service.checkIn(BOOKING_ID, STAFF_ID));
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.checkIn(BOOKING_ID, null, null, STAFF_ID));
 
         assertEquals(ErrorCode.CHECK_IN_REQUIREMENTS_NOT_MET, ex.getErrorCode());
         verify(historyService, never()).recordTransition(any(), any(), any(), any(), any());
@@ -71,7 +72,7 @@ class StaffBookingTransactionServiceImplTest {
     void checkInMovesConfirmedBookingToCheckedIn() {
         Booking booking = booking(BookingStatus.CONFIRMED, Instant.now(), VEHICLE_ID);
 
-        service.checkIn(BOOKING_ID, STAFF_ID);
+        service.checkIn(BOOKING_ID, null, null, STAFF_ID);
 
         assertEquals(true, booking.getCheckedInAt() != null);
         verify(historyService).recordTransition(booking, BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN,
@@ -82,7 +83,7 @@ class StaffBookingTransactionServiceImplTest {
     void checkInIsIdempotent() {
         booking(BookingStatus.CHECKED_IN, Instant.now(), VEHICLE_ID);
 
-        service.checkIn(BOOKING_ID, STAFF_ID);
+        service.checkIn(BOOKING_ID, null, null, STAFF_ID);
 
         verify(historyService, never()).recordTransition(any(), any(), any(), any(), any());
     }
@@ -118,31 +119,30 @@ class StaffBookingTransactionServiceImplTest {
     }
 
     @Test
-    void linkVehicleRejectsPlateMismatch() {
-        booking(BookingStatus.CONFIRMED, Instant.now().plusSeconds(3600), null);
+    void checkInRejectsVehiclePlateMismatch() {
+        booking(BookingStatus.CONFIRMED, Instant.now(), null);
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.linkVehicle(BOOKING_ID, VEHICLE_ID, "30H-99999"));
+                () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "30H-99999", STAFF_ID));
 
         assertEquals(ErrorCode.VEHICLE_PLATE_MISMATCH, ex.getErrorCode());
     }
 
     @Test
-    void linkVehicleIgnoresPlateFormattingAndIsIdempotent() {
-        Booking booking = booking(BookingStatus.CONFIRMED, Instant.now().plusSeconds(3600), null);
+    void checkInLinksVehicleWhenPlateFormattingMatches() {
+        Booking booking = booking(BookingStatus.CONFIRMED, Instant.now(), null);
 
-        service.linkVehicle(BOOKING_ID, VEHICLE_ID, "51a 12345");
+        service.checkIn(BOOKING_ID, VEHICLE_ID, "51a 12345", STAFF_ID);
         assertEquals(VEHICLE_ID, booking.getVehicleId());
-
-        service.linkVehicle(BOOKING_ID, VEHICLE_ID, "51A-12345");
+        assertEquals(true, booking.getCheckedInAt() != null);
     }
 
     @Test
-    void linkVehicleRejectsDifferentVehicleWhenAlreadyLinked() {
+    void checkInRejectsDifferentVehicleWhenAlreadyLinked() {
         booking(BookingStatus.CONFIRMED, Instant.now().plusSeconds(3600), UUID.randomUUID());
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.linkVehicle(BOOKING_ID, VEHICLE_ID, "51A-12345"));
+                () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "51A-12345", STAFF_ID));
 
         assertEquals(ErrorCode.VEHICLE_ALREADY_LINKED, ex.getErrorCode());
     }

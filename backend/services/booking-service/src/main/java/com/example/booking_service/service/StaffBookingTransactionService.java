@@ -25,9 +25,7 @@ public interface StaffBookingTransactionService {
 
     StaffBookingResponse get(UUID bookingId);
 
-    StaffBookingResponse linkVehicle(UUID bookingId, UUID vehicleId, String verifiedPlate);
-
-    StaffBookingResponse checkIn(UUID bookingId, UUID staffUserId);
+    StaffBookingResponse checkIn(UUID bookingId, UUID vehicleId, String verifiedPlate, UUID staffUserId);
 
     StaffBookingResponse updateStatus(UUID bookingId, BookingStatus target, String reason, UUID staffUserId);
 }

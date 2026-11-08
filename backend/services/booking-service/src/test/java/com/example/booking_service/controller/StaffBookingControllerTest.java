@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -118,6 +119,7 @@ class StaffBookingControllerTest {
     @Test
     void staffOperationsRequireTheirOwnPermissions() throws Exception {
         Instant nextStart = Instant.now().plusSeconds(7200);
+        UUID vehicleId = UUID.randomUUID();
 
         mvc.perform(post("/api/staff/bookings/{id}/cancel", BOOKING_ID)
                         .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CANCEL"))))
@@ -129,15 +131,13 @@ class StaffBookingControllerTest {
                         .content("{\"startAt\":\"" + nextStart + "\"}"))
                 .andExpect(status().isOk());
 
-        mvc.perform(patch("/api/staff/bookings/{id}/vehicle", BOOKING_ID)
-                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_VEHICLE_LINK")))
+        mvc.perform(post("/api/staff/bookings/{id}/check-in", BOOKING_ID)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CHECK_IN")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"vehicleId\":\"" + UUID.randomUUID() + "\"}"))
+                        .content("{\"vehicleId\":\"" + vehicleId + "\"}"))
                 .andExpect(status().isOk());
 
-        mvc.perform(post("/api/staff/bookings/{id}/check-in", BOOKING_ID)
-                        .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CHECK_IN"))))
-                .andExpect(status().isOk());
+        verify(staffBookingService).checkIn(eq(BOOKING_ID), eq(vehicleId), any());
     }
 
     @Test

@@ -26,8 +26,6 @@ public interface StaffBookingService {
 
     StaffBookingResponse reschedule(UUID bookingId, Instant startAt, Jwt jwt);
 
-    StaffBookingResponse linkVehicle(UUID bookingId, UUID vehicleId);
-
     StaffBookingResponse checkIn(UUID bookingId, UUID vehicleId, Jwt jwt);
 
     StaffBookingResponse updateStatus(UUID bookingId, BookingStatus status, String reason, Jwt jwt);
