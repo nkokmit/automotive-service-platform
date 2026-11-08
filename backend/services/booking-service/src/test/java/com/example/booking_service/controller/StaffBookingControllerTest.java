@@ -134,10 +134,14 @@ class StaffBookingControllerTest {
         mvc.perform(post("/api/staff/bookings/{id}/check-in", BOOKING_ID)
                         .with(jwt().authorities(new SimpleGrantedAuthority("BOOKING_CHECK_IN")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"vehicleId\":\"" + vehicleId + "\"}"))
+                        .content("{\"vehicleId\":\"" + vehicleId + "\",\"odometerIn\":1200}"))
                 .andExpect(status().isOk());
 
-        verify(staffBookingService).checkIn(eq(BOOKING_ID), eq(vehicleId), any());
+        verify(staffBookingService).checkIn(
+                eq(BOOKING_ID),
+                org.mockito.ArgumentMatchers.argThat(request ->
+                        request.vehicleId().equals(vehicleId) && request.odometerIn() == 1200),
+                any());
     }
 
     @Test

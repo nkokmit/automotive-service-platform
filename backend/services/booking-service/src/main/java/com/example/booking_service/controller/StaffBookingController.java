@@ -108,10 +108,11 @@ public class StaffBookingController {
     @PreAuthorize("hasAuthority('BOOKING_CHECK_IN')")
     public ApiResponse<StaffBookingResponse> checkIn(
             @PathVariable UUID bookingId,
-            @RequestBody(required = false) @Valid StaffBookingVehicleRequest request,
+            @Valid @RequestBody StaffBookingVehicleRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        UUID vehicleId = request == null ? null : request.vehicleId();
-        return ApiResponse.success("Tiếp nhận xe thành công", staffBookingService.checkIn(bookingId, vehicleId, jwt));
+        return ApiResponse.success(
+                "Tiếp nhận xe thành công",
+                staffBookingService.checkIn(bookingId, request, jwt));
     }
 }

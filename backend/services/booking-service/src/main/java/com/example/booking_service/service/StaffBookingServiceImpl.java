@@ -8,6 +8,7 @@ import com.example.booking_service.capacity.SupplyInterval;
 import com.example.booking_service.common.ServiceSelectionValidator;
 import com.example.booking_service.dto.request.BookingCreateRequest;
 import com.example.booking_service.dto.request.StaffBookingCreateRequest;
+import com.example.booking_service.dto.request.StaffBookingVehicleRequest;
 import com.example.booking_service.dto.response.BookingResponse;
 import com.example.booking_service.dto.response.StaffBookingPageResponse;
 import com.example.booking_service.dto.response.StaffBookingResponse;
@@ -103,14 +104,21 @@ public class StaffBookingServiceImpl implements StaffBookingService {
     }
 
     @Override
-    public StaffBookingResponse checkIn(UUID bookingId, UUID vehicleId, Jwt jwt) {
+    public StaffBookingResponse checkIn(
+            UUID bookingId,
+            StaffBookingVehicleRequest request,
+            Jwt jwt
+    ) {
         UUID staffUserId = staffUserId(jwt);
-        String verifiedPlate = null;
-        if (vehicleId != null) {
-            VehicleContract vehicle = customerDirectory.requireActiveVehicle(vehicleId);
-            verifiedPlate = vehicle.licensePlate();
-        }
-        return staffTransactionService.checkIn(bookingId, vehicleId, verifiedPlate, staffUserId);
+        VehicleContract vehicle = customerDirectory.requireActiveVehicle(request.vehicleId());
+        return staffTransactionService.checkIn(
+                bookingId,
+                request.vehicleId(),
+                vehicle.licensePlate(),
+                request.odometerIn(),
+                request.vehicleCondition(),
+                request.customerNote(),
+                staffUserId);
     }
 
     @Override

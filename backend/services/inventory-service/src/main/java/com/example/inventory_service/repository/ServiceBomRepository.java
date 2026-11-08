@@ -1,6 +1,7 @@
 package com.example.inventory_service.repository;
 
 import com.example.inventory_service.entity.ServiceBom;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +14,7 @@ import java.util.UUID;
 @Repository
 public interface ServiceBomRepository extends JpaRepository<ServiceBom, UUID> {
 
+    @EntityGraph(attributePaths = "part")
     List<ServiceBom> findByServiceIdOrderById(UUID serviceId);
 
     Optional<ServiceBom> findByServiceIdAndPartId(UUID serviceId, UUID partId);

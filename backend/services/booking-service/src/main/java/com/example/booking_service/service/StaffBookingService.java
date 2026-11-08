@@ -1,6 +1,7 @@
 package com.example.booking_service.service;
 
 import com.example.booking_service.dto.request.StaffBookingCreateRequest;
+import com.example.booking_service.dto.request.StaffBookingVehicleRequest;
 import com.example.booking_service.dto.response.StaffBookingPageResponse;
 import com.example.booking_service.dto.response.StaffBookingResponse;
 import com.example.booking_service.enums.BookingSource;
@@ -26,7 +27,7 @@ public interface StaffBookingService {
 
     StaffBookingResponse reschedule(UUID bookingId, Instant startAt, Jwt jwt);
 
-    StaffBookingResponse checkIn(UUID bookingId, UUID vehicleId, Jwt jwt);
+    StaffBookingResponse checkIn(UUID bookingId, StaffBookingVehicleRequest request, Jwt jwt);
 
     StaffBookingResponse updateStatus(UUID bookingId, BookingStatus status, String reason, Jwt jwt);
 }

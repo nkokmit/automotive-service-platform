@@ -357,25 +357,25 @@ POST /api/work-orders
 ### Business Flow
 
 ```text
-Advisor tiếp nhận xe
+Booking CONFIRMED
         ↓
-Verify booking
+Booking Service check-in xe
         ↓
-Verify vehicle
+Booking chuyển sang CHECKED_IN
         ↓
-Check booking_id đã có Work Order?
+Booking Service phát VehicleCheckedInEvent sau commit
+        ↓
+Work Order Service kiểm tra booking_id đã có Work Order?
         │
-        ├── Có → trả WO hiện tại
+        ├── Có → bỏ qua event trùng
         │
         └── Không
                 ↓
-           Create Work Order
+           Tạo Work Order
                 ↓
            Status = CREATED
                 ↓
-           Save Status History
-                ↓
-           Publish VehicleCheckedInEvent
+           Lưu Status History
 ```
 
 ---
@@ -388,30 +388,38 @@ Event:
 VehicleCheckedInEvent
 ```
 
-Consumer:
+Producer:
 
 ```text
 booking-service
 ```
 
-Booking Service xử lý:
+Consumer:
 
 ```text
-CONFIRMED
-    ↓
-FULFILLED
+work-order-service
 ```
 
-Event nên chứa:
+Payload:
 
 ```text
 eventId
-workOrderId
 bookingId
+customerId
+vehicleId
+advisorId
+odometerIn
+vehicleCondition
+customerNote
 occurredAt
 ```
 
-Consumer phải xử lý idempotent để tránh duplicate event.
+Work Order Service tạo Work Order và trạng thái ban đầu `CREATED`. Việc xử lý idempotent theo `bookingId` để tránh tạo nhiều Work Order từ event trùng.
+
+Độ bền của event:
+
+- Booking Service gửi event **trong transaction check-in (trước commit)** và chờ Kafka ack (`app.kafka.publish-timeout-ms`). Gửi lỗi/timeout thì check-in rollback (HTTP 503) để Advisor thử lại, nên không có trạng thái `CHECKED_IN` mà thiếu event.
+- Hệ quả: event có thể tới sớm hơn commit hoặc là event "ma" nếu commit lỗi. Work Order Service gọi lại Booking Service để xác nhận booking `CHECKED_IN` (khớp customer/vehicle) trước khi tạo; chưa thỏa thì listener retry có backoff (`app.kafka.consumer.retry-interval-ms`, `max-retries`) rồi bỏ qua.
 
 ---
 
@@ -501,6 +509,10 @@ cho các business transition quan trọng.
 
 Endpoint phải thể hiện business action.
 
+Chỉ cho phép bắt đầu chẩn đoán khi Work Order đang ở trạng thái `CREATED`.
+Khi thành công, chuyển sang `DIAGNOSING` và ghi lịch sử với người thực hiện.
+Work Order không tồn tại trả về 404; trạng thái không hợp lệ trả về 409.
+
 ---
 
 # 📌 Pha 5: Quản Lý Estimate & Lập Báo Giá
@@ -584,10 +596,13 @@ POST /api/estimates/{estimateId}/services
 
 ```json
 {
-  "serviceId": "uuid",
-  "quantity": 1
+  "serviceId": "uuid"
 }
 ```
+
+Mỗi request thêm một Service Line. Số lượng Part Line bung từ BOM lấy theo
+`default_quantity` của từng dòng BOM; nếu cần cùng một dịch vụ nhiều lần,
+thêm nhiều Service Line riêng.
 
 ### Flow
 
@@ -1735,10 +1750,10 @@ Inventory Release Reservation
 
 ```text
 Producer:
-work-order-service
+booking-service
 
 Consumer:
-booking-service
+work-order-service
 ```
 
 Mục đích:
@@ -1746,7 +1761,9 @@ Mục đích:
 ```text
 Booking CONFIRMED
         ↓
-FULFILLED
+Booking CHECKED_IN
+        ↓
+Work Order CREATED
 ```
 
 ---
@@ -2344,13 +2361,13 @@ Work Order chỉ được tạo sau khi xe thực sự:
 Check-in
 ```
 
-Sau đó phát:
+Booking Service phát:
 
 ```text
 VehicleCheckedInEvent
 ```
 
-để Booking cập nhật trạng thái.
+Work Order Service tiêu thụ event và tạo Work Order. Booking giữ trạng thái `CHECKED_IN` trong suốt quá trình sửa chữa; trạng thái `FULFILLED` chỉ áp dụng ở bước hoàn tất phù hợp của quy trình Booking.
 
 ---
 
@@ -2405,11 +2422,9 @@ Customer đến gara
         ↓
 Advisor Check-in
         ↓
-Create Work Order
-        ↓
 VehicleCheckedInEvent
         ↓
-Booking FULFILLED
+Work Order CREATED
         ↓
 Start Diagnosis
         ↓

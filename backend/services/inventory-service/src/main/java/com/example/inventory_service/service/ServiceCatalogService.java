@@ -4,6 +4,7 @@ import com.example.inventory_service.common.PageResponse;
 import com.example.inventory_service.dto.request.ServiceBomRequest;
 import com.example.inventory_service.dto.request.ServiceBomUpdateRequest;
 import com.example.inventory_service.dto.request.ServiceRequest;
+import com.example.inventory_service.dto.response.InternalServiceBomResponse;
 import com.example.inventory_service.dto.response.ServiceBomResponse;
 import com.example.inventory_service.dto.response.ServiceResponse;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +28,8 @@ public interface ServiceCatalogService {
     void deleteService(UUID id);
 
     List<ServiceBomResponse> getBom(UUID serviceId);
+
+    List<InternalServiceBomResponse> getInternalBom(UUID serviceId);
 
     ServiceBomResponse addBomItem(UUID serviceId, ServiceBomRequest request);
 

@@ -8,6 +8,10 @@ app:
     availability:
       slot-interval-minutes: ${BOOKING_SLOT_INTERVAL_MINUTES:30}
       max-days: ${BOOKING_AVAILABILITY_MAX_DAYS:14}
+  kafka:
+    publish-timeout-ms: ${KAFKA_PUBLISH_TIMEOUT_MS:5000}
+    topics:
+      vehicle-checked-in: ${VEHICLE_CHECKED_IN_TOPIC:vehicle-checked-in}
   integration:
     inventory-service-url: ${INVENTORY_SERVICE_URL:http://inventory-service:8084}
     staff-service-url: ${STAFF_SERVICE_URL:http://staff-service:8083}

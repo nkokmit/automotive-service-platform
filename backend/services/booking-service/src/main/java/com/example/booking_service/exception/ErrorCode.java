@@ -30,6 +30,7 @@ public enum ErrorCode {
     // Sức chứa & tích hợp (52xx)
     INSUFFICIENT_TECHNICIAN_CAPACITY(5201, "Không đủ kỹ thuật viên khả dụng"),
     INTEGRATION_SERVICE_UNAVAILABLE(5202, "Dịch vụ tích hợp tạm thời không khả dụng"),
+    EVENT_PUBLISH_FAILED(5203, "Không thể phát sự kiện, vui lòng thử lại"),
 
     // Khách hàng & xe (53xx)
     CUSTOMER_NOT_FOUND(5301, "Không tìm thấy hồ sơ khách hàng hợp lệ"),

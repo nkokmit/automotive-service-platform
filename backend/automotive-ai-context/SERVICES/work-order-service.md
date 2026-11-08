@@ -79,6 +79,20 @@ Item C → Rejected
 
 Only approved items are executed.
 
+Work Order Service snapshots service and part details when adding a service
+to an estimate. It reads service pricing and the current BOM synchronously
+from Inventory Service through the internal catalog endpoints; it does not
+read Inventory Service's database. BOM-generated part lines retain their
+source service-line ID as an indexed, non-FK reference so removing a service
+removes only its generated parts, not manually added part lines. The estimate
+remains the owning relationship for every part line; source-line cleanup is
+performed transactionally by Work Order Service.
+
+New service and BOM part lines start in `PENDING`. Services can be added only
+to a `DRAFT` estimate. A service line can be removed while the estimate is
+`DRAFT` or `PENDING_APPROVAL`; estimates with a final decision cannot be
+modified through this operation.
+
 ## Supplementary estimate
 
 If a new problem is discovered during repair:

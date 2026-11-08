@@ -4,6 +4,7 @@ import com.example.booking_service.entity.Booking;
 import com.example.booking_service.enums.BookingStatus;
 import com.example.booking_service.exception.ApiException;
 import com.example.booking_service.exception.ErrorCode;
+import com.example.booking_service.messaging.VehicleCheckedInDomainEvent;
 import com.example.booking_service.repository.BookingRepository;
 import com.example.booking_service.repository.BookingServiceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -39,13 +42,15 @@ class StaffBookingTransactionServiceImplTest {
     private BookingServiceRepository bookingServiceRepository;
     @Mock
     private BookingStatusHistoryService historyService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private StaffBookingTransactionServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new StaffBookingTransactionServiceImpl(bookingRepository, bookingServiceRepository,
-                historyService, ZoneId.of("Asia/Ho_Chi_Minh"));
+                historyService, ZoneId.of("Asia/Ho_Chi_Minh"), eventPublisher);
         lenient().when(bookingServiceRepository.findAllByBookingIds(any())).thenReturn(List.of());
     }
 
@@ -62,7 +67,7 @@ class StaffBookingTransactionServiceImplTest {
         booking(BookingStatus.CONFIRMED, Instant.now(), null);
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.checkIn(BOOKING_ID, null, null, STAFF_ID));
+                () -> service.checkIn(BOOKING_ID, null, null, 1200, null, null, STAFF_ID));
 
         assertEquals(ErrorCode.CHECK_IN_REQUIREMENTS_NOT_MET, ex.getErrorCode());
         verify(historyService, never()).recordTransition(any(), any(), any(), any(), any());
@@ -72,20 +77,29 @@ class StaffBookingTransactionServiceImplTest {
     void checkInMovesConfirmedBookingToCheckedIn() {
         Booking booking = booking(BookingStatus.CONFIRMED, Instant.now(), VEHICLE_ID);
 
-        service.checkIn(BOOKING_ID, null, null, STAFF_ID);
+        service.checkIn(BOOKING_ID, null, null, 1200, null, null, STAFF_ID);
 
         assertEquals(true, booking.getCheckedInAt() != null);
         verify(historyService).recordTransition(booking, BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN,
                 STAFF_ID, "STAFF_CHECK_IN");
+        ArgumentCaptor<VehicleCheckedInDomainEvent> eventCaptor =
+                ArgumentCaptor.forClass(VehicleCheckedInDomainEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(BOOKING_ID, eventCaptor.getValue().bookingId());
+        assertEquals(booking.getCustomerId(), eventCaptor.getValue().customerId());
+        assertEquals(VEHICLE_ID, eventCaptor.getValue().vehicleId());
+        assertEquals(STAFF_ID, eventCaptor.getValue().advisorId());
+        assertEquals(1200, eventCaptor.getValue().odometerIn());
     }
 
     @Test
     void checkInIsIdempotent() {
         booking(BookingStatus.CHECKED_IN, Instant.now(), VEHICLE_ID);
 
-        service.checkIn(BOOKING_ID, null, null, STAFF_ID);
+        service.checkIn(BOOKING_ID, null, null, 1200, null, null, STAFF_ID);
 
         verify(historyService, never()).recordTransition(any(), any(), any(), any(), any());
+        verify(eventPublisher).publishEvent(any(VehicleCheckedInDomainEvent.class));
     }
 
     @Test
@@ -123,7 +137,7 @@ class StaffBookingTransactionServiceImplTest {
         booking(BookingStatus.CONFIRMED, Instant.now(), null);
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "30H-99999", STAFF_ID));
+                () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "30H-99999", 1200, null, null, STAFF_ID));
 
         assertEquals(ErrorCode.VEHICLE_PLATE_MISMATCH, ex.getErrorCode());
     }
@@ -132,7 +146,7 @@ class StaffBookingTransactionServiceImplTest {
     void checkInLinksVehicleWhenPlateFormattingMatches() {
         Booking booking = booking(BookingStatus.CONFIRMED, Instant.now(), null);
 
-        service.checkIn(BOOKING_ID, VEHICLE_ID, "51a 12345", STAFF_ID);
+        service.checkIn(BOOKING_ID, VEHICLE_ID, "51a 12345", 1200, "Minor damage", "Call first", STAFF_ID);
         assertEquals(VEHICLE_ID, booking.getVehicleId());
         assertEquals(true, booking.getCheckedInAt() != null);
     }
@@ -142,7 +156,7 @@ class StaffBookingTransactionServiceImplTest {
         booking(BookingStatus.CONFIRMED, Instant.now().plusSeconds(3600), UUID.randomUUID());
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "51A-12345", STAFF_ID));
+                () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "51A-12345", 1200, null, null, STAFF_ID));
 
         assertEquals(ErrorCode.VEHICLE_ALREADY_LINKED, ex.getErrorCode());
     }

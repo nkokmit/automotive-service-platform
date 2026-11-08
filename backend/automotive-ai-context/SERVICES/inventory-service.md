@@ -34,6 +34,11 @@ Customer JWTs are not forwarded, so Customers do not need `SERVICE_READ`.
 This read must be synchronous — the caller needs the values immediately to
 create the booking.
 
+Work Order Service uses the same internal service-token authority to read
+service pricing and the BOM through `/internal/services/{id}` and
+`/internal/services/{id}/bom`. These endpoints return catalog snapshots only;
+they do not expose inventory database access.
+
 ## Work Order integration
 
 When Work Order estimate items are approved:

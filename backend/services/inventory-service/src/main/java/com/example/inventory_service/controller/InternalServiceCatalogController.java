@@ -1,6 +1,7 @@
 package com.example.inventory_service.controller;
 
 import com.example.inventory_service.common.ApiResponse;
+import com.example.inventory_service.dto.response.InternalServiceBomResponse;
 import com.example.inventory_service.dto.response.InternalServiceCatalogResponse;
 import com.example.inventory_service.dto.response.ServiceResponse;
 import com.example.inventory_service.service.ServiceCatalogService;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -29,6 +31,12 @@ public class InternalServiceCatalogController {
         ServiceResponse service = serviceCatalogService.getServiceById(serviceId);
         return ApiResponse.success(new InternalServiceCatalogResponse(
                 service.id(), service.name(), service.durationMinutes(),
-                service.requiredTechs(), service.isActive()));
+                service.requiredTechs(), service.baseLaborPrice(), service.isActive()));
+    }
+
+    @GetMapping("/{serviceId}/bom")
+    @PreAuthorize("hasAuthority('INTERNAL_SERVICE_CATALOG_READ')")
+    public ApiResponse<List<InternalServiceBomResponse>> getServiceBom(@PathVariable UUID serviceId) {
+        return ApiResponse.success(serviceCatalogService.getInternalBom(serviceId));
     }
 }

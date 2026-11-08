@@ -80,9 +80,11 @@ CREATE TABLE IF NOT EXISTS `work_order_services` (
 CREATE TABLE IF NOT EXISTS `work_order_parts` (
     `id` VARCHAR(36) NOT NULL,
     `estimate_id` VARCHAR(36) NOT NULL,
+    `source_service_line_id` VARCHAR(36) NULL,
     `part_id` VARCHAR(36) NOT NULL,
     `snapshot_name` VARCHAR(150) NOT NULL,
     `snapshot_sku` VARCHAR(50) NOT NULL,
+    `snapshot_unit` VARCHAR(20) NOT NULL,
     
     -- Tracking số lượng phụ tùng
     `requested_quantity` INT NOT NULL,
@@ -97,6 +99,7 @@ CREATE TABLE IF NOT EXISTS `work_order_parts` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_wop_estimate` (`estimate_id`),
+    KEY `idx_wop_source_service_line` (`source_service_line_id`),
     CONSTRAINT `fk_wop_estimate` FOREIGN KEY (`estimate_id`) REFERENCES `estimates` (`id`) ON DELETE CASCADE,
     
     -- Ràng buộc logic toán học số lượng

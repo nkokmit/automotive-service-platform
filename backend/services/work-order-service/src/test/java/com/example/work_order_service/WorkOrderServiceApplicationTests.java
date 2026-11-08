@@ -2,7 +2,9 @@ package com.example.work_order_service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 
+@TestPropertySource(properties = "spring.jpa.hibernate.ddl-auto=none")
 @SpringBootTest(properties = {
 		"spring.datasource.url=jdbc:h2:mem:work-order-test;DB_CLOSE_DELAY=-1",
 		"spring.datasource.username=sa",

@@ -9,11 +9,13 @@ import com.example.booking_service.enums.BookingStatus;
 import com.example.booking_service.exception.ApiException;
 import com.example.booking_service.exception.ErrorCode;
 import com.example.booking_service.integration.customer.CustomerDirectory;
+import com.example.booking_service.messaging.VehicleCheckedInDomainEvent;
 import com.example.booking_service.mapper.BookingMapper;
 import com.example.booking_service.repository.BookingRepository;
 import com.example.booking_service.repository.BookingServiceRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -39,6 +41,7 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
     private final BookingServiceRepository bookingServiceRepository;
     private final BookingStatusHistoryService bookingStatusHistoryService;
     private final ZoneId scheduleZoneId;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -114,12 +117,21 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
 
     @Override
     @Transactional
-    public StaffBookingResponse checkIn(UUID bookingId, UUID vehicleId, String verifiedPlate, UUID staffUserId) {
+    public StaffBookingResponse checkIn(
+            UUID bookingId,
+            UUID vehicleId,
+            String verifiedPlate,
+            Integer odometerIn,
+            String vehicleCondition,
+            String customerNote,
+            UUID staffUserId
+    ) {
         Booking booking = lock(bookingId);
         if (booking.getStatus() == BookingStatus.CHECKED_IN) {
             if (vehicleId != null) {
                 linkVehicle(booking, vehicleId, verifiedPlate);
             }
+            publishVehicleCheckedInEvent(booking, odometerIn, vehicleCondition, customerNote, staffUserId);
             return respond(booking);
         }
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
@@ -142,7 +154,27 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
         bookingStatusHistoryService.recordTransition(
                 booking, BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN, staffUserId, "STAFF_CHECK_IN");
         bookingRepository.saveAndFlush(booking);
+        publishVehicleCheckedInEvent(booking, odometerIn, vehicleCondition, customerNote, staffUserId);
         return respond(booking);
+    }
+
+    private void publishVehicleCheckedInEvent(
+            Booking booking,
+            Integer odometerIn,
+            String vehicleCondition,
+            String customerNote,
+            UUID advisorId
+    ) {
+        eventPublisher.publishEvent(new VehicleCheckedInDomainEvent(
+                UUID.randomUUID(),
+                booking.getId(),
+                booking.getCustomerId(),
+                booking.getVehicleId(),
+                advisorId,
+                odometerIn,
+                vehicleCondition,
+                customerNote,
+                Instant.now()));
     }
 
     /** Chỉ cho phép NO_SHOW (CONFIRMED, đã quá giờ hẹn) và FULFILLED (CHECKED_IN). */
