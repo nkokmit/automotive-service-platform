@@ -55,6 +55,7 @@ public class EstimateMapper {
                 line.getTotalPrice(),
                 line.getStatus(),
                 line.getAssignedTechId(),
+                line.getCompletedAt(),
                 line.getCreatedAt());
     }
 

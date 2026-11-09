@@ -7,6 +7,7 @@ app:
     booking-service-url: ${BOOKING_SERVICE_URL:http://localhost:8085}
     customer-vehicle-service-url: ${CUSTOMER_VEHICLE_SERVICE_URL:http://localhost:8082}
     inventory-service-url: ${INVENTORY_SERVICE_URL:http://localhost:8084}
+    staff-service-url: ${STAFF_SERVICE_URL:http://localhost:8083}
   kafka:
     consumer:
       retry-interval-ms: ${KAFKA_CONSUMER_RETRY_INTERVAL_MS:1000}

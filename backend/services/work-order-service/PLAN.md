@@ -989,6 +989,10 @@ POST /api/work-orders/{id}/estimates
   "type": "SUPPLEMENTARY"
 ```
 
+Estimate ban đầu chỉ được tạo khi Work Order đang `DIAGNOSING`; Estimate bổ
+sung chỉ được tạo khi Work Order đang `IN_PROGRESS`. Khi gửi Estimate bổ sung,
+trạng thái Work Order không thay đổi.
+
 Flow:
 
 ```text
@@ -1043,7 +1047,12 @@ Một Service Line
 Một Primary Mechanic
 ```
 
-Advisor có quyền phân công.
+`mechanicId` là `staffId` do Staff Service sở hữu. Chỉ phân công Service Line
+đã `APPROVED` thuộc Work Order `IN_PROGRESS`; Staff Service được dùng để xác
+nhận hồ sơ mechanic tồn tại và đang hoạt động.
+
+Endpoint hiện yêu cầu đăng nhập; kiểm tra role Advisor được để ngoài phạm vi
+MVP.
 
 ---
 
@@ -1064,6 +1073,10 @@ GET /api/me/work-order-service-lines?status=APPROVED
 Mechanic không cần truyền `mechanicId` của chính mình.
 
 Backend lấy identity từ JWT.
+
+Work Order Service dùng `userId` trong JWT để tra cứu `staffId` qua
+`GET /api/staff/by-user/{userId}` của Staff Service. Kết quả trả về gồm
+`workOrderId`, `workOrderCode`, `estimateId` và thông tin Service Line.
 
 ---
 
@@ -1087,7 +1100,8 @@ APPROVED
 IN_PROGRESS
 ```
 
-Chỉ Mechanic được phân công hoặc actor có quyền phù hợp mới được thực hiện.
+Service Line và Work Order phải ở trạng thái phù hợp; thao tác chỉ được thực
+hiện bởi mechanic được phân công.
 
 ---
 
@@ -1112,6 +1126,8 @@ Lưu:
 ```text
 completed_at
 ```
+
+`completed_at` được ghi khi Service Line chuyển sang `COMPLETED`.
 
 ---
 

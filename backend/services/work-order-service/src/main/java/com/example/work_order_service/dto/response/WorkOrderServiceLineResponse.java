@@ -16,6 +16,7 @@ public record WorkOrderServiceLineResponse(
         BigDecimal totalPrice,
         WorkOrderServiceStatus status,
         UUID assignedTechId,
+        Instant completedAt,
         Instant createdAt
 ) {
 }

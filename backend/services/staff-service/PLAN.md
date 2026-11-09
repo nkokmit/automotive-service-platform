@@ -181,6 +181,7 @@ project.
 -   `POST /api/staff` --- tạo hồ sơ.
 -   `GET /api/staff` --- danh sách có phân trang và bộ lọc phù hợp.
 -   `GET /api/staff/{staffId}` --- xem chi tiết.
+-   `GET /api/staff/by-user/{userId}` --- tra cứu hồ sơ theo user ID liên kết.
 -   `PUT /api/staff/{staffId}` --- cập nhật thông tin hồ sơ.
 -   `PATCH /api/staff/{staffId}/is-active` --- đổi `isActive`.
 -   `DELETE /api/staff/{staffId}` --- xóa mềm bằng cách đặt `deletedAt`;

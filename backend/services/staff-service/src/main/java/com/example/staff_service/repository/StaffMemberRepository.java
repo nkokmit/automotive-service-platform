@@ -40,6 +40,8 @@ public interface StaffMemberRepository extends JpaRepository<StaffMember, UUID> 
 
     List<StaffMember> findByIsActiveTrueOrderByEmployeeCodeAsc();
 
+    Optional<StaffMember> findByUserId(UUID userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM StaffMember s WHERE s.id = :id")
     Optional<StaffMember> findByIdForUpdate(@Param("id") UUID id);

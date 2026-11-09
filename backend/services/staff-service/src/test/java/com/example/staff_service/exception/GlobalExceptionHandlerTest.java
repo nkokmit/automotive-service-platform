@@ -14,14 +14,24 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void businessExceptionUsesBadRequestAndDomainErrorCode() {
-        ApiException exception = new StaffNotFoundException("Không tìm thấy nhân viên");
+        ApiException exception = new ApiException(ErrorCode.INVALID_REQUEST, "Yêu cầu không hợp lệ");
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleApiException(exception);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().code()).isEqualTo(1000);
+        assertThat(response.getBody().message()).isEqualTo("Yêu cầu không hợp lệ");
+    }
+
+    @Test
+    void staffNotFoundUsesNotFoundStatus() {
+        ResponseEntity<ApiResponse<Void>> response = handler.handleStaffNotFound(
+                new StaffNotFoundException("Không tìm thấy nhân viên"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().code()).isEqualTo(3001);
-        assertThat(response.getBody().message()).isEqualTo("Không tìm thấy nhân viên");
     }
 
     @Test

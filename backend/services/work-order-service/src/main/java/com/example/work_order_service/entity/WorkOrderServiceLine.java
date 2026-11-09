@@ -74,6 +74,9 @@ public class WorkOrderServiceLine {
     @Column(name = "assigned_tech_id", length = 36)
     private UUID assignedTechId;
 
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

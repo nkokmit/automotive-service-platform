@@ -114,13 +114,23 @@ Customer decision
    └── Rejected → skip
 ```
 
+Create an initial estimate only while the Work Order is `DIAGNOSING`; create
+a supplementary estimate only while it is `IN_PROGRESS`. Submitting a
+supplementary estimate does not change the Work Order status.
+
 ## Technician assignment
 
 Work Order supports technician assignment.
 
-The exact assignment model must follow the current implementation and
-Staff Service contract. Do not invent scheduling/assignment rules not
-present in code or requirements.
+`assignedTechId` stores the Staff Service `staffId`, not the User Service
+`userId`. Resolve the authenticated mechanic through Staff Service's
+`GET /api/staff/by-user/{userId}` endpoint. Assignment is allowed for approved
+service lines on an in-progress Work Order; validate the referenced staff
+profile is active. Only the assigned mechanic may start or complete that
+service line. Do not introduce scheduling rules.
+
+Service line progress is `APPROVED → IN_PROGRESS → COMPLETED`; persist
+`completed_at` when marking a line complete.
 
 ## Real-time progress
 

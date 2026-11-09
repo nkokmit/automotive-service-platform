@@ -22,6 +22,7 @@ class StaffAuthorizationTest {
         assertAuthorityRules(StaffController.class, Map.of(
                 "getStaff", "STAFF_READ",
                 "getStaffById", "STAFF_READ",
+                "getStaffByUserId", "STAFF_READ",
                 "createStaff", "STAFF_CREATE",
                 "updateStaff", "STAFF_UPDATE",
                 "updateStaffIsActive", "STAFF_UPDATE",

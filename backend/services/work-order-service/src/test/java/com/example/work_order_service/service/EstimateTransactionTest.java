@@ -2,6 +2,7 @@ package com.example.work_order_service.service;
 
 import com.example.work_order_service.dto.request.AddServiceToEstimateRequest;
 import com.example.work_order_service.dto.request.AddPartToEstimateRequest;
+import com.example.work_order_service.dto.request.CreateEstimateRequest;
 import com.example.work_order_service.dto.request.EstimateDecisionRequest;
 import com.example.work_order_service.dto.request.EstimateItemDecisionRequest;
 import com.example.work_order_service.entity.Estimate;
@@ -97,7 +98,7 @@ class EstimateTransactionTest {
                 .thenReturn(Optional.of(estimate.getWorkOrder()));
         serviceLines = new ArrayList<>();
         partLines = new ArrayList<>();
-        when(estimateRepository.findByIdForUpdate(ESTIMATE_ID)).thenReturn(Optional.of(estimate));
+        lenient().when(estimateRepository.findByIdForUpdate(ESTIMATE_ID)).thenReturn(Optional.of(estimate));
         lenient().when(serviceLineRepository.saveAndFlush(any(WorkOrderServiceLine.class))).thenAnswer(invocation -> {
             WorkOrderServiceLine line = invocation.getArgument(0);
             line.setId(UUID.randomUUID());
@@ -144,6 +145,71 @@ class EstimateTransactionTest {
         assertEquals(2, result.partLines().get(0).requestedQuantity());
         assertEquals("L", result.partLines().get(0).snapshotUnit());
         assertEquals(WorkOrderPartStatus.PENDING, result.partLines().get(0).status());
+    }
+
+    @Test
+    void createsInitialEstimateOnlyWhileDiagnosing() {
+        UUID workOrderId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        WorkOrder workOrder = WorkOrder.builder()
+                .id(workOrderId)
+                .status(WorkOrderStatus.DIAGNOSING)
+                .build();
+        when(workOrderRepository.findByIdForUpdate(workOrderId)).thenReturn(Optional.of(workOrder));
+        when(estimateRepository.save(any())).thenAnswer(invocation -> {
+            Estimate saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
+
+        var result = transaction.create(
+                workOrderId, new CreateEstimateRequest(EstimateType.INITIAL), actorId);
+
+        assertEquals(EstimateType.INITIAL, result.type());
+        assertEquals(EstimateStatus.DRAFT, result.status());
+        assertEquals(workOrderId, result.workOrderId());
+    }
+
+    @Test
+    void createsSupplementaryEstimateOnlyWhileWorkOrderIsInProgress() {
+        UUID workOrderId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        WorkOrder workOrder = WorkOrder.builder()
+                .id(workOrderId)
+                .status(WorkOrderStatus.IN_PROGRESS)
+                .build();
+        when(workOrderRepository.findByIdForUpdate(workOrderId)).thenReturn(Optional.of(workOrder));
+        when(estimateRepository.save(any())).thenAnswer(invocation -> {
+            Estimate saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
+
+        var result = transaction.create(
+                workOrderId, new CreateEstimateRequest(EstimateType.SUPPLEMENTARY), actorId);
+
+        assertEquals(EstimateType.SUPPLEMENTARY, result.type());
+        assertEquals(EstimateStatus.DRAFT, result.status());
+        assertEquals(workOrderId, result.workOrderId());
+    }
+
+    @Test
+    void rejectsSupplementaryEstimateOutsideWorkOrderInProgress() {
+        UUID workOrderId = UUID.randomUUID();
+        WorkOrder workOrder = WorkOrder.builder()
+                .id(workOrderId)
+                .status(WorkOrderStatus.DIAGNOSING)
+                .build();
+        when(workOrderRepository.findByIdForUpdate(workOrderId)).thenReturn(Optional.of(workOrder));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> transaction.create(
+                        workOrderId,
+                        new CreateEstimateRequest(EstimateType.SUPPLEMENTARY),
+                        UUID.randomUUID()));
+
+        assertEquals(ErrorCode.INVALID_WORK_ORDER_STATUS_TRANSITION, exception.getErrorCode());
+        verify(estimateRepository, never()).save(any());
     }
 
     @Test

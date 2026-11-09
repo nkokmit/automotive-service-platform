@@ -15,6 +15,10 @@ public enum ErrorCode {
     SERVICE_LINE_NOT_FOUND(6103, "Không tìm thấy dòng dịch vụ trong Estimate", HttpStatus.NOT_FOUND),
     PART_LINE_NOT_FOUND(6104, "Không tìm thấy dòng phụ tùng trong Estimate", HttpStatus.NOT_FOUND),
     ESTIMATE_ITEM_DECISION_CONFLICT(6105, "Không thể thay đổi quyết định của hạng mục", HttpStatus.CONFLICT),
+    INVALID_SERVICE_LINE_STATUS_TRANSITION(6106, "Chuyển trạng thái dòng dịch vụ không hợp lệ",
+            HttpStatus.CONFLICT),
+    STAFF_PROFILE_NOT_FOUND(6107, "Không tìm thấy hồ sơ nhân viên", HttpStatus.NOT_FOUND),
+    STAFF_PROFILE_INACTIVE(6108, "Hồ sơ nhân viên không hoạt động", HttpStatus.CONFLICT),
 
     // Booking (62xx)
     BOOKING_NOT_FOUND(6201, "Không tìm thấy lịch hẹn", HttpStatus.NOT_FOUND),

@@ -59,8 +59,17 @@ public class EstimateTransaction {
 
     @Transactional
     public EstimateResponse create(UUID workOrderId, CreateEstimateRequest request, UUID createdBy) {
-        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+        WorkOrder workOrder = workOrderRepository.findByIdForUpdate(workOrderId)
                 .orElseThrow(() -> new ApiException(ErrorCode.WORK_ORDER_NOT_FOUND));
+        boolean validState = request.type() == EstimateType.INITIAL
+                ? workOrder.getStatus() == WorkOrderStatus.DIAGNOSING
+                : workOrder.getStatus() == WorkOrderStatus.IN_PROGRESS;
+        if (!validState) {
+            throw new ApiException(ErrorCode.INVALID_WORK_ORDER_STATUS_TRANSITION,
+                    request.type() == EstimateType.SUPPLEMENTARY
+                            ? "Chỉ có thể tạo Estimate bổ sung khi Work Order đang IN_PROGRESS"
+                            : "Chỉ có thể tạo Estimate ban đầu khi Work Order đang DIAGNOSING");
+        }
         Estimate estimate = estimateRepository.save(Estimate.builder()
                 .code("EST-" + UUID.randomUUID())
                 .workOrder(workOrder)

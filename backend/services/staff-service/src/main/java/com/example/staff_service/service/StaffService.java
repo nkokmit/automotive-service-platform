@@ -14,6 +14,8 @@ public interface StaffService {
 
     StaffResponse getStaffById(UUID id);
 
+    StaffResponse getStaffByUserId(UUID userId);
+
     StaffResponse createStaff(StaffCreateRequest request);
 
     StaffResponse updateStaff(UUID id, StaffUpdateRequest request);
