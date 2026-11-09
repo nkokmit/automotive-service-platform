@@ -2,6 +2,7 @@ package com.example.work_order_service.integration.client;
 
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
+import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
 import com.example.work_order_service.integration.contract.ServiceApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,4 +24,7 @@ public interface InventoryServiceClient {
 
     @GetMapping("/internal/services/{serviceId}/bom")
     ServiceApiResponse<List<InternalServiceBomContract>> getServiceBom(@PathVariable UUID serviceId);
+
+    @GetMapping("/internal/parts/{partId}")
+    ServiceApiResponse<InternalPartCatalogContract> getPart(@PathVariable UUID partId);
 }

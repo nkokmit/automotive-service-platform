@@ -18,6 +18,18 @@ Tài liệu này là chỉ dẫn thực thi (**Implementation Plan**) chi tiết
 - **Build Tool:** Maven
 - **ErrorCode:** 6xxx
 
+Mã lỗi nghiệp vụ trong API response được chia theo nhóm:
+
+- `60xx`: Work Order và yêu cầu chung.
+- `61xx`: Estimate và các dòng báo giá.
+- `62xx`: Booking.
+- `63xx`: Khách hàng và xe.
+- `64xx`: Catalog dịch vụ và phụ tùng.
+- `65xx`: Kết nối đến service tích hợp.
+
+Các lỗi xác thực/phân quyền `1401`/`1403` và lỗi không xác định `9999` giữ
+nguyên. Việc phân nhóm thay đổi mã số của các lỗi tương ứng trong API response.
+
 ## 1.2. Tech Stack
 
 - Spring Web
@@ -592,13 +604,6 @@ Estimate
 POST /api/estimates/{estimateId}/services
 ```
 
-### Request
-
-```json
-{
-  "serviceId": "uuid"
-}
-```
 
 Mỗi request thêm một Service Line. Số lượng Part Line bung từ BOM lấy theo
 `default_quantity` của từng dòng BOM; nếu cần cùng một dịch vụ nhiều lần,
@@ -662,14 +667,6 @@ Không phải phụ tùng nào cũng xuất phát từ BOM.
 POST /api/estimates/{estimateId}/parts
 ```
 
-### Request
-
-```json
-{
-  "partId": "uuid",
-  "quantity": 1
-}
-```
 
 Work Order Service gọi Catalog/Inventory Service để lấy:
 
@@ -769,6 +766,12 @@ PATCH /api/estimates/{estimateId}/decision
 }
 ```
 
+Mỗi item gửi lên phải có quyết định `APPROVED` hoặc `REJECTED`. Item không có
+trong request tiếp tục ở trạng thái chờ quyết định; Estimate chỉ được chốt khi
+tất cả Service Line và Part Line đã có quyết định. Từ chối toàn bộ Estimate
+ban đầu sẽ chuyển Work Order sang `CANCELED`; từ chối Estimate bổ sung không
+hủy Work Order đang sửa chữa.
+
 Không sử dụng request chỉ chứa:
 
 ```text
@@ -842,7 +845,8 @@ REJECTED
 
 # 📌 Pha 10: Reserve Phụ Tùng
 
-Sau khi có các Part Lines được:
+Sau khi Estimate đã được chốt `APPROVED` hoặc `PARTIALLY_APPROVED`, Work
+Order Service chỉ gửi các Part Lines có trạng thái:
 
 ```text
 APPROVED
@@ -867,7 +871,13 @@ parts:
     - workOrderPartId
       catalogPartId
       quantity
+requestedBy
 ```
+
+`eventId` được dùng để Inventory xử lý idempotent. Nếu Estimate ban đầu
+không có Part Line được duyệt, Work Order có thể chuyển thẳng sang
+`IN_PROGRESS`; nếu có phụ tùng, chỉ chuyển trạng thái sau khi nhận kết quả
+reservation thành công.
 
 ---
 
@@ -880,8 +890,11 @@ Receive Reservation Request
         ↓
 Validate stock
         ↓
-Reserve parts
+Reserve all requested parts atomically
 ```
+
+Inventory không truy cập DB của Work Order Service. Không đủ tồn kho hoặc
+phụ tùng không còn hợp lệ sẽ phát `PartsReservationFailedEvent`.
 
 ---
 
@@ -896,7 +909,7 @@ PartsReservedEvent
 Work Order Consumer:
 
 ```text
-Update reservation status
+Update reserved quantity and reservation status
 ```
 
 Các Part Line:
@@ -904,6 +917,9 @@ Các Part Line:
 ```text
 RESERVED
 ```
+
+Work Order chuyển Estimate ban đầu đang `PENDING_APPROVAL` sang `IN_PROGRESS`
+sau khi các Part Line được duyệt đã giữ chỗ thành công.
 
 Nếu Initial Estimate đã được xử lý và đủ điều kiện:
 
@@ -925,7 +941,7 @@ PartsReservationFailedEvent
 
 Work Order không được giả định rằng reservation luôn thành công.
 
-Cần lưu trạng thái reservation phù hợp, ví dụ:
+Cần lưu trạng thái reservation phù hợp:
 
 ```text
 PENDING
@@ -934,6 +950,10 @@ FAILED
 RELEASED
 ISSUED
 ```
+
+Khi nhận thất bại, các Part Line được gửi đi chuyển sang `FAILED`; Work Order
+không chuyển sang `IN_PROGRESS`. Các bản tin lặp lại không được giữ chỗ trùng
+lần hoặc làm lùi trạng thái đã cập nhật.
 
 Advisor xử lý theo business flow:
 
@@ -965,12 +985,8 @@ Tạo Estimate mới:
 POST /api/work-orders/{id}/estimates
 ```
 
-Request:
-
-```json
-{
+```text
   "type": "SUPPLEMENTARY"
-}
 ```
 
 Flow:
@@ -1847,7 +1863,7 @@ và trạng thái reservation phù hợp.
 
 ```text
 Producer:
-catalog-inventory-service
+inventory-service
 
 Consumer:
 work-order-service

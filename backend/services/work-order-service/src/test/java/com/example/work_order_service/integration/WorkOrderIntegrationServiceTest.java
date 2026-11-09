@@ -9,6 +9,7 @@ import com.example.work_order_service.integration.contract.BookingContract;
 import com.example.work_order_service.integration.contract.CustomerContract;
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
+import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
 import com.example.work_order_service.integration.contract.ServiceApiResponse;
 import com.example.work_order_service.integration.contract.VehicleContract;
 import feign.FeignException;
@@ -82,6 +83,42 @@ class WorkOrderIntegrationServiceTest {
                 () -> integrationService.getServiceEstimateCatalog(serviceId));
 
         assertEquals(ErrorCode.SERVICE_NOT_ACTIVE, exception.getErrorCode());
+    }
+
+    @Test
+    void loadsActivePartCatalogForManualEstimatePart() {
+        UUID partId = UUID.randomUUID();
+        InternalPartCatalogContract part = new InternalPartCatalogContract(
+                partId, "FILTER-1", "Oil filter", "pcs", BigDecimal.valueOf(25), true);
+        when(inventoryServiceClient.getPart(partId))
+                .thenReturn(new ServiceApiResponse<>(0, "Success", part));
+
+        assertEquals(part, integrationService.getPartCatalog(partId));
+    }
+
+    @Test
+    void rejectsInactivePartFromInventoryCatalog() {
+        UUID partId = UUID.randomUUID();
+        when(inventoryServiceClient.getPart(partId)).thenReturn(new ServiceApiResponse<>(0, "Success",
+                new InternalPartCatalogContract(partId, "FILTER-1", "Oil filter", "pcs",
+                        BigDecimal.valueOf(25), false)));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> integrationService.getPartCatalog(partId));
+
+        assertEquals(ErrorCode.PART_NOT_ACTIVE, exception.getErrorCode());
+    }
+
+    @Test
+    void mapsMissingPartToDomainError() {
+        UUID partId = UUID.randomUUID();
+        FeignException.NotFound notFound = mock(FeignException.NotFound.class);
+        when(inventoryServiceClient.getPart(partId)).thenThrow(notFound);
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> integrationService.getPartCatalog(partId));
+
+        assertEquals(ErrorCode.PART_NOT_FOUND, exception.getErrorCode());
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.example.work_order_service.service;
 
 import com.example.work_order_service.dto.request.AddServiceToEstimateRequest;
+import com.example.work_order_service.dto.request.AddPartToEstimateRequest;
+import com.example.work_order_service.dto.request.EstimateDecisionRequest;
 import com.example.work_order_service.dto.request.CreateEstimateRequest;
 import com.example.work_order_service.dto.response.EstimateResponse;
 import com.example.work_order_service.dto.response.EstimateSummaryResponse;
@@ -53,6 +55,32 @@ public class EstimateServiceImpl implements EstimateService {
     @Override
     public void removeService(UUID estimateId, UUID serviceLineId) {
         estimateTransaction.removeService(estimateId, serviceLineId);
+    }
+
+    @Override
+    public EstimateResponse addPart(UUID estimateId, AddPartToEstimateRequest request) {
+        var estimate = estimateRepository.findById(estimateId)
+                .orElseThrow(() -> new ApiException(ErrorCode.ESTIMATE_NOT_FOUND));
+        if (estimate.getStatus() != EstimateStatus.DRAFT) {
+            throw new ApiException(ErrorCode.ESTIMATE_NOT_EDITABLE);
+        }
+        var part = integrationService.getPartCatalog(request.partId());
+        return estimateTransaction.addPart(estimateId, request, part);
+    }
+
+    @Override
+    public void removePart(UUID estimateId, UUID partLineId) {
+        estimateTransaction.removePart(estimateId, partLineId);
+    }
+
+    @Override
+    public EstimateResponse submit(UUID estimateId, Jwt jwt) {
+        return estimateTransaction.submit(estimateId, requireUserId(jwt));
+    }
+
+    @Override
+    public EstimateResponse decide(UUID estimateId, EstimateDecisionRequest request, Jwt jwt) {
+        return estimateTransaction.decide(estimateId, request, requireUserId(jwt));
     }
 
     private UUID requireUserId(Jwt jwt) {

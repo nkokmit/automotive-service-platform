@@ -10,6 +10,7 @@ import com.example.work_order_service.integration.contract.BookingContract;
 import com.example.work_order_service.integration.contract.CustomerContract;
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
+import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
 import com.example.work_order_service.integration.contract.ServiceApiResponse;
 import com.example.work_order_service.integration.contract.VehicleContract;
 import com.example.work_order_service.integration.ServiceEstimateCatalog;
@@ -72,6 +73,32 @@ public class WorkOrderIntegrationService {
             }
         }
         return new ServiceEstimateCatalog(service, bom);
+    }
+
+    public InternalPartCatalogContract getPartCatalog(UUID partId) {
+        ServiceApiResponse<InternalPartCatalogContract> response;
+        try {
+            response = inventoryServiceClient.getPart(partId);
+        } catch (FeignException.NotFound exception) {
+            throw new ApiException(ErrorCode.PART_NOT_FOUND);
+        } catch (FeignException exception) {
+            throw new ApiException(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE,
+                    "Không thể lấy catalog phụ tùng từ Inventory Service");
+        }
+
+        InternalPartCatalogContract part = response == null ? null : response.result();
+        if (response == null || response.code() != 0 || part == null
+                || !partId.equals(part.id())
+                || part.sku() == null || part.sku().isBlank()
+                || part.name() == null || part.name().isBlank()
+                || part.unit() == null || part.unit().isBlank()
+                || part.sellingPrice() == null || part.sellingPrice().signum() < 0) {
+            throw invalidIntegrationResponse("Inventory Service trả về catalog phụ tùng không hợp lệ");
+        }
+        if (!Boolean.TRUE.equals(part.isActive())) {
+            throw new ApiException(ErrorCode.PART_NOT_ACTIVE);
+        }
+        return part;
     }
 
     public WorkOrderDetailContext requireCheckedInBooking(UUID bookingId) {

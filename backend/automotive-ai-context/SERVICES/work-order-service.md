@@ -89,9 +89,14 @@ remains the owning relationship for every part line; source-line cleanup is
 performed transactionally by Work Order Service.
 
 New service and BOM part lines start in `PENDING`. Services can be added only
-to a `DRAFT` estimate. A service line can be removed while the estimate is
-`DRAFT` or `PENDING_APPROVAL`; estimates with a final decision cannot be
-modified through this operation.
+to a `DRAFT` estimate. Manually added parts are snapshotted from Inventory
+Service's internal part catalog, including the requested quantity and current
+selling price; they can be added only to a `DRAFT` estimate. Service and part
+lines can be removed while the estimate is `DRAFT` or `PENDING_APPROVAL`;
+estimates with a final decision cannot be modified through these operations.
+Submitting an initial estimate moves a `DIAGNOSING` Work Order to
+`PENDING_APPROVAL`. Submitting a supplementary estimate while its Work Order
+is `IN_PROGRESS` leaves the Work Order status unchanged.
 
 ## Supplementary estimate
 
@@ -126,17 +131,22 @@ the task or already present in the project.
 
 ## Inventory integration
 
-When approved Work Order items require parts:
+When an Estimate is finalized and approved Work Order part lines require
+parts:
 
 ``` text
-Approved items
+Approved part lines
       ↓
-Inventory Service
+PartsReservationRequestedEvent
       ↓
-Deduct stock
+Inventory Service reserves stock
+      ↓
+PartsReservedEvent / PartsReservationFailedEvent
 ```
 
-Only approved items consume stock.
+Only approved part lines are sent for reservation. Work Order records the
+reservation result asynchronously; it never assumes reservation succeeded.
+Stock is deducted later when parts are issued.
 
 Work Order Service must never modify Inventory DB directly.
 

@@ -13,6 +13,9 @@ app:
       max-retries: ${KAFKA_CONSUMER_MAX_RETRIES:10}
     topics:
       vehicle-checked-in: ${VEHICLE_CHECKED_IN_TOPIC:vehicle-checked-in}
+      parts-reservation-requested: ${PARTS_RESERVATION_REQUESTED_TOPIC:parts-reservation-requested}
+      parts-reserved: ${PARTS_RESERVED_TOPIC:parts-reserved}
+      parts-reservation-failed: ${PARTS_RESERVATION_FAILED_TOPIC:parts-reservation-failed}
 
 spring:
   application:

@@ -41,33 +41,38 @@ they do not expose inventory database access.
 
 ## Work Order integration
 
-When Work Order estimate items are approved:
+When Work Order estimate part lines are approved:
 
 ``` text
 Work Order
    ↓
-Approved part items
+PartsReservationRequestedEvent
    ↓
-Inventory Service
+Inventory Service reserves stock
    ↓
-Deduct stock
+PartsReservedEvent / PartsReservationFailedEvent
 ```
 
-Only approved items consume stock.
+Inventory processes each reservation event idempotently and reserves all
+requested parts atomically. Reservation does not deduct on-hand stock; stock
+is deducted when reserved parts are issued.
 
 Do not let Work Order Service update inventory tables directly.
 
 ## Insufficient stock
 
-The existing project behavior should determine the exact failure/event
-contract. Do not invent a distributed transaction.
+Reservation is all-or-nothing. If stock cannot be reserved, Inventory keeps
+the failed outcome for the event ID and emits `PartsReservationFailedEvent`;
+it must not report a reservation as successful.
 
 ## Events
 
-Potential event:
+Reservation result events:
 
 ``` text
-StockDeducted
+PartsReserved
+PartsReservationFailed
 ```
 
-Use the existing event contract if one exists.
+Reservation does not deduct on-hand stock; deduction happens when reserved
+parts are issued.

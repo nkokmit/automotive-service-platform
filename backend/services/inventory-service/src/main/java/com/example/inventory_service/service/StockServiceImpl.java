@@ -52,7 +52,11 @@ public class StockServiceImpl implements StockService {
 
     @Override
     public List<InventoryTransactionResponse> reserve(StockOperationRequest request) {
-        UUID actorId = currentActorIdProvider.requireCurrentUserId();
+        return reserve(request, currentActorIdProvider.requireCurrentUserId());
+    }
+
+    @Override
+    public List<InventoryTransactionResponse> reserve(StockOperationRequest request, UUID actorId) {
         Map<UUID, Integer> quantities = mergeQuantities(request);
         Map<UUID, Part> parts = lockParts(quantities);
 

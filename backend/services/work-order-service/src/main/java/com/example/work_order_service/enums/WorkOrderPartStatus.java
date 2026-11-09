@@ -6,6 +6,7 @@ public enum WorkOrderPartStatus {
     REJECTED,
     PARTIALLY_RESERVED,
     RESERVED,
+    FAILED,
     ISSUED,
     RETURNED
 }
