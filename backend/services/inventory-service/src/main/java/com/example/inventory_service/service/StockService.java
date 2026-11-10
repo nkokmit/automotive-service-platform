@@ -21,6 +21,14 @@ public interface StockService {
     /** Giảm {@code on_hand} và {@code reserved}; số lượng không vượt phần còn giữ chỗ. */
     List<InventoryTransactionResponse> issue(StockOperationRequest request);
 
+    /** Synchronous Work Order issue command with durable idempotency. */
+    List<InventoryTransactionResponse> issue(
+            StockOperationRequest request, UUID actorId, String idempotencyKey);
+
     /** Giảm {@code reserved}; số lượng không vượt phần còn giữ chỗ. */
     List<InventoryTransactionResponse> release(StockOperationRequest request);
+
+    /** Synchronous Work Order release command with durable idempotency. */
+    List<InventoryTransactionResponse> release(
+            StockOperationRequest request, UUID actorId, String idempotencyKey);
 }

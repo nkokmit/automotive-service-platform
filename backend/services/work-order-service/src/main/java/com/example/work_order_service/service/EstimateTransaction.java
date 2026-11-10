@@ -51,6 +51,7 @@ public class EstimateTransaction {
 
     private final WorkOrderRepository workOrderRepository;
     private final WorkOrderStatusHistoryRepository statusHistoryRepository;
+    private final WorkOrderPartTransaction workOrderPartTransaction;
     private final EstimateRepository estimateRepository;
     private final WorkOrderServiceLineRepository serviceLineRepository;
     private final WorkOrderPartLineRepository partLineRepository;
@@ -319,6 +320,7 @@ public class EstimateTransaction {
                 .changedBy(decidedBy)
                 .note("Initial Estimate rejected by customer")
                 .build());
+        workOrderPartTransaction.releaseOutstandingParts(workOrder.getId(), decidedBy);
     }
 
     private void applyDecision(

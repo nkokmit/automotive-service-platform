@@ -14,7 +14,8 @@ public class InventoryServiceClientConfig {
     public RequestInterceptor inventoryServiceTokenInterceptor(@Value("${jwt.secret}") String secret) {
         ServiceTokenProvider provider = new ServiceTokenProvider(
                 secret, "work-order-service",
-                List.of("INTERNAL_SERVICE_CATALOG_READ", "INTERNAL_PART_CATALOG_READ"), Clock.systemUTC());
+                List.of("INTERNAL_SERVICE_CATALOG_READ", "INTERNAL_PART_CATALOG_READ",
+                        "INTERNAL_PART_STOCK_WRITE"), Clock.systemUTC());
         return template -> template.header("Authorization", "Bearer " + provider.getToken());
     }
 }

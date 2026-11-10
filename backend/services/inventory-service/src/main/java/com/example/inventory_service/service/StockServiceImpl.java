@@ -83,48 +83,86 @@ public class StockServiceImpl implements StockService {
 
     @Override
     public List<InventoryTransactionResponse> issue(StockOperationRequest request) {
-        UUID actorId = currentActorIdProvider.requireCurrentUserId();
-        Map<UUID, Integer> quantities = mergeQuantities(request);
-        Map<UUID, Part> parts = lockParts(quantities);
+        return issue(request, currentActorIdProvider.requireCurrentUserId(), null);
+    }
 
-        List<InventoryTransaction> ledger = new ArrayList<>();
-        for (Map.Entry<UUID, Integer> entry : quantities.entrySet()) {
-            Part part = parts.get(entry.getKey());
-            int quantity = entry.getValue();
-            requireOutstanding(part, quantity, request.referenceId());
-            if (part.getOnHandStock() < quantity || part.getReservedStock() < quantity) {
-                throw new InsufficientStockException("Tồn kho không đủ để xuất phụ tùng " + part.getSku());
-            }
-            int before = part.getOnHandStock();
-            part.setOnHandStock(before - quantity);
-            part.setReservedStock(part.getReservedStock() - quantity);
-            ledger.add(newTransaction(part, TransactionType.EXPORT, quantity, before, before - quantity,
-                    request, actorId));
-        }
-        return save(parts, ledger, "xuất kho", request.referenceId());
+    @Override
+    public List<InventoryTransactionResponse> issue(
+            StockOperationRequest request, UUID actorId, String idempotencyKey
+    ) {
+        return changeReservedStock(
+                request, actorId, idempotencyKey, TransactionType.EXPORT);
     }
 
     @Override
     public List<InventoryTransactionResponse> release(StockOperationRequest request) {
-        UUID actorId = currentActorIdProvider.requireCurrentUserId();
+        return release(request, currentActorIdProvider.requireCurrentUserId(), null);
+    }
+
+    @Override
+    public List<InventoryTransactionResponse> release(
+            StockOperationRequest request, UUID actorId, String idempotencyKey
+    ) {
+        return changeReservedStock(
+                request, actorId, idempotencyKey, TransactionType.RELEASE);
+    }
+
+    private List<InventoryTransactionResponse> changeReservedStock(
+            StockOperationRequest request,
+            UUID actorId,
+            String idempotencyKey,
+            TransactionType operation
+    ) {
         Map<UUID, Integer> quantities = mergeQuantities(request);
         Map<UUID, Part> parts = lockParts(quantities);
+        if (idempotencyKey != null) {
+            if (quantities.size() != 1 || idempotencyKey.isBlank()) {
+                throw new ApiException(ErrorCode.INVALID_REQUEST,
+                        "Idempotent stock commands require one part and a non-blank key");
+            }
+            InventoryTransaction existing = inventoryTransactionRepository.findByIdempotencyKey(idempotencyKey)
+                    .orElse(null);
+            if (existing != null) {
+                Map.Entry<UUID, Integer> requested = quantities.entrySet().iterator().next();
+                if (existing.getType() != operation
+                        || !existing.getPart().getId().equals(requested.getKey())
+                        || !existing.getReferenceId().equals(request.referenceId())
+                        || !existing.getQuantity().equals(requested.getValue())
+                        || !existing.getCreatedBy().equals(actorId)) {
+                    throw new ApiException(ErrorCode.INVALID_REQUEST,
+                            "Idempotency key was reused for a different stock command");
+                }
+                return List.of(inventoryTransactionMapper.toResponse(existing));
+            }
+        }
 
         List<InventoryTransaction> ledger = new ArrayList<>();
         for (Map.Entry<UUID, Integer> entry : quantities.entrySet()) {
             Part part = parts.get(entry.getKey());
             int quantity = entry.getValue();
             requireOutstanding(part, quantity, request.referenceId());
-            if (part.getReservedStock() < quantity) {
-                throw new InsufficientStockException(
-                        "Tồn giữ chỗ không đủ để giải phóng phụ tùng " + part.getSku());
+            if (operation == TransactionType.EXPORT) {
+                if (part.getOnHandStock() < quantity || part.getReservedStock() < quantity) {
+                    throw new InsufficientStockException("Tồn kho không đủ để xuất phụ tùng " + part.getSku());
+                }
+                int before = part.getOnHandStock();
+                part.setOnHandStock(before - quantity);
+                part.setReservedStock(part.getReservedStock() - quantity);
+                ledger.add(newTransaction(part, operation, quantity, before, before - quantity,
+                        request, actorId, idempotencyKey));
+            } else {
+                if (part.getReservedStock() < quantity) {
+                    throw new InsufficientStockException(
+                            "Tồn giữ chỗ không đủ để giải phóng phụ tùng " + part.getSku());
+                }
+                int before = part.getReservedStock();
+                part.setReservedStock(before - quantity);
+                ledger.add(newTransaction(part, operation, quantity, before, before - quantity,
+                        request, actorId, idempotencyKey));
             }
-            int before = part.getReservedStock();
-            part.setReservedStock(before - quantity);
-            ledger.add(newTransaction(part, TransactionType.RELEASE, quantity, before, before - quantity,
-                    request, actorId));
         }
-        return save(parts, ledger, "giải phóng giữ chỗ", request.referenceId());
+        return save(parts, ledger, operation == TransactionType.EXPORT ? "xuất kho" : "giải phóng giữ chỗ",
+                request.referenceId());
     }
 
     /**
@@ -160,6 +198,13 @@ public class StockServiceImpl implements StockService {
     private InventoryTransaction newTransaction(Part part, TransactionType type, int quantity,
                                                 int stockBefore, int stockAfter,
                                                 StockOperationRequest request, UUID actorId) {
+        return newTransaction(part, type, quantity, stockBefore, stockAfter, request, actorId, null);
+    }
+
+    private InventoryTransaction newTransaction(Part part, TransactionType type, int quantity,
+                                                int stockBefore, int stockAfter,
+                                                StockOperationRequest request, UUID actorId,
+                                                String idempotencyKey) {
         return InventoryTransaction.builder()
                 .part(part)
                 .type(type)
@@ -168,6 +213,7 @@ public class StockServiceImpl implements StockService {
                 .stockAfter(stockAfter)
                 .referenceType(ReferenceType.WORK_ORDER)
                 .referenceId(request.referenceId())
+                .idempotencyKey(idempotencyKey)
                 .createdBy(actorId)
                 .note(request.note() == null || request.note().isBlank() ? null : request.note().trim())
                 .build();

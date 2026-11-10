@@ -177,6 +177,11 @@ Closed
 ```
 
 Billing owns Invoice and Payment.
+Completion requires every service line to be completed or rejected, releases
+unused part reservations through Inventory Service, and transitions the Work
+Order through `COMPLETED` to `PENDING_PAYMENT`. `WorkOrderCompletedEvent`
+contains service price snapshots and only the quantities of parts actually
+issued, so Billing does not need current catalog prices.
 
 ## Events
 

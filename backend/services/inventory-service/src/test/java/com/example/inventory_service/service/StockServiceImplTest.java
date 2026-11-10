@@ -2,11 +2,13 @@ package com.example.inventory_service.service;
 
 import com.example.inventory_service.dto.request.StockItemRequest;
 import com.example.inventory_service.dto.request.StockOperationRequest;
+import com.example.inventory_service.dto.response.InventoryTransactionResponse;
 import com.example.inventory_service.entity.InventoryTransaction;
 import com.example.inventory_service.entity.Part;
 import com.example.inventory_service.enums.ReferenceType;
 import com.example.inventory_service.enums.TransactionType;
 import com.example.inventory_service.exception.InsufficientStockException;
+import com.example.inventory_service.exception.ApiException;
 import com.example.inventory_service.exception.PartNotFoundException;
 import com.example.inventory_service.exception.ReservationNotFoundException;
 import com.example.inventory_service.mapper.InventoryTransactionMapper;
@@ -31,6 +33,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 
 /**
  * Unit test nghiệp vụ tồn kho, không cần MySQL/Flyway.
@@ -66,7 +69,7 @@ class StockServiceImplTest {
                 inventoryTransactionRepository,
                 inventoryTransactionMapper,
                 currentActorIdProvider);
-        given(currentActorIdProvider.requireCurrentUserId()).willReturn(ACTOR_ID);
+        lenient().when(currentActorIdProvider.requireCurrentUserId()).thenReturn(ACTOR_ID);
     }
 
     // ---------------------------------------------------------------------
@@ -176,6 +179,59 @@ class StockServiceImplTest {
         assertThatThrownBy(() -> stockService.issue(request(PART_ID, 4)))
                 .isInstanceOf(InsufficientStockException.class);
         assertThat(part.getOnHandStock()).isEqualTo(2);
+    }
+
+    @Test
+    void idempotentIssue_replaysExistingTransactionWithoutChangingStockAgain() {
+        String key = "wo-" + WORK_ORDER_ID + "-part-" + UUID.randomUUID() + "-issue-0-0";
+        Part part = part(8, 3);
+        InventoryTransaction existing = InventoryTransaction.builder()
+                .id(UUID.randomUUID())
+                .part(part)
+                .type(TransactionType.EXPORT)
+                .quantity(2)
+                .referenceId(WORK_ORDER_ID)
+                .idempotencyKey(key)
+                .createdBy(ACTOR_ID)
+                .build();
+        InventoryTransactionResponse response = new InventoryTransactionResponse(
+                existing.getId(), PART_ID, part.getSku(), part.getName(), TransactionType.EXPORT, 2,
+                10, 8, ReferenceType.WORK_ORDER, WORK_ORDER_ID, ACTOR_ID, null, null);
+        given(partRepository.findByIdForUpdate(PART_ID)).willReturn(Optional.of(part));
+        given(inventoryTransactionRepository.findByIdempotencyKey(key)).willReturn(Optional.of(existing));
+        given(inventoryTransactionMapper.toResponse(existing)).willReturn(response);
+
+        List<InventoryTransactionResponse> result = stockService.issue(
+                request(PART_ID, 2), ACTOR_ID, key);
+
+        assertThat(result).containsExactly(response);
+        assertThat(part.getOnHandStock()).isEqualTo(8);
+        assertThat(part.getReservedStock()).isEqualTo(3);
+        verify(inventoryTransactionRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void idempotentIssue_rejectsKeyReuseWithDifferentQuantity() {
+        String key = "issue-key";
+        Part part = part(8, 3);
+        InventoryTransaction existing = InventoryTransaction.builder()
+                .id(UUID.randomUUID())
+                .part(part)
+                .type(TransactionType.EXPORT)
+                .quantity(1)
+                .referenceId(WORK_ORDER_ID)
+                .idempotencyKey(key)
+                .createdBy(ACTOR_ID)
+                .build();
+        given(partRepository.findByIdForUpdate(PART_ID)).willReturn(Optional.of(part));
+        given(inventoryTransactionRepository.findByIdempotencyKey(key)).willReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> stockService.issue(request(PART_ID, 2), ACTOR_ID, key))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("Idempotency key");
+        assertThat(part.getOnHandStock()).isEqualTo(8);
+        assertThat(part.getReservedStock()).isEqualTo(3);
+        verify(inventoryTransactionRepository, never()).saveAll(any());
     }
 
     // ---------------------------------------------------------------------

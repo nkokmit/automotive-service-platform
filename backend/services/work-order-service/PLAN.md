@@ -1061,13 +1061,13 @@ MVP.
 ### API
 
 ```http
-GET /api/me/work-order-service-lines
+GET /api/work-order-service-lines/me
 ```
 
 Ví dụ:
 
 ```http
-GET /api/me/work-order-service-lines?status=APPROVED
+GET /api/work-order-service-lines/me?status=APPROVED
 ```
 
 Mechanic không cần truyền `mechanicId` của chính mình.
@@ -1236,14 +1236,17 @@ POST /api/work-orders/{workOrderId}/parts/{partLineId}/issue
 
 MVP không bắt buộc Mechanic trực tiếp thực hiện thao tác xuất kho.
 
-Actor được phép thực hiện:
+Actor dự kiến thực hiện:
 
 ```text
 ADVISOR
 MANAGER
 ```
 
-Việc phân quyền cuối cùng vẫn dựa trên Permission của hệ thống.
+Pha này chưa áp dụng phân quyền theo role hoặc permission cho API issue/release.
+API vẫn yêu cầu JWT hợp lệ như các API Work Order khác; mọi người dùng đã xác thực
+đều có thể gọi API này, kể cả CUSTOMER. Phân quyền theo Permission sẽ được bổ sung sau.
+Các endpoint Inventory nội bộ vẫn chỉ dành cho service có authority tương ứng.
 
 ---
 
@@ -1351,7 +1354,7 @@ OpenFeign
 Ví dụ:
 
 ```http
-POST /internal/parts/reservations/{reservationId}/issue
+POST /internal/parts/issue
 ```
 
 Request:
@@ -1361,9 +1364,14 @@ Request:
   "workOrderId": "uuid",
   "partId": "uuid",
   "quantity": 2,
-  "idempotencyKey": "unique-key"
+  "idempotencyKey": "unique-key",
+  "requestedBy": "uuid"
 }
 ```
+
+`requestedBy` được Work Order Service lấy từ JWT người thao tác và được Inventory lưu vào `created_by`.
+`idempotencyKey` gắn lệnh với Part Line.
+Lệnh Release dùng cùng contract tại `/internal/parts/release`.
 
 Inventory Service thực hiện:
 
@@ -1386,10 +1394,10 @@ Return Success
 Inventory Transaction:
 
 ```text
-type = ISSUE
+type = EXPORT
 ```
 
-hoặc sử dụng convention transaction type hiện có của `catalog-inventory-service`.
+`EXPORT` là transaction type hiện có của Inventory Service.
 
 ---
 
@@ -2198,7 +2206,7 @@ POST /api/work-order-service-lines/{serviceLineId}/complete
 ## Mechanic
 
 ```http
-GET /api/me/work-order-service-lines
+GET /api/work-order-service-lines/me
 ```
 
 ---

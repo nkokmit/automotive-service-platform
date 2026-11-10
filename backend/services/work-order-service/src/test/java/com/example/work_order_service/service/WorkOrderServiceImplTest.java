@@ -52,6 +52,8 @@ class WorkOrderServiceImplTest {
     private WorkOrderCreationTransaction creationTransaction;
     @Mock
     private WorkOrderDiagnosisTransaction diagnosisTransaction;
+    @Mock
+    private WorkOrderCompletionTransaction completionTransaction;
 
     private WorkOrderServiceImpl service;
 
@@ -64,6 +66,7 @@ class WorkOrderServiceImplTest {
                 integrationService,
                 creationTransaction,
                 diagnosisTransaction,
+                completionTransaction,
                 new WorkOrderMapper(),
                 new EstimateMapper());
     }
@@ -153,6 +156,38 @@ class WorkOrderServiceImplTest {
         assertEquals(ErrorCode.UNAUTHENTICATED, exception.getErrorCode());
         verify(diagnosisTransaction, never()).start(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void completeUsesAuthenticatedUserAndReturnsUpdatedWorkOrder() {
+        UUID actorId = UUID.randomUUID();
+        WorkOrder workOrder = WorkOrder.builder()
+                .id(workOrderId)
+                .code("WO-" + workOrderId)
+                .bookingId(bookingId)
+                .customerId(UUID.randomUUID())
+                .vehicleId(UUID.randomUUID())
+                .advisorId(UUID.randomUUID())
+                .status(WorkOrderStatus.PENDING_PAYMENT)
+                .odometerIn(42)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        when(workOrderRepository.findById(workOrderId)).thenReturn(Optional.of(workOrder));
+        when(historyRepository.findByWorkOrder_IdOrderByCreatedAtAsc(workOrderId)).thenReturn(List.of());
+        when(integrationService.getDetailContext(workOrder)).thenReturn(new WorkOrderDetailContext(
+                new BookingContract(
+                        bookingId, workOrder.getCustomerId(), workOrder.getVehicleId(), workOrderId,
+                        "51A-12345", null, null, "CHECKED_IN", "WALK_IN", null, null, List.of()),
+                new CustomerContract(workOrder.getCustomerId(), "Customer", "0123", null, true),
+                new VehicleContract(
+                        workOrder.getVehicleId(), "51A-12345", null, "Make", "Model", (short) 2024,
+                        null, null, null, null, 0, null, true)));
+
+        var result = service.complete(workOrderId, jwt(actorId));
+
+        assertEquals(WorkOrderStatus.PENDING_PAYMENT, result.status());
+        verify(completionTransaction).complete(workOrderId, actorId);
     }
 
     private Jwt jwt() {

@@ -74,6 +74,14 @@ public class WorkOrderController {
                 workOrderService.startDiagnosis(id, jwt));
     }
 
+    @PostMapping("/{id}/complete")
+    public ApiResponse<WorkOrderResponse> complete(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.success("Hoàn thành Work Order thành công", workOrderService.complete(id, jwt));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<WorkOrderResponse> get(@PathVariable UUID id) {
         return ApiResponse.success(workOrderService.get(id));

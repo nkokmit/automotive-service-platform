@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -37,6 +38,8 @@ public interface InventoryTransactionRepository
                                       @Param("fromDate") Instant fromDate,
                                       @Param("toDate") Instant toDate,
                                       Pageable pageable);
+
+    Optional<InventoryTransaction> findByIdempotencyKey(String idempotencyKey);
 
     /**
      * Số lượng còn giữ chỗ của một phụ tùng theo một tham chiếu:

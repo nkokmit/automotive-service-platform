@@ -33,6 +33,7 @@ class ErrorCodeTest {
                 Map.entry(ErrorCode.BOM_PART_NOT_ACTIVE, 6403),
                 Map.entry(ErrorCode.PART_NOT_FOUND, 6404),
                 Map.entry(ErrorCode.PART_NOT_ACTIVE, 6405),
+                Map.entry(ErrorCode.PART_RESERVATION_NOT_FOUND, 6406),
                 Map.entry(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE, 6501),
                 Map.entry(ErrorCode.UNAUTHENTICATED, 1401),
                 Map.entry(ErrorCode.UNAUTHORIZED, 1403),

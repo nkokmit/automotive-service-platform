@@ -16,6 +16,8 @@ public interface WorkOrderServiceLineRepository extends JpaRepository<WorkOrderS
 
     List<WorkOrderServiceLine> findByEstimate_IdOrderByCreatedAtAsc(UUID estimateId);
 
+    List<WorkOrderServiceLine> findByEstimate_WorkOrder_IdOrderByCreatedAtAsc(UUID workOrderId);
+
     Optional<WorkOrderServiceLine> findByIdAndEstimate_Id(UUID id, UUID estimateId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

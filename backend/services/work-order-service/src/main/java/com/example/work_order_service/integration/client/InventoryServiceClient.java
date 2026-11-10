@@ -3,10 +3,14 @@ package com.example.work_order_service.integration.client;
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
 import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
+import com.example.work_order_service.integration.contract.InternalPartStockCommand;
+import com.example.work_order_service.integration.contract.InternalInventoryTransactionContract;
 import com.example.work_order_service.integration.contract.ServiceApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,4 +31,12 @@ public interface InventoryServiceClient {
 
     @GetMapping("/internal/parts/{partId}")
     ServiceApiResponse<InternalPartCatalogContract> getPart(@PathVariable UUID partId);
+
+    @PostMapping("/internal/parts/issue")
+    ServiceApiResponse<InternalInventoryTransactionContract> issueReservedPart(
+            @RequestBody InternalPartStockCommand command);
+
+    @PostMapping("/internal/parts/release")
+    ServiceApiResponse<InternalInventoryTransactionContract> releaseReservedPart(
+            @RequestBody InternalPartStockCommand command);
 }

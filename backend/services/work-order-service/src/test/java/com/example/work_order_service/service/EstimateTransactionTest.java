@@ -68,6 +68,8 @@ class EstimateTransactionTest {
     private WorkOrderStatusHistoryRepository statusHistoryRepository;
     @Mock
     private PartsReservationRequestPublisher reservationRequestPublisher;
+    @Mock
+    private WorkOrderPartTransaction workOrderPartTransaction;
 
     private EstimateTransaction transaction;
     private Estimate estimate;
@@ -79,6 +81,7 @@ class EstimateTransactionTest {
         transaction = new EstimateTransaction(
                 workOrderRepository,
                 statusHistoryRepository,
+                workOrderPartTransaction,
                 estimateRepository,
                 serviceLineRepository,
                 partLineRepository,

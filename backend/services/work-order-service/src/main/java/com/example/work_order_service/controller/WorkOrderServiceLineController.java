@@ -35,7 +35,7 @@ public class WorkOrderServiceLineController {
                 service.assign(serviceLineId, request));
     }
 
-    @GetMapping("/api/me/work-order-service-lines")
+    @GetMapping("/api/work-order-service-lines/me")
     public ApiResponse<List<AssignedServiceLineResponse>> getMyLines(
             @RequestParam(required = false) WorkOrderServiceStatus status,
             @AuthenticationPrincipal Jwt jwt

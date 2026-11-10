@@ -49,6 +49,9 @@ public class InventoryTransaction {
     @Column(name = "reference_id", length = 36, nullable = false)
     private UUID referenceId;
 
+    @Column(name = "idempotency_key", length = 160, unique = true)
+    private String idempotencyKey;
+
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "created_by", length = 36, nullable = false)
     private UUID createdBy;

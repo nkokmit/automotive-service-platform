@@ -15,6 +15,8 @@ public interface WorkOrderService {
 
     WorkOrderResponse startDiagnosis(UUID id, Jwt jwt);
 
+    WorkOrderResponse complete(UUID id, Jwt jwt);
+
     WorkOrderResponse get(UUID id);
 
     WorkOrderPageResponse search(

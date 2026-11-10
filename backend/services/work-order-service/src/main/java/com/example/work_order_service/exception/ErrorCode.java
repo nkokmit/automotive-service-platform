@@ -35,6 +35,7 @@ public enum ErrorCode {
     BOM_PART_NOT_ACTIVE(6403, "Phụ tùng trong BOM đã ngừng hoạt động", HttpStatus.CONFLICT),
     PART_NOT_FOUND(6404, "Không tìm thấy phụ tùng", HttpStatus.NOT_FOUND),
     PART_NOT_ACTIVE(6405, "Phụ tùng đã ngừng hoạt động", HttpStatus.CONFLICT),
+    PART_RESERVATION_NOT_FOUND(6406, "Không tìm thấy reservation của phụ tùng", HttpStatus.CONFLICT),
 
     // Tích hợp service (65xx)
     INTEGRATION_SERVICE_UNAVAILABLE(6501, "Dịch vụ tích hợp tạm thời không khả dụng", HttpStatus.SERVICE_UNAVAILABLE),
