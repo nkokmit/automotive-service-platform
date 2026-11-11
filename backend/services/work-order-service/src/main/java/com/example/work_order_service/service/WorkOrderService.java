@@ -17,6 +17,8 @@ public interface WorkOrderService {
 
     WorkOrderResponse complete(UUID id, Jwt jwt);
 
+    WorkOrderResponse cancel(UUID id, Jwt jwt);
+
     WorkOrderResponse get(UUID id);
 
     WorkOrderPageResponse search(

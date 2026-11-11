@@ -132,6 +132,40 @@ service line. Do not introduce scheduling rules.
 Service line progress is `APPROVED → IN_PROGRESS → COMPLETED`; persist
 `completed_at` when marking a line complete.
 
+## Cancellation
+
+Cancel a Work Order only from `CREATED`, `DIAGNOSING`, or `PENDING_APPROVAL`.
+Do not cancel an `IN_PROGRESS` or later Work Order. If part reservations remain,
+publish `PartsReleaseRequestedEvent` after the cancellation transaction commits;
+Inventory releases each reservation idempotently. A reservation result arriving
+after cancellation must also trigger release instead of moving the Work Order
+back to `IN_PROGRESS`.
+
+## API permissions
+
+All Work Order, Estimate, service-line, and part endpoints require
+`@PreAuthorize` permission checks using the `authorities` JWT claim. Permission
+names are seeded by user-service migration `V14__seed_work_order_service_permissions.sql`.
+`ADMIN` and `MANAGER` receive Work Order management permissions; MANAGER covers
+Advisor operations because the current role seed has no `ADVISOR` role.
+`MECHANIC` receives only assigned service-line and part-operation permissions.
+`CUSTOMER` receives none. A permission denial returns HTTP 403 with error code
+`1403`.
+
+| Permission | API operation |
+| --- | --- |
+| `WORK_ORDER_READ` | Read/search Work Orders |
+| `WORK_ORDER_CREATE` | Create Work Orders |
+| `WORK_ORDER_DIAGNOSIS_START` | Start diagnosis |
+| `WORK_ORDER_COMPLETE` / `WORK_ORDER_CANCEL` | Complete/cancel Work Orders |
+| `ESTIMATE_READ` / `ESTIMATE_CREATE` | Read/create Estimates |
+| `ESTIMATE_UPDATE` | Add/remove Estimate lines |
+| `ESTIMATE_SUBMIT` / `ESTIMATE_DECISION_RECORD` | Submit/record decisions |
+| `SERVICE_LINE_ASSIGN` | Assign mechanics |
+| `SERVICE_LINE_READ_ASSIGNED` | Read the mechanic's assigned lines |
+| `SERVICE_LINE_START` / `SERVICE_LINE_COMPLETE` | Update assigned-line progress |
+| `PART_ISSUE` / `PART_RELEASE` | Issue/release reserved parts |
+
 ## Real-time progress
 
 Work Order owns repair progress.

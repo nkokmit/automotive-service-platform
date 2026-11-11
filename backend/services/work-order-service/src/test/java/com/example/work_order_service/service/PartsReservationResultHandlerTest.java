@@ -9,7 +9,9 @@ import com.example.work_order_service.enums.WorkOrderPartStatus;
 import com.example.work_order_service.enums.WorkOrderStatus;
 import com.example.work_order_service.messaging.event.PartReservationItem;
 import com.example.work_order_service.messaging.event.PartsReservationFailedEvent;
+import com.example.work_order_service.messaging.event.PartsReleaseRequestedEvent;
 import com.example.work_order_service.messaging.event.PartsReservedEvent;
+import com.example.work_order_service.messaging.producer.PartsReleaseRequestPublisher;
 import com.example.work_order_service.repository.EstimateRepository;
 import com.example.work_order_service.repository.WorkOrderPartLineRepository;
 import com.example.work_order_service.repository.WorkOrderRepository;
@@ -48,6 +50,8 @@ class PartsReservationResultHandlerTest {
     private WorkOrderRepository workOrderRepository;
     @Mock
     private WorkOrderStatusHistoryRepository statusHistoryRepository;
+    @Mock
+    private PartsReleaseRequestPublisher releaseRequestPublisher;
 
     private PartsReservationResultHandler handler;
     private Estimate estimate;
@@ -57,7 +61,8 @@ class PartsReservationResultHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new PartsReservationResultHandler(
-                estimateRepository, partLineRepository, workOrderRepository, statusHistoryRepository);
+                estimateRepository, partLineRepository, workOrderRepository, statusHistoryRepository,
+                releaseRequestPublisher);
         workOrder = WorkOrder.builder().id(workOrderId).status(WorkOrderStatus.PENDING_APPROVAL).build();
         estimate = Estimate.builder()
                 .id(estimateId)
@@ -74,7 +79,7 @@ class PartsReservationResultHandlerTest {
                 .status(WorkOrderPartStatus.APPROVED)
                 .build();
         when(estimateRepository.findByIdForUpdate(estimateId)).thenReturn(Optional.of(estimate));
-        when(partLineRepository.findByIdAndEstimate_Id(partLineId, estimateId))
+        lenient().when(partLineRepository.findByIdAndEstimate_Id(partLineId, estimateId))
                 .thenReturn(Optional.of(partLine));
         lenient().when(workOrderRepository.findByIdForUpdate(workOrderId)).thenReturn(Optional.of(workOrder));
     }
@@ -118,6 +123,21 @@ class PartsReservationResultHandlerTest {
         verify(partLineRepository, never()).save(any());
         verify(workOrderRepository, never()).saveAndFlush(any());
         verify(statusHistoryRepository, never()).save(any());
+    }
+
+    @Test
+    void releasesPartsWhenReservationCompletesAfterWorkOrderWasCanceled() {
+        workOrder.setStatus(WorkOrderStatus.CANCELED);
+
+        handler.handleReserved(new PartsReservedEvent(
+                UUID.randomUUID(), workOrderId, estimateId, actorId, List.of(item())));
+
+        verify(releaseRequestPublisher).publish(org.mockito.ArgumentMatchers.argThat(event ->
+                event.workOrderId().equals(workOrderId)
+                        && event.requestedBy().equals(actorId)
+                        && event.parts().equals(List.of(item()))));
+        verify(partLineRepository, never()).save(any());
+        verify(workOrderRepository, never()).saveAndFlush(any());
     }
 
     private PartReservationItem item() {

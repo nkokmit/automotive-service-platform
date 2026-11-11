@@ -115,6 +115,12 @@ self-service endpoints in customer-vehicle-service, which filter by owner.
 `CUSTOMER_READ` and `VEHICLE_READ` stay ungranted on purpose — they expose
 garage-wide listings.
 
+`V14__seed_work_order_service_permissions.sql` adds the Work Order and Estimate
+permissions. `ADMIN` and `MANAGER` receive all Work Order permissions;
+`MECHANIC` receives only assigned service-line and part-operation permissions.
+`CUSTOMER` receives none. MANAGER covers Advisor operations because the current
+role seed does not contain a separate `ADVISOR` role.
+
 Granting more permissions is a schema/data decision: add a new Flyway
 migration. Do not edit `V4__seed_data.sql`.
 

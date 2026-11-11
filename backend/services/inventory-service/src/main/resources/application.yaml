@@ -8,6 +8,7 @@ app:
       group-id: ${KAFKA_CONSUMER_GROUP:inventory-service}
     topics:
       parts-reservation-requested: ${PARTS_RESERVATION_REQUESTED_TOPIC:parts-reservation-requested}
+      parts-release-requested: ${PARTS_RELEASE_REQUESTED_TOPIC:parts-release-requested}
       parts-reserved: ${PARTS_RESERVED_TOPIC:parts-reserved}
       parts-reservation-failed: ${PARTS_RESERVATION_FAILED_TOPIC:parts-reservation-failed}
 

@@ -5,21 +5,29 @@ Gateway, Eureka và MySQL.
 
 ## Thành phần trong phạm vi hiện tại
 
-| Service                    | Vai trò                          | Port (host) |
-|----------------------------|----------------------------------|-------------|
-| `api-gateway`              | Entry point, routing, xác thực JWT | 8000        |
-| `discovery-server`         | Service registry (Eureka)        | 8761        |
-| `user-service`             | User / role / permission, đăng nhập | 8081        |
-| `mysql`                    | MySQL cho các microservice       | 3306        |
-| `customer-vehicle-service` | Customer / vehicle / lịch sử bảo dưỡng | 8082        |
-| `staff-service`            | Hồ sơ nhân viên, ca làm và lịch làm việc | 8083        |
-| `kafka`                    | Kafka                            | 9092        |
+| Service                    | Vai trò                              | Port (host)                  |
+|----------------------------|--------------------------------------|------------------------------|
+| `api-gateway`              | Entry point, routing, xác thực JWT   | 8000                         |
+| `discovery-server`         | Service registry (Eureka)            | 8761                         |
+| `user-service`             | User / role / permission, đăng nhập | 8081                         |
+| `customer-vehicle-service` | Customer / vehicle / lịch sử bảo dưỡng | 8082                       |
+| `staff-service`            | Hồ sơ nhân viên và lịch làm việc     | 8083                         |
+| `inventory-service`        | Catalog, kho và reservation          | 8084                         |
+| `booking-service`          | Lịch hẹn                              | 8085                         |
+| `work-order-service`       | Work Order và tiến độ sửa chữa       | Nội bộ, chỉ qua API Gateway  |
+| `mysql`                    | MySQL cho các microservice            | 3306                         |
+| `kafka`                    | Kafka                                | 9092                         |
 
-
-Các service còn lại trong `backend/automotive-ai-context/ARCHITECTURE.md` chưa
-được cài đặt trong Compose.
+Backend dùng chung multi-stage `backend/Dockerfile`. Work Order Service không
+publish port ra host; truy cập API qua API Gateway.
 
 ## Chạy bằng Docker Compose
+
+Yêu cầu Docker Engine và Docker Compose plugin đang chạy, đủ RAM và dung lượng
+cho các service, kết nối mạng để tải image/dependency lần đầu, và các host
+port trong `.env.example` còn trống.
+Sau khi clone, cần tạo `.env` một lần trước khi chạy Compose; các giá trị bí mật
+không được lưu sẵn trong repository.
 
 ### 1. Chuẩn bị `.env`
 
@@ -27,16 +35,16 @@ Các service còn lại trong `backend/automotive-ai-context/ARCHITECTURE.md` ch
 cp .env.example .env
 ```
 
-Mở `.env` và điền 3 giá trị bắt buộc:
+Mở `.env` và điền 3 giá trị bí mật bắt buộc:
 
 - `MYSQL_ROOT_PASSWORD`
 - `MYSQL_PASSWORD`
 - `JWT_SECRET` — chuỗi Base64 hợp lệ, giải mã ra **tối thiểu 32 byte**
-- `SCHEDULE_ZONE_ID` — múi giờ IANA dùng để tính lịch nhân viên (ví dụ
-  `Asia/Ho_Chi_Minh`)
 
-`JWT_SECRET` được dùng chung cho `api-gateway`, `user-service`,
-`customer-vehicle-service` và `staff-service`.
+`SCHEDULE_ZONE_ID` đã có giá trị mẫu `Asia/Ho_Chi_Minh`; thay đổi nếu cần
+dùng múi giờ IANA khác.
+
+`JWT_SECRET` được dùng chung cho API Gateway và các microservice xác thực JWT.
 
 Sinh `JWT_SECRET`:
 
@@ -56,29 +64,19 @@ chạy với secret mặc định yếu.
 docker compose up --build
 ```
 
-MySQL tự tạo database `user_service` (qua `MYSQL_DATABASE`) và tạo database
-`customer_vehicle_service`, `staff_service` kèm quyền cho `MYSQL_USER` qua
-script init. Có thể đổi tên hai database này bằng `CUSTOMER_VEHICLE_MYSQL_DATABASE`
-và `STAFF_MYSQL_DATABASE` trong `.env`.
+MySQL tự tạo database `user_service` (qua `MYSQL_DATABASE`). Compose chạy
+`mysql-bootstrap` sau khi MySQL sẵn sàng để tạo các database
+`customer_vehicle_service`, `staff_service`, `inventory_service`,
+`booking_service`, `work_order_service` kèm quyền cho `MYSQL_USER` qua script
+init; các service chờ bootstrap thành công trước khi khởi động. Script có thể
+chạy lại an toàn và bổ sung database khi volume đã tồn tại, không cần thao tác
+thủ công hay xóa dữ liệu. Có thể đổi tên bằng các biến `*_MYSQL_DATABASE` tương
+ứng trong `.env`. Không dùng `docker compose down -v` nếu cần giữ dữ liệu.
 
-**Volume đã tồn tại:** script init chỉ chạy khi volume còn trống. Không cần xóa
-volume để bổ sung database; chạy script một lần trên MySQL đang hoạt động:
-
-```bash
-docker compose exec mysql bash /docker-entrypoint-initdb.d/01-create-databases.sh
-```
-
-Không dùng `docker compose down -v` nếu cần giữ dữ liệu hiện có.
-
-Thứ tự khởi động được điều khiển bằng healthcheck:
-
-``` text
-mysql (healthy)               ─┐
-kafka (healthy)               ─┼─┐
-discovery-server (healthy) ────┼─┬─> user-service (healthy) ─┐
-                              ├─┴─> customer-vehicle-service ├─> api-gateway
-                              └────> staff-service (healthy) ┘
-```
+Thứ tự khởi động được điều khiển bằng healthcheck. Work Order Service chờ
+MySQL, Kafka, Eureka và các service tích hợp (Booking, Customer Vehicle,
+Inventory, Staff); API Gateway chờ các service đã healthy.
+Lần build và khởi động đầu tiên có thể mất vài phút.
 
 ### 3. Địa chỉ
 
@@ -87,13 +85,14 @@ discovery-server (healthy) ────┼─┬─> user-service (healthy) ─�
 | API Gateway           | http://localhost:8000                            |
 | Swagger UI            | http://localhost:8000/swagger-ui.html           |
 | OpenAPI user-service  | http://localhost:8000/v3/api-docs/user-service   |
+| OpenAPI work-order-service | http://localhost:8000/v3/api-docs/work-order-service |
 | Eureka dashboard      | http://localhost:8761                            |
 | User service (nội bộ) | http://localhost:8081                            |
 | Customer vehicle svc   | http://localhost:8082                            |
 | Staff service (nội bộ) | http://localhost:8083                            |
 | OpenAPI customer vehicle | http://localhost:8000/v3/api-docs/customer-vehicle-service |
 | OpenAPI staff service | http://localhost:8000/v3/api-docs/staff-service |
-| MySQL                 | localhost:3306 (`user_service`, `customer_vehicle_service`, `staff_service`) |
+| MySQL                 | localhost:3306 (các database service được bootstrap ở trên) |
 | Kafka broker          | localhost:9092 (PLAINTEXT, không auth)                |
 
 ### 4. Đăng nhập thử

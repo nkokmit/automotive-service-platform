@@ -56,6 +56,21 @@ spring:
               predicates:
                 - Path=/api/staff/bookings,/api/staff/bookings/**
 
+            - id: work-order-service-work-orders
+              uri: lb://work-order-service
+              predicates:
+                - Path=/api/work-orders,/api/work-orders/**
+
+            - id: work-order-service-estimates
+              uri: lb://work-order-service
+              predicates:
+                - Path=/api/estimates,/api/estimates/**
+
+            - id: work-order-service-service-lines
+              uri: lb://work-order-service
+              predicates:
+                - Path=/api/work-order-service-lines,/api/work-order-service-lines/**
+
             - id: staff-service-staff
               uri: lb://staff-service
               predicates:

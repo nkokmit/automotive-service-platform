@@ -58,6 +58,9 @@ if [ -n "$access_token" ]; then pass "login returned an access token"; else fail
 
 echo "== RBAC =="
 if [ -n "$access_token" ]; then
+  status=$(http_status "$GATEWAY_URL/api/work-orders" -H "Authorization: Bearer $access_token")
+  if [ "$status" = "200" ]; then pass "admin can list work orders through gateway ($status)"; else fail "admin list work orders ($status)"; fi
+
   status=$(http_status "$GATEWAY_URL/api/users" -H "Authorization: Bearer $access_token")
   if [ "$status" = "200" ]; then pass "admin can list users ($status)"; else fail "admin list users ($status)"; fi
 
@@ -72,6 +75,9 @@ if [ "$status" = "200" ]; then pass "gateway serves user-service OpenAPI ($statu
 status=$(http_status "$GATEWAY_URL/v3/api-docs/customer-vehicle-service")
 if [ "$status" = "200" ]; then pass "gateway serves customer-vehicle-service OpenAPI ($status)"; else fail "gateway customer-vehicle-service OpenAPI ($status)"; fi
 
+status=$(http_status "$GATEWAY_URL/v3/api-docs/work-order-service")
+if [ "$status" = "200" ]; then pass "gateway serves work-order-service OpenAPI ($status)"; else fail "gateway work-order-service OpenAPI ($status)"; fi
+
 echo "== eureka registration =="
 registry=$(curl -s -H 'Accept: application/json' "$DISCOVERY_URL/eureka/apps")
 if printf '%s' "$registry" | grep -q '"name":"USER-SERVICE"'; then
@@ -84,6 +90,12 @@ if printf '%s' "$registry" | grep -q '"name":"CUSTOMER-VEHICLE-SERVICE"'; then
   pass "customer-vehicle-service is registered with Eureka"
 else
   fail "customer-vehicle-service is not registered with Eureka"
+fi
+
+if printf '%s' "$registry" | grep -q '"name":"WORK-ORDER-SERVICE"'; then
+  pass "work-order-service is registered with Eureka"
+else
+  fail "work-order-service is not registered with Eureka"
 fi
 
 echo

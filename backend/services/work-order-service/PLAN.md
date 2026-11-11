@@ -1742,11 +1742,7 @@ POST /api/work-orders/{id}/cancel
 
 ### Request
 
-```json
-{
-  "reason": "Customer canceled repair"
-}
-```
+Không yêu cầu request body.
 
 ---
 
@@ -1766,7 +1762,8 @@ Việc cancel khi:
 IN_PROGRESS
 ```
 
-phải được quyết định rõ bằng business rule.
+không được phép; Work Order đang thi công phải được xử lý theo quy trình hoàn
+thành hiện tại.
 
 Nếu đã reserve phụ tùng:
 
@@ -1777,6 +1774,10 @@ Publish PartsReleaseRequestedEvent
         ↓
 Inventory Release Reservation
 ```
+
+Chỉ cho phép hủy khi trạng thái là `CREATED`, `DIAGNOSING` hoặc
+`PENDING_APPROVAL`. Event release chứa các Part Line còn reservation chưa
+được issue/release và chỉ được gửi sau khi transaction hủy commit.
 
 ---
 
@@ -1974,6 +1975,39 @@ Có quyền quản lý phù hợp và có thể kế thừa các nghiệp vụ c
 ## Admin
 
 Quyền quản trị theo permission model.
+
+---
+
+## 19.1. API Permissions
+
+Mọi API nghiệp vụ trong `work-order-service` phải dùng
+`@PreAuthorize("hasAuthority(...)")`; không kiểm tra role trực tiếp trong
+controller. Các permission được seed và gán role bằng migration mới của
+`user-service`.
+
+| API nghiệp vụ | Permission |
+|---|---|
+| Đọc/tìm kiếm Work Order | `WORK_ORDER_READ` |
+| Tạo Work Order | `WORK_ORDER_CREATE` |
+| Bắt đầu chẩn đoán | `WORK_ORDER_DIAGNOSIS_START` |
+| Hoàn tất Work Order | `WORK_ORDER_COMPLETE` |
+| Hủy Work Order | `WORK_ORDER_CANCEL` |
+| Đọc Estimate | `ESTIMATE_READ` |
+| Tạo Estimate | `ESTIMATE_CREATE` |
+| Thêm/xóa service hoặc part line | `ESTIMATE_UPDATE` |
+| Gửi Estimate | `ESTIMATE_SUBMIT` |
+| Ghi nhận quyết định Estimate | `ESTIMATE_DECISION_RECORD` |
+| Phân công service line | `SERVICE_LINE_ASSIGN` |
+| Xem service line được giao cho mình | `SERVICE_LINE_READ_ASSIGNED` |
+| Bắt đầu/hoàn tất service line | `SERVICE_LINE_START` / `SERVICE_LINE_COMPLETE` |
+| Issue/release part | `PART_ISSUE` / `PART_RELEASE` |
+
+`ADMIN` và `MANAGER` được cấp các permission quản lý Work Order; `MANAGER`
+đại diện các nghiệp vụ Advisor trong mô hình role hiện có. `MECHANIC` chỉ được
+cấp quyền xem service line được giao, cập nhật tiến độ service line và
+issue/release phụ tùng. `CUSTOMER` không được cấp các permission này. Mọi
+request thiếu permission tương ứng phải bị từ chối với HTTP 403 và API error
+code `1403`.
 
 Authorization nên dựa trên Permission thay vì hard-code role trong business logic.
 

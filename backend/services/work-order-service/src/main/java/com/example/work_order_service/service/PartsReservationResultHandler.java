@@ -12,7 +12,9 @@ import com.example.work_order_service.exception.ApiException;
 import com.example.work_order_service.exception.ErrorCode;
 import com.example.work_order_service.messaging.event.PartReservationItem;
 import com.example.work_order_service.messaging.event.PartsReservationFailedEvent;
+import com.example.work_order_service.messaging.event.PartsReleaseRequestedEvent;
 import com.example.work_order_service.messaging.event.PartsReservedEvent;
+import com.example.work_order_service.messaging.producer.PartsReleaseRequestPublisher;
 import com.example.work_order_service.repository.EstimateRepository;
 import com.example.work_order_service.repository.WorkOrderPartLineRepository;
 import com.example.work_order_service.repository.WorkOrderRepository;
@@ -36,11 +38,19 @@ public class PartsReservationResultHandler {
     private final WorkOrderPartLineRepository partLineRepository;
     private final WorkOrderRepository workOrderRepository;
     private final WorkOrderStatusHistoryRepository statusHistoryRepository;
+    private final PartsReleaseRequestPublisher releaseRequestPublisher;
 
     @Transactional
     public void handleReserved(PartsReservedEvent event) {
         Estimate estimate = findAndValidateEstimate(
                 event.eventId(), event.workOrderId(), event.estimateId(), event.requestedBy(), event.parts());
+        WorkOrder workOrder = workOrderRepository.findByIdForUpdate(event.workOrderId())
+                .orElseThrow(() -> new ApiException(ErrorCode.WORK_ORDER_NOT_FOUND));
+        if (workOrder.getStatus() == WorkOrderStatus.CANCELED) {
+            releaseRequestPublisher.publish(new PartsReleaseRequestedEvent(
+                    UUID.randomUUID(), event.workOrderId(), event.requestedBy(), event.parts()));
+            return;
+        }
         updatePartLines(estimate, event.parts(), true);
         if (estimate.getType() == EstimateType.INITIAL) {
             moveInitialWorkOrderToInProgress(estimate, event.requestedBy());

@@ -9,6 +9,7 @@ services:
       STAFF_MYSQL_DATABASE: ${STAFF_MYSQL_DATABASE:-staff_service}
       INVENTORY_MYSQL_DATABASE: ${INVENTORY_MYSQL_DATABASE:-inventory_service}
       BOOKING_MYSQL_DATABASE: ${BOOKING_MYSQL_DATABASE:-booking_service}
+      WORK_ORDER_MYSQL_DATABASE: ${WORK_ORDER_MYSQL_DATABASE:-work_order_service}
       MYSQL_USER: ${MYSQL_USER:-app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
     ports:
@@ -20,12 +21,33 @@ services:
     networks:
       - platform
     healthcheck:
-      # TCP avoids the temporary bootstrap server; check the app's DB credentials.
-      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u\"$$MYSQL_USER\" -D\"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null"]
+      # TCP avoids the temporary bootstrap server; check the app's credentials.
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u\"$$MYSQL_USER\" -e 'SELECT 1' >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 30
       start_period: 120s
+
+  mysql-bootstrap:
+    image: mysql:9.7
+    restart: "no"
+    network_mode: service:mysql
+    entrypoint: ["bash", "/bootstrap/01-create-databases.sh"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-user_service}
+      CUSTOMER_VEHICLE_MYSQL_DATABASE: ${CUSTOMER_VEHICLE_MYSQL_DATABASE:-customer_vehicle_service}
+      STAFF_MYSQL_DATABASE: ${STAFF_MYSQL_DATABASE:-staff_service}
+      INVENTORY_MYSQL_DATABASE: ${INVENTORY_MYSQL_DATABASE:-inventory_service}
+      BOOKING_MYSQL_DATABASE: ${BOOKING_MYSQL_DATABASE:-booking_service}
+      WORK_ORDER_MYSQL_DATABASE: ${WORK_ORDER_MYSQL_DATABASE:-work_order_service}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_BOOTSTRAP_TCP: "true"
+    volumes:
+      - ./backend/infra/mysql/init:/bootstrap:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   # Kafka ở chế độ KRaft single-node (không cần ZooKeeper).
   # Hai listener: 9092 cho host/IDE (localhost), 19092 cho container trong
@@ -116,6 +138,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mysql-bootstrap:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_healthy
       kafka:
@@ -157,6 +181,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mysql-bootstrap:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_healthy
       kafka:
@@ -194,6 +220,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mysql-bootstrap:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_healthy
     networks:
@@ -229,6 +257,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mysql-bootstrap:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_healthy
       kafka:
@@ -267,6 +297,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mysql-bootstrap:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_healthy
       kafka:
@@ -275,6 +307,55 @@ services:
       - platform
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8085/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  work-order-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE_PATH: services/work-order-service
+    restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8086
+      DB_URL: jdbc:mysql://mysql:3306/${WORK_ORDER_MYSQL_DATABASE:-work_order_service}
+      DB_USERNAME: ${MYSQL_USER:-app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 JWT_SECRET (at least 32 decoded bytes) in .env}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
+      EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
+      BOOKING_SERVICE_URL: http://booking-service:8085
+      CUSTOMER_VEHICLE_SERVICE_URL: http://customer-vehicle-service:8082
+      INVENTORY_SERVICE_URL: http://inventory-service:8084
+      STAFF_SERVICE_URL: http://staff-service:8083
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS_CONTAINER:-kafka:19092}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mysql-bootstrap:
+        condition: service_completed_successfully
+      discovery-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+      customer-vehicle-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      staff-service:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8086/actuator/health/readiness"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -308,6 +389,8 @@ services:
       inventory-service:
         condition: service_healthy
       booking-service:
+        condition: service_healthy
+      work-order-service:
         condition: service_healthy
     networks:
       - platform

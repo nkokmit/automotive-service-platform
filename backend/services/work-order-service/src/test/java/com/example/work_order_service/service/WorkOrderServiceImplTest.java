@@ -54,6 +54,8 @@ class WorkOrderServiceImplTest {
     private WorkOrderDiagnosisTransaction diagnosisTransaction;
     @Mock
     private WorkOrderCompletionTransaction completionTransaction;
+    @Mock
+    private WorkOrderCancellationTransaction cancellationTransaction;
 
     private WorkOrderServiceImpl service;
 
@@ -67,6 +69,7 @@ class WorkOrderServiceImplTest {
                 creationTransaction,
                 diagnosisTransaction,
                 completionTransaction,
+                cancellationTransaction,
                 new WorkOrderMapper(),
                 new EstimateMapper());
     }

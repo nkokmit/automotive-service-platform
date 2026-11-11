@@ -40,6 +40,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final WorkOrderCreationTransaction creationTransaction;
     private final WorkOrderDiagnosisTransaction diagnosisTransaction;
     private final WorkOrderCompletionTransaction completionTransaction;
+    private final WorkOrderCancellationTransaction cancellationTransaction;
     private final WorkOrderMapper mapper;
     private final EstimateMapper estimateMapper;
 
@@ -79,6 +80,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Override
     public WorkOrderResponse complete(UUID id, Jwt jwt) {
         completionTransaction.complete(id, requireUserId(jwt));
+        return get(id);
+    }
+
+    @Override
+    public WorkOrderResponse cancel(UUID id, Jwt jwt) {
+        cancellationTransaction.cancel(id, requireUserId(jwt));
         return get(id);
     }
 
