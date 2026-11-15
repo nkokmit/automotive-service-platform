@@ -2,7 +2,6 @@ package com.example.inventory_service.controller;
 
 import com.example.inventory_service.common.ApiResponse;
 import com.example.inventory_service.common.PageResponse;
-import com.example.inventory_service.dto.response.InventoryTransactionResponse;
 import com.example.inventory_service.dto.response.PartCompatibilityResponse;
 import com.example.inventory_service.dto.response.PartPricingResponse;
 import com.example.inventory_service.dto.response.PartResponse;
@@ -154,24 +153,6 @@ class PartControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.id").value(PART_ID.toString()))
                 .andExpect(jsonPath("$.result.sku").value("SKU-001"));
-    }
-
-    @Test
-    void reserveReturnsLedgerRows() throws Exception {
-        given(stockService.reserve(any())).willReturn(List.of(
-                new InventoryTransactionResponse(UUID.randomUUID(), PART_ID, "SKU-001", "Dầu nhớt",
-                        com.example.inventory_service.enums.TransactionType.RESERVE, 3, 2, 5,
-                        com.example.inventory_service.enums.ReferenceType.WORK_ORDER,
-                        UUID.randomUUID(), UUID.randomUUID(), null, null)));
-
-        mvc.perform(post("/api/parts/reserve")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"referenceId\":\"" + UUID.randomUUID() + "\","
-                                + "\"items\":[{\"partId\":\"" + PART_ID + "\",\"quantity\":3}]}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result[0].type").value("RESERVE"))
-                .andExpect(jsonPath("$.result[0].stockBefore").value(2))
-                .andExpect(jsonPath("$.result[0].stockAfter").value(5));
     }
 
     @Test

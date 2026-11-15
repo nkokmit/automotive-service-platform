@@ -44,6 +44,15 @@ public class StaffServiceImpl implements StaffService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public StaffResponse getStaffByUserId(UUID userId) {
+        StaffMember staffMember = staffMemberRepository.findByUserId(userId)
+                .orElseThrow(() -> new StaffNotFoundException(
+                        "Không tìm thấy hồ sơ nhân viên cho tài khoản: " + userId));
+        return staffMapper.toStaffResponse(staffMember);
+    }
+
+    @Override
     public StaffResponse createStaff(StaffCreateRequest request) {
         requireEmployeeCodeAvailable(request.employeeCode(), null);
         requireUserIdAvailable(request.userId(), null);

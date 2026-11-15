@@ -27,38 +27,52 @@ and staffing. It reads `id`, `name`, `is_active`, `duration_minutes` and
 `required_techs`, then stores a snapshot on the booking so later catalog
 changes do not rewrite booking history.
 
+The read uses the internal `GET /internal/services/{id}` endpoint with
+booking-service's own service token (authority `INTERNAL_SERVICE_CATALOG_READ`);
+Customer JWTs are not forwarded, so Customers do not need `SERVICE_READ`.
+
 This read must be synchronous — the caller needs the values immediately to
 create the booking.
 
+Work Order Service uses the same internal service-token authority to read
+service pricing and the BOM through `/internal/services/{id}` and
+`/internal/services/{id}/bom`. These endpoints return catalog snapshots only;
+they do not expose inventory database access.
+
 ## Work Order integration
 
-When Work Order estimate items are approved:
+When Work Order estimate part lines are approved:
 
 ``` text
 Work Order
    ↓
-Approved part items
+PartsReservationRequestedEvent
    ↓
-Inventory Service
+Inventory Service reserves stock
    ↓
-Deduct stock
+PartsReservedEvent / PartsReservationFailedEvent
 ```
 
-Only approved items consume stock.
+Inventory processes each reservation event idempotently and reserves all
+requested parts atomically. Reservation does not deduct on-hand stock; stock
+is deducted when reserved parts are issued.
 
 Do not let Work Order Service update inventory tables directly.
 
 ## Insufficient stock
 
-The existing project behavior should determine the exact failure/event
-contract. Do not invent a distributed transaction.
+Reservation is all-or-nothing. If stock cannot be reserved, Inventory keeps
+the failed outcome for the event ID and emits `PartsReservationFailedEvent`;
+it must not report a reservation as successful.
 
 ## Events
 
-Potential event:
+Reservation result events:
 
 ``` text
-StockDeducted
+PartsReserved
+PartsReservationFailed
 ```
 
-Use the existing event contract if one exists.
+Reservation does not deduct on-hand stock; deduction happens when reserved
+parts are issued.

@@ -26,6 +26,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.error(errorCode, exception.getMessage()));
     }
 
+    @ExceptionHandler(StaffNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleStaffNotFound(StaffNotFoundException exception) {
+        ErrorCode errorCode = exception.getErrorCode();
+        log.warn("Staff not found [{}]: {}", errorCode.getCode(), exception.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(errorCode, exception.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException exception) {
         String message = exception.getBindingResult().getFieldErrors().stream()

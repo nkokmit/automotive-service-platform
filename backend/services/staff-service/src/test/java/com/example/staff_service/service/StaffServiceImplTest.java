@@ -1,6 +1,7 @@
 package com.example.staff_service.service;
 
 import com.example.staff_service.dto.request.StaffCreateRequest;
+import com.example.staff_service.dto.response.StaffResponse;
 import com.example.staff_service.entity.StaffMember;
 import com.example.staff_service.exception.ErrorCode;
 import com.example.staff_service.exception.StaffAlreadyExistsException;
@@ -69,6 +70,32 @@ class StaffServiceImplTest {
         given(staffMemberRepository.findById(id)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> staffService.getStaffById(id))
+                .isInstanceOf(StaffNotFoundException.class)
+                .extracting(exception -> ((StaffNotFoundException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.STAFF_NOT_FOUND);
+    }
+
+    @Test
+    void getStaffByUserIdReturnsLinkedStaffProfile() {
+        UUID userId = UUID.randomUUID();
+        StaffMember staffMember = StaffMember.builder().id(UUID.randomUUID()).userId(userId).build();
+        StaffResponse response = new StaffResponse(
+                staffMember.getId(), userId, "EMP-003", "Nguyen Van C", null, null, null, true, null, null);
+        given(staffMemberRepository.findByUserId(userId)).willReturn(Optional.of(staffMember));
+        given(staffMapper.toStaffResponse(staffMember)).willReturn(response);
+
+        assertThat(staffService.getStaffByUserId(userId)).isSameAs(response);
+
+        verify(staffMemberRepository).findByUserId(userId);
+        verify(staffMapper).toStaffResponse(staffMember);
+    }
+
+    @Test
+    void getStaffByUserIdRejectsUnlinkedAccount() {
+        UUID userId = UUID.randomUUID();
+        given(staffMemberRepository.findByUserId(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> staffService.getStaffByUserId(userId))
                 .isInstanceOf(StaffNotFoundException.class)
                 .extracting(exception -> ((StaffNotFoundException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.STAFF_NOT_FOUND);

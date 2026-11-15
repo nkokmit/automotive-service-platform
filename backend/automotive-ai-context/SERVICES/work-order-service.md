@@ -79,6 +79,25 @@ Item C → Rejected
 
 Only approved items are executed.
 
+Work Order Service snapshots service and part details when adding a service
+to an estimate. It reads service pricing and the current BOM synchronously
+from Inventory Service through the internal catalog endpoints; it does not
+read Inventory Service's database. BOM-generated part lines retain their
+source service-line ID as an indexed, non-FK reference so removing a service
+removes only its generated parts, not manually added part lines. The estimate
+remains the owning relationship for every part line; source-line cleanup is
+performed transactionally by Work Order Service.
+
+New service and BOM part lines start in `PENDING`. Services can be added only
+to a `DRAFT` estimate. Manually added parts are snapshotted from Inventory
+Service's internal part catalog, including the requested quantity and current
+selling price; they can be added only to a `DRAFT` estimate. Service and part
+lines can be removed while the estimate is `DRAFT` or `PENDING_APPROVAL`;
+estimates with a final decision cannot be modified through these operations.
+Submitting an initial estimate moves a `DIAGNOSING` Work Order to
+`PENDING_APPROVAL`. Submitting a supplementary estimate while its Work Order
+is `IN_PROGRESS` leaves the Work Order status unchanged.
+
 ## Supplementary estimate
 
 If a new problem is discovered during repair:
@@ -95,13 +114,57 @@ Customer decision
    └── Rejected → skip
 ```
 
+Create an initial estimate only while the Work Order is `DIAGNOSING`; create
+a supplementary estimate only while it is `IN_PROGRESS`. Submitting a
+supplementary estimate does not change the Work Order status.
+
 ## Technician assignment
 
 Work Order supports technician assignment.
 
-The exact assignment model must follow the current implementation and
-Staff Service contract. Do not invent scheduling/assignment rules not
-present in code or requirements.
+`assignedTechId` stores the Staff Service `staffId`, not the User Service
+`userId`. Resolve the authenticated mechanic through Staff Service's
+`GET /api/staff/by-user/{userId}` endpoint. Assignment is allowed for approved
+service lines on an in-progress Work Order; validate the referenced staff
+profile is active. Only the assigned mechanic may start or complete that
+service line. Do not introduce scheduling rules.
+
+Service line progress is `APPROVED → IN_PROGRESS → COMPLETED`; persist
+`completed_at` when marking a line complete.
+
+## Cancellation
+
+Cancel a Work Order only from `CREATED`, `DIAGNOSING`, or `PENDING_APPROVAL`.
+Do not cancel an `IN_PROGRESS` or later Work Order. If part reservations remain,
+publish `PartsReleaseRequestedEvent` after the cancellation transaction commits;
+Inventory releases each reservation idempotently. A reservation result arriving
+after cancellation must also trigger release instead of moving the Work Order
+back to `IN_PROGRESS`.
+
+## API permissions
+
+All Work Order, Estimate, service-line, and part endpoints require
+`@PreAuthorize` permission checks using the `authorities` JWT claim. Permission
+names are seeded by user-service migration `V14__seed_work_order_service_permissions.sql`.
+`ADMIN` and `MANAGER` receive Work Order management permissions; MANAGER covers
+Advisor operations because the current role seed has no `ADVISOR` role.
+`MECHANIC` receives only assigned service-line and part-operation permissions.
+`CUSTOMER` receives none. A permission denial returns HTTP 403 with error code
+`1403`.
+
+| Permission | API operation |
+| --- | --- |
+| `WORK_ORDER_READ` | Read/search Work Orders |
+| `WORK_ORDER_CREATE` | Create Work Orders |
+| `WORK_ORDER_DIAGNOSIS_START` | Start diagnosis |
+| `WORK_ORDER_COMPLETE` / `WORK_ORDER_CANCEL` | Complete/cancel Work Orders |
+| `ESTIMATE_READ` / `ESTIMATE_CREATE` | Read/create Estimates |
+| `ESTIMATE_UPDATE` | Add/remove Estimate lines |
+| `ESTIMATE_SUBMIT` / `ESTIMATE_DECISION_RECORD` | Submit/record decisions |
+| `SERVICE_LINE_ASSIGN` | Assign mechanics |
+| `SERVICE_LINE_READ_ASSIGNED` | Read the mechanic's assigned lines |
+| `SERVICE_LINE_START` / `SERVICE_LINE_COMPLETE` | Update assigned-line progress |
+| `PART_ISSUE` / `PART_RELEASE` | Issue/release reserved parts |
 
 ## Real-time progress
 
@@ -112,17 +175,22 @@ the task or already present in the project.
 
 ## Inventory integration
 
-When approved Work Order items require parts:
+When an Estimate is finalized and approved Work Order part lines require
+parts:
 
 ``` text
-Approved items
+Approved part lines
       ↓
-Inventory Service
+PartsReservationRequestedEvent
       ↓
-Deduct stock
+Inventory Service reserves stock
+      ↓
+PartsReservedEvent / PartsReservationFailedEvent
 ```
 
-Only approved items consume stock.
+Only approved part lines are sent for reservation. Work Order records the
+reservation result asynchronously; it never assumes reservation succeeded.
+Stock is deducted later when parts are issued.
 
 Work Order Service must never modify Inventory DB directly.
 
@@ -143,6 +211,11 @@ Closed
 ```
 
 Billing owns Invoice and Payment.
+Completion requires every service line to be completed or rejected, releases
+unused part reservations through Inventory Service, and transitions the Work
+Order through `COMPLETED` to `PENDING_PAYMENT`. `WorkOrderCompletedEvent`
+contains service price snapshots and only the quantities of parts actually
+issued, so Billing does not need current catalog prices.
 
 ## Events
 

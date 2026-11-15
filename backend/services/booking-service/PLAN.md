@@ -232,11 +232,21 @@ Lưu danh sách dịch vụ dự kiến theo thứ tự thực hiện.
 
 Snapshot là dữ liệu dùng để tái dựng kế hoạch ước tính ban đầu. Không tự động ghi đè snapshot lịch sử khi Inventory Service thay đổi thời lượng hoặc nhu cầu nhân sự.
 
-### 4.3. `booking_status_histories` — tùy chọn
+### 4.3. `booking_status_histories`
 
-Có thể sử dụng để ghi nhận lịch sử chuyển trạng thái nếu nghiệp vụ cần audit hoặc tra cứu diễn biến booking.
+Bảng bắt buộc dùng để ghi nhận lịch sử chuyển trạng thái booking phục vụ audit và tra cứu diễn biến.
 
-Không bắt buộc triển khai nếu chưa có yêu cầu sử dụng rõ ràng và dự án đã có cơ chế ghi nhận phù hợp.
+| Trường | Ý nghĩa |
+|---|---|
+| `id` | ID bản ghi lịch sử |
+| `booking_id` | Booking nội bộ sở hữu bản ghi lịch sử |
+| `from_status` | Trạng thái trước chuyển đổi, nullable khi ghi trạng thái khởi tạo |
+| `to_status` | Trạng thái sau chuyển đổi |
+| `changed_at` | Thời điểm chuyển trạng thái |
+| `reason` | Lý do chuyển trạng thái, nullable |
+| `changed_by` | ID người thực hiện, nullable, chỉ là tham chiếu logic sang service khác |
+
+`booking_id` là quan hệ nội bộ với cascade delete. `changed_by` không tạo khóa ngoại cross-service. Bản ghi khởi tạo dùng `from_status = NULL` và `to_status = CONFIRMED`.
 
 ### 4.4. Trạng thái booking
 
@@ -348,8 +358,6 @@ Dữ liệu nguồn cung cần có dạng các khoảng làm việc của từng
 Các khoảng này phải phản ánh kết quả tổng hợp lịch làm việc của Staff Service, bao gồm lịch định kỳ, ngoại lệ và thời gian nghỉ theo quy tắc của service đó.
 
 **Yêu cầu hợp đồng API:** Booking Service cần một API hoặc cơ chế đọc lịch tổng hợp cho phép lấy các khoảng làm việc thực tế của từng nhân viên trong `[reqStart, reqEnd)`. Dữ liệu phải xác định được từng nhân viên và các khoảng không chồng lấn của người đó.
-
-API hiện tại chỉ trả về danh sách nhân viên có thể làm việc liên tục trong toàn bộ khoảng được hỏi không đủ để tái dựng nguồn cung biến đổi theo thời gian. Không được dùng số lượng nhân viên của API đó làm nguồn cung cố định cho toàn booking.
 
 Nếu Staff Service chưa cung cấp dữ liệu phù hợp, phải bổ sung hợp đồng API trước khi triển khai thuật toán này. Không tự tính lại toàn bộ lịch định kỳ, ngoại lệ và nghỉ phép ở Booking Service.
 
@@ -698,7 +706,7 @@ No-show chỉ được ghi nhận theo quy trình xác định rằng khách kh�
 
 ## 7. API dự kiến
 
-Các endpoint dưới đây là đề xuất thiết kế, cần thống nhất với conventions và authorization hiện có trước khi triển khai.
+Các endpoint khách hàng dưới đây và API nhân viên ở §7.2 đã được triển khai.
 
 ### 7.1. Khách hàng
 
@@ -708,28 +716,47 @@ Các endpoint dưới đây là đề xuất thiết kế, cần thống nhất 
 | `POST` | `/api/bookings` | Tạo booking và xác nhận ngay |
 | `GET` | `/api/bookings/me` | Danh sách booking của khách hiện tại |
 | `GET` | `/api/bookings/{id}` | Chi tiết booking nếu khách có quyền truy cập |
-| `POST` hoặc `PATCH` | `/api/bookings/{id}/cancel` | Hủy booking |
+| `POST` | `/api/bookings/{id}/cancel` | Hủy booking |
 | `PATCH` | `/api/bookings/{id}/reschedule` | Đổi lịch booking |
 
-Request tìm slot cần có ngày hoặc khoảng thời gian tìm kiếm và danh sách ID dịch vụ theo thứ tự mong muốn.
+`GET /api/bookings/availability` nhận `from`, `to` (ngày ISO, bao gồm cả hai đầu) và nhiều tham số `serviceIds` theo thứ tự mong muốn. Ngày được diễn giải theo `app.schedule-zone-id`. Thời điểm bắt đầu ứng viên cách nhau theo `app.booking.availability.slot-interval-minutes` (mặc định 30 phút); khoảng tìm kiếm tối đa cấu hình qua `app.booking.availability.max-days` (mặc định 14 ngày).
 
-Response tìm slot nên chứa tối thiểu thời điểm bắt đầu, thời điểm kết thúc dự kiến và thông tin cần thiết để khách chọn lịch. Không coi kết quả tìm slot là cam kết giữ chỗ.
+Response tìm slot chứa `startAt` và `endAt` dự kiến. Không coi kết quả tìm slot là cam kết giữ chỗ.
 
-Request tạo booking cần chứa thời điểm bắt đầu, danh sách dịch vụ có thứ tự, biển số snapshot và ghi chú tùy chọn.
+`POST /api/bookings` nhận `startAt` dạng Instant, danh sách `serviceIds` có thứ tự, `licensePlate` và `customerNote` tùy chọn. Customer ID được resolve từ hồ sơ hiện tại qua Customer-Vehicle Service bằng JWT của caller; không nhận `customerId` từ body. Booking được tạo trả HTTP 201; thiếu sức chứa trả HTTP 409; lỗi dependency trả HTTP 503.
 
-Khách hàng không được tự truyền `customer_id` tùy ý để tạo booking cho người khác. ID khách hàng phải được xác định từ ngữ cảnh xác thực hoặc theo luồng nghiệp vụ được cho phép.
+Tạo booking lấy khóa theo ngày bắt đầu (`booking_capacity_day_locks`, tạo hàng nếu chưa có rồi `SELECT ... FOR UPDATE`) trong `booking_service`, kiểm tra lại tải hiện tại và lưu booking, snapshot dịch vụ cùng lịch sử trạng thái ban đầu trong một transaction. Lời gọi service phụ thuộc nằm ngoài transaction; các lệnh đọc được retry tối đa hai lần khi gặp lỗi mạng/5xx tạm thời. Không retry thao tác ghi booking.
+
+Các endpoint quản lý booking cũng resolve Customer hiện tại từ Customer-Vehicle Service bằng JWT của caller; booking không thuộc khách hàng sẽ trả `404`. Danh sách sắp xếp theo `startAt` giảm dần và chi tiết gồm snapshot dịch vụ đã đặt.
+
+Hủy chỉ áp dụng cho booking `CONFIRMED` chưa đến giờ hẹn và chưa bước vào tiếp nhận/Work Order. Hủy lặp lại booking đã `CANCELLED` trả booking hiện tại mà không ghi thêm lịch sử. Chuyển trạng thái và `cancelled_at` được ghi cùng transaction dưới khóa booking và khóa ngày sức chứa; `CANCELLED` không còn giữ sức chứa.
+
+Đổi lịch chỉ áp dụng cho booking `CONFIRMED` còn ở tương lai, dùng snapshot dịch vụ cũ thay vì tải lại catalog. Transaction khóa booking và các ngày cũ/mới theo thứ tự tăng dần, kiểm tra sức chứa lịch mới sau khi loại trừ chính booking đang đổi, rồi mới cập nhật `start_at`/`end_at`. Nếu không đủ sức chứa, lịch cũ không thay đổi; lời gọi Staff Service diễn ra trước transaction.
 
 ### 7.2. Nhân viên
 
+Tất cả endpoint nằm dưới `/api/staff/bookings`, yêu cầu `ROLE_STAFF` (hoặc `ROLE_MANAGER`/`ROLE_ADMIN`), tách khỏi `/api/bookings` của khách. Đã triển khai.
+
 | Method | Endpoint | Mục đích |
 |---|---|---|
-| `GET` | `/api/bookings` | Tra cứu booking theo bộ lọc |
-| `GET` | `/api/bookings/{id}` | Xem chi tiết booking |
-| `PATCH` | `/api/bookings/{id}/status` | Cập nhật trạng thái khi được phép |
-| `PATCH` | `/api/bookings/{id}/vehicle` | Liên kết xe chính thức sau khi xác minh |
-| `POST` | `/api/bookings/{id}/check-in` | Thực hiện hoặc khởi tạo quy trình tiếp nhận |
+| `GET` | `/api/staff/bookings` | Tra cứu theo `status`, `source`, `customerId`, `licensePlate`, `from`/`to` (ngày, theo `app.schedule-zone-id`), phân trang (`page`, `size` tối đa 100, `newestFirst`) |
+| `GET` | `/api/staff/bookings/{id}` | Chi tiết booking (gồm `source`, `createdBy`, `checkedInAt`, `workOrderId`) |
+| `POST` | `/api/staff/bookings` | Tạo booking offline hộ khách (`source` = `PHONE` hoặc `WALK_IN`) |
+| `POST` | `/api/staff/bookings/{id}/cancel` | Hủy hộ khách (cùng quy tắc `CONFIRMED`, chưa đến giờ hẹn, chưa tiếp nhận) |
+| `PATCH` | `/api/staff/bookings/{id}/reschedule` | Đổi lịch hộ khách (cùng quy tắc và kiểm tra sức chứa như khách) |
+| `PATCH` | `/api/staff/bookings/{id}/status` | Chỉ `CONFIRMED → NO_SHOW` (sau giờ hẹn) và `CHECKED_IN → FULFILLED` |
+| `POST` | `/api/staff/bookings/{id}/check-in` | Tiếp nhận (`CONFIRMED → CHECKED_IN`); body tùy chọn `vehicleId` để xác minh biển số, liên kết xe và tiếp nhận cùng lúc |
 
-Các endpoint phục vụ tiếp nhận và liên kết Work Order cần có thiết kế idempotency, xác thực chuyển trạng thái và kiểm tra trạng thái hiện tại. Không để một endpoint tổng quát cho phép chuyển tùy ý giữa mọi trạng thái.
+Quyết định cho booking offline:
+
+- Booking offline dùng đúng thuật toán sức chứa và khóa theo ngày như booking online; không có cơ chế ép đặt khi hết sức chứa (v1).
+- `POST` bắt buộc `customerId` của Customer đã tồn tại (booking-service chỉ xác minh còn hoạt động, không tạo Customer). Nếu khách chưa có hồ sơ, FE tìm/tạo Customer qua customer-vehicle-service trước rồi mới gọi API này — cùng nguyên tắc với `vehicleId` ở check-in.
+- `PHONE` phải có `startAt` ở tương lai; `WALK_IN` cho phép lùi tối đa 15 phút.
+- Cột `bookings.source` (`ONLINE`/`PHONE`/`WALK_IN`) và `created_by` (staff user) phục vụ truy vết; lịch sử trạng thái ghi `changed_by` là nhân viên.
+- Check-in yêu cầu đúng ngày hẹn và xe đã được liên kết hoặc được xác minh qua `vehicleId`; lặp lại trên booking đã `CHECKED_IN` trả kết quả hiện tại. Gửi cùng `vehicleId` là idempotent, xe khác trả `409`.
+- Chưa tạo Work Order (chưa có Work Order Service): `work_order_id` vẫn `NULL`, sẽ nối ở giai đoạn 6.
+
+Các endpoint tiếp nhận cần giữ idempotency, xác thực chuyển trạng thái và kiểm tra trạng thái hiện tại. Không có endpoint tổng quát cho phép chuyển tùy ý giữa mọi trạng thái.
 
 ## 8. Các quyết định nghiệp vụ đã chốt
 
@@ -780,12 +807,11 @@ Các endpoint phục vụ tiếp nhận và liên kết Work Order cần có thi
 - Tích hợp kiểm tra sức chứa với cơ chế đồng bộ khi ghi booking.
 - Xử lý lỗi và retry khi các service phụ thuộc không khả dụng.
 
-### Giai đoạn 5 — Quản lý booking
-
-- Danh sách và chi tiết booking.
-- Hủy booking.
-- Đổi lịch an toàn.
-- Quản lý trạng thái và quy tắc giải phóng sức chứa.
+### Giai đoạn 5 — Quản lý booking (API khách hàng đã triển khai)
+- Danh sách và chi tiết booking theo Customer hiện tại.
+- Hủy booking `CONFIRMED` trước giờ hẹn, ghi lịch sử và giải phóng sức chứa idempotent.
+- Đổi lịch an toàn bằng khóa ngày, kiểm tra lại sức chứa và giữ nguyên lịch cũ nếu thất bại.
+- Chặn thao tác hủy/đổi sau giờ hẹn hoặc khi booking đã bước vào tiếp nhận.
 
 ### Giai đoạn 6 — Tiếp nhận xe và Work Order
 

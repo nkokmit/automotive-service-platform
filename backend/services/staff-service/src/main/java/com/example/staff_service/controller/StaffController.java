@@ -60,6 +60,12 @@ public class StaffController {
         return ApiResponse.success(staffService.getStaffById(id));
     }
 
+    @GetMapping("/by-user/{userId}")
+    @PreAuthorize("hasAuthority('STAFF_READ')")
+    public ApiResponse<StaffResponse> getStaffByUserId(@PathVariable UUID userId) {
+        return ApiResponse.success(staffService.getStaffByUserId(userId));
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('STAFF_CREATE')")

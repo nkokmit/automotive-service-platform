@@ -79,7 +79,7 @@ của project** (tham chiếu `backend/services/staff-service/PLAN.md` §5 và
   `/api/services/{serviceId}/bom`, `/api/purchase-orders/{purchaseOrderId}/items`.
 - **Hành động nghiệp vụ dùng sub-resource dạng verb:**
   `POST /api/purchase-orders/{purchaseOrderId}/complete`,
-  `POST /api/parts/reserve`, `POST /api/parts/issue`, `POST /api/parts/release`.
+  `POST /api/parts/issue`.
 - **Trả về đúng contract chung (`GLOBAL_RULES` §15):** mọi response bọc trong
   `ApiResponse<T>` (`code`, `message`, `result`). Danh sách có phân trang dùng
   `PageResponse<T>` với tham số `page`, `size`, `sortBy`, `sortDirection`.
@@ -103,10 +103,12 @@ foreign key hay JPA relationship (`GLOBAL_RULES` §2):
    `required_techs` để tính thời lượng và nhu cầu nhân sự rồi lưu snapshot
    (`booking-service/PLAN.md` §3.1). Endpoint đọc này phải là **synchronous**
    vì caller cần dữ liệu ngay để tạo booking.
-2. **Với `work-order-service` — trừ tồn kho (event-driven).**
-   Work Order Service **không** được ghi thẳng vào bảng của service này
-   (`ARCHITECTURE.md` §10). Chỉ **phụ tùng thuộc item được duyệt** mới bị
-   trừ, vì khách hàng có thể duyệt từng phần của báo giá.
+2. **Với `work-order-service` — giữ chỗ phụ tùng (event-driven).**
+   Khi khách duyệt báo giá, Work Order Service phát Kafka event; Inventory
+   Service chỉ giữ chỗ phụ tùng thuộc các item được duyệt. Không cần gọi REST
+   API để reserve. Work Order Service **không** được ghi thẳng vào bảng của
+   Inventory Service (`ARCHITECTURE.md` §10). Tồn thực (`on_hand_stock`) chỉ
+   giảm khi phụ tùng được xuất kho.
 
 Tên cột trong API phải khớp đúng tên cột trong schema (`duration_minutes`,
 `required_techs`, `default_quantity`) để hai bên không lệch contract.
@@ -148,9 +150,7 @@ Tên cột trong API phải khớp đúng tên cột trong schema (`duration_min
 | `POST` | `/api/purchase-orders/{purchaseOrderId}/approve` | Duyệt đơn nhập hàng (`DRAFT` → `APPROVED`) |
 | `POST` | `/api/purchase-orders/{purchaseOrderId}/complete` | Hoàn tất nhập kho (`APPROVED` → `RECEIVED`) |
 | `POST` | `/api/purchase-orders/{purchaseOrderId}/cancel` | Hủy đơn nhập hàng (`DRAFT`/`APPROVED` → `CANCELED`) |
-| `POST` | `/api/parts/reserve` | Giữ chỗ tồn kho cho Work Order |
 | `POST` | `/api/parts/issue` | Xuất kho phụ tùng |
-| `POST` | `/api/parts/release` | Giải phóng giữ chỗ tồn kho |
 | `POST` | `/api/parts/check-availability` | Kiểm tra tồn kho tức thời (sync cho service khác) |
 | `POST` | `/api/parts/pricing` | Lấy đơn giá phụ tùng phục vụ lập Báo giá (sync cho service khác) |
 | `GET` | `/api/inventory-transactions` | Tra cứu sổ nhật ký kho (lọc phụ tùng, loại, khoảng thời gian) |
@@ -237,14 +237,16 @@ Tên cột trong API phải khớp đúng tên cột trong schema (`duration_min
   đúng `duration_minutes` / `required_techs` để hai bên khớp.
 
 #### Module 3.2: Quản Lý Kho & Giữ Chỗ Tồn Kho (Inventory Rules)
-- [ ] **Xử lý Giữ chỗ (`reserveParts`) khi Khách duyệt Báo giá:**
+- [ ] **Xử lý Giữ chỗ (`reserveParts`) khi nhận Kafka event khách duyệt Báo giá**
+  (nghiệp vụ nội bộ, không expose REST endpoint):
   * Tính `availableStock = onHandStock - reservedStock`.
   * Nếu đủ hàng: Tăng `reservedStock`, tạo bản ghi `inventory_transactions` (`type = RESERVE`).
   * Nếu thiếu hàng: Bắn lỗi `InsufficientStockException`.
 - [ ] **Xử lý Xuất kho (`issueParts`) khi Kỹ thuật viên nhận phụ tùng:**
   * Giảm `onHandStock` và `reservedStock`.
   * Ghi nhật ký vào `inventory_transactions` (`type = EXPORT`).
-- [ ] **Xử lý Giải phóng Giữ chỗ (`releaseParts`) khi Hủy báo giá:**
+- [ ] **Xử lý Giải phóng Giữ chỗ (`releaseParts`) khi nhận Kafka event hủy**
+  (nghiệp vụ nội bộ, không expose REST endpoint):
   * Giảm `reservedStock`, ghi log `inventory_transactions` (`type = RELEASE`).
 - [ ] **Mọi biến động tồn kho phải ghi đủ `stock_before` / `stock_after`** trong
   `inventory_transactions` để phục vụ audit (Tiêu chí chấp nhận §3).
@@ -269,8 +271,13 @@ Tên cột trong API phải khớp đúng tên cột trong schema (`duration_min
 > tên đã thiết lập — không tự đặt tên mới nếu đã có contract.
 
 - [ ] **4.1. Kafka Consumers (Lắng nghe sự kiện từ Work Order Service)**
-  * **Consumer sự kiện báo giá được duyệt:** Khi khách duyệt các item trong báo giá, lọc ra danh sách phụ tùng thuộc item **được duyệt** -> Gọi `reserveParts()` hoặc `issueParts()`.
-  * **Consumer sự kiện hủy lệnh sửa chữa:** Tự động gọi `releaseParts()` nếu lệnh sửa chữa bị hủy.
+  * **Consumer sự kiện báo giá được duyệt:** Lọc phụ tùng thuộc các item
+    **được duyệt** rồi gọi nghiệp vụ nội bộ `reserveParts()`; không gọi
+    `POST /api/parts/reserve`. Việc xuất kho (`issueParts()`) thực hiện khi
+    phụ tùng được giao cho kỹ thuật viên.
+  * **Consumer sự kiện hủy lệnh sửa chữa:** Tự động gọi nghiệp vụ nội bộ
+    `releaseParts()` nếu lệnh sửa chữa bị hủy; không gọi
+    `POST /api/parts/release`.
   * **Idempotency:** mỗi lần xử lý event phải ghi đủ `inventory_transactions`
     với `reference_type` + `reference_id` để không trừ tồn kho hai lần khi
     Kafka redeliver.
