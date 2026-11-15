@@ -14,12 +14,12 @@ Gateway, Eureka và MySQL.
 | `staff-service`            | Hồ sơ nhân viên và lịch làm việc     | 8083                         |
 | `inventory-service`        | Catalog, kho và reservation          | 8084                         |
 | `booking-service`          | Lịch hẹn                              | 8085                         |
-| `work-order-service`       | Work Order và tiến độ sửa chữa       | Nội bộ, chỉ qua API Gateway  |
+| `work-order-service`       | Work Order và tiến độ sửa chữa       | 8086 (dev/debug)             |
 | `mysql`                    | MySQL cho các microservice            | 3306                         |
 | `kafka`                    | Kafka                                | 9092                         |
 
-Backend dùng chung multi-stage `backend/Dockerfile`. Work Order Service không
-publish port ra host; truy cập API qua API Gateway.
+Backend dùng chung multi-stage `backend/Dockerfile`. Trong dev/debug, các business service publish host port; . Khi deploy production, bỏ toàn bộ port mapping trực tiếp của các business service và truy
+cập API qua API Gateway.
 
 ## Chạy bằng Docker Compose
 
@@ -90,6 +90,7 @@ Lần build và khởi động đầu tiên có thể mất vài phút.
 | User service (nội bộ) | http://localhost:8081                            |
 | Customer vehicle svc   | http://localhost:8082                            |
 | Staff service (nội bộ) | http://localhost:8083                            |
+| Work Order Service (dev/debug) | http://localhost:8086                     |
 | OpenAPI customer vehicle | http://localhost:8000/v3/api-docs/customer-vehicle-service |
 | OpenAPI staff service | http://localhost:8000/v3/api-docs/staff-service |
 | MySQL                 | localhost:3306 (các database service được bootstrap ở trên) |
@@ -234,6 +235,7 @@ docker compose down -v
 - Đổi `JWT_SECRET` sẽ làm mất hiệu lực các token đang chạy.
 - Actuator đã được giới hạn, nhưng Swagger UI và OpenAPI vẫn được permit để phục
   vụ tài liệu API.
-- `user-service`, `customer-vehicle-service` và `staff-service` được expose ở
-  host port chỉ để phục vụ dev/debug; gateway là entry point theo kiến trúc.
-  Không expose port các microservice ra ngoài trong production.
+- `user-service`, `customer-vehicle-service`, `staff-service`, `inventory-service`,
+  `booking-service` và `work-order-service` được expose ở host port để phục vụ
+  dev/debug; gateway vẫn là entry point theo kiến trúc. Khi deploy production,
+  bỏ toàn bộ port mapping trực tiếp của các business service.
