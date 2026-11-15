@@ -1,5 +1,816 @@
 openapi: 3.0.3
 info:
-  title: Auth API
-  version: 0.1.0
-paths: {}
+  title: Auth & User Service API
+  description: |
+    Spec đã **đồng bộ với code backend** (`backend/services/user-service`).
+
+    **Lưu ý thay đổi so với skeleton 0.1.0-draft:**
+    - Đăng nhập bằng `username` (không phải email).
+    - Endpoint refresh là `/auth/refresh-token`, nhận `{ rawToken }`.
+    - User có `username` + `fullName` + `roles[]`; không có `avatar`/`tier`/
+      `memberSince`/`loyaltyPoints` (chưa có trong DB, chỉ là ý tưởng UI).
+    - Mọi response bọc trong `ApiResponse<T>` — kiểm tra `code` (0 = thành công),
+      không chỉ HTTP status.
+    - Phân trang dùng `page` **0-based** + `size`.
+    - Phân quyền theo **authority** (`USER_READ`, `ROLE_WRITE`, ...), không theo
+      tên role.
+    - Route `/auth/*`, `/actuator/health/*`, `/swagger-ui/*`, `/v3/api-docs/*` là
+      public; tất cả route khác yêu cầu Bearer token.
+
+    Base URL qua API Gateway: `http://localhost:8000/api/...` (Gateway chạy port 8000,
+    KHÔNG phải 4000 — xem `docker-compose.yml`).
+  version: 1.0.0
+  contact:
+    name: Thành viên 2
+servers:
+  - url: http://localhost:8081/api
+    description: Local dev (direct tới user-service)
+  - url: http://localhost:8000/api
+    description: Qua API Gateway
+tags:
+  - name: Auth
+  - name: Users
+  - name: Roles
+  - name: Permissions
+
+paths:
+  # ── Auth ────────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Đăng ký tài khoản mới
+      description: |
+        Role được server gán cứng là `CUSTOMER` — client **không** được gửi
+        `roleIds`/`isActive` (chống privilege escalation). Thành công thì trả về
+        cả access + refresh token nên client vào thẳng phiên, không cần gọi login.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Đăng ký thành công
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAuth' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Đăng nhập
+      description: Xác thực bằng **username** + password (không phải email).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAuth' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Lấy access token mới từ refresh token
+      description: |
+        Refresh token đã bị revoke hoặc hết hạn sẽ bị từ chối.
+        Response chỉ chứa `accessToken` mới — refresh token cũ vẫn dùng được.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRefresh' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Đăng xuất
+      description: Revoke toàn bộ refresh token của user (Bearer access token bắt buộc).
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Đăng xuất thành công
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseVoid' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Users ───────────────────────────────────────────────────────────────────
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Hồ sơ user hiện tại
+      description: |
+        Đọc danh tính từ `sub` của access token, không nhận tham số id — vì vậy
+        không thể dùng endpoint này để xem hồ sơ người khác.
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Danh sách user (quản trị)
+      description: Cần authority `USER_READ`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortByParam'
+        - $ref: '#/components/parameters/SortDirectionParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseUserPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      summary: Tạo user (quản trị)
+      description: |
+        Cần authority `USER_CREATE`. Gán role `ADMIN` chỉ thành công khi caller
+        có `ROLE_ADMIN` — nếu không sẽ bị chặn ở service.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserCreateRequest' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseUser' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Chi tiết một user
+      description: Cần authority `USER_READ`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseUser' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Users]
+      summary: Cập nhật user
+      description: Cần authority `USER_UPDATE`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserUpdateRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseUser' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Users]
+      summary: Xoá user (soft delete)
+      description: |
+        Cần authority `USER_DELETE`. Xoá mềm (`deletedAt` + `isActive=false`);
+        response rỗng, HTTP 204. Gọi lại lần hai trên cùng id là idempotent.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204': { description: Đã xoá }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/{id}/roles:
+    post:
+      tags: [Users]
+      summary: Gán role cho user (thay thế toàn bộ set hiện có)
+      description: Cần authority `USER_UPDATE`. Body là mảng thuần các UUID role.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseUser' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/{id}/roles/{roleId}:
+    delete:
+      tags: [Users]
+      summary: Gỡ một role khỏi user
+      description: Cần authority `USER_UPDATE`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - in: path
+          name: roleId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseUser' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ── Roles ───────────────────────────────────────────────────────────────────
+  /roles:
+    get:
+      tags: [Roles]
+      summary: Danh sách role
+      description: Cần authority `ROLE_READ`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortByParam'
+        - $ref: '#/components/parameters/SortDirectionParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRolePage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Roles]
+      summary: Tạo role
+      description: |
+        Cần authority `ROLE_WRITE`. Gửi `name` **không** kèm prefix `ROLE_` —
+        service tự thêm thành `ROLE_<NAME>`.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleCreateRequest' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRole' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /roles/{id}:
+    get:
+      tags: [Roles]
+      summary: Chi tiết role
+      description: Cần authority `ROLE_READ`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRole' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Roles]
+      summary: Cập nhật role
+      description: Cần authority `ROLE_WRITE`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleUpdateRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRole' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Roles]
+      summary: Xoá role
+      description: Cần authority `ROLE_WRITE`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204': { description: Đã xoá }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /roles/{id}/permissions:
+    post:
+      tags: [Roles]
+      summary: Gán permission cho role
+      description: Cần authority `ROLE_WRITE`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRole' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /roles/{id}/permissions/{permissionId}:
+    delete:
+      tags: [Roles]
+      summary: Gỡ permission khỏi role
+      description: Cần authority `ROLE_WRITE`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+        - in: path
+          name: permissionId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRole' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── Permissions ─────────────────────────────────────────────────────────────
+  /permissions:
+    get:
+      tags: [Permissions]
+      summary: Danh sách permission
+      description: Cần authority `PERMISSION_READ`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePermissionPage' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Permissions]
+      summary: Tạo permission
+      description: Cần authority `PERMISSION_WRITE`.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PermissionCreateRequest' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePermission' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /permissions/{id}:
+    get:
+      tags: [Permissions]
+      summary: Chi tiết permission
+      description: Cần authority `PERMISSION_READ`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePermission' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Permissions]
+      summary: Cập nhật permission
+      description: Cần authority `PERMISSION_WRITE`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PermissionUpdateRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePermission' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Permissions]
+      summary: Xoá permission
+      description: Cần authority `PERMISSION_WRITE`.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204': { description: Đã xoá }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Access token ký bằng **HS256** dùng chung `JWT_SECRET` với API Gateway
+        (không phải RS256). Claims: `sub` = username, `userId` = UUID của user,
+        `authorities` = danh sách authority.
+
+  parameters:
+    IdParam:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    PageParam:
+      in: query
+      name: page
+      description: Trang bắt đầu từ **0**.
+      schema: { type: integer, minimum: 0, default: 0 }
+    SizeParam:
+      in: query
+      name: size
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SortByParam:
+      in: query
+      name: sortBy
+      schema: { type: string, default: createdAt }
+    SortDirectionParam:
+      in: query
+      name: sortDirection
+      schema: { type: string, enum: [ASC, DESC], default: DESC }
+
+  responses:
+    BadRequest:
+      description: Dữ liệu không hợp lệ (lỗi validation)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponseError' }
+    Unauthorized:
+      description: Chưa đăng nhập, token thiếu/hết hạn/hồi sai (ErrorCode 1401)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponseError' }
+    Forbidden:
+      description: Đã đăng nhập nhưng thiếu authority (ErrorCode 1403)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponseError' }
+    NotFound:
+      description: Không tìm thấy (ErrorCode 1001 / 1101 / 1201)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponseError' }
+    Conflict:
+      description: Dữ liệu trùng — username/email/số điện thoại đã tồn tại
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponseError' }
+
+  schemas:
+    # ── Envelope ───────────────────────────────────────────────────────────────
+    ApiResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          description: |
+            `0` = thành công. Khác 0 là lỗi nghiệp vụ — kiểm tra field này,
+            **không** chỉ dựa vào HTTP status.
+          example: 0
+        message: { type: string, example: Success }
+        result: { nullable: true }
+
+    ErrorCode:
+      type: integer
+      description: |
+        9999 lỗi không xác định · 1000 yêu cầu không hợp lệ · 1001 user không tồn tại ·
+        1002 username/email đã tồn tại · 1003 username trùng · 1004 email trùng ·
+        1005 số điện thoại trùng · 1101 role không tồn tại · 1102 role trùng ·
+        1201 permission không tồn tại · 1202 permission trùng ·
+        1401 chưa đăng nhập · 1403 không có quyền
+      example: 1002
+
+    # ── Auth ───────────────────────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: Tên đăng nhập, KHÔNG phải email.
+          example: nguyenvana
+        password: { type: string, format: password }
+
+    RegisterRequest:
+      type: object
+      required: [username, password, email]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50 }
+        password: { type: string, format: password, minLength: 6, maxLength: 100 }
+        email: { type: string, format: email }
+        phone: { type: string, minLength: 1, maxLength: 20, nullable: true }
+        fullName: { type: string, maxLength: 100, nullable: true }
+
+    RefreshTokenRequest:
+      type: object
+      required: [rawToken]
+      properties:
+        rawToken:
+          type: string
+          description: Refresh token nhận được lúc login/register.
+          example: eyJhbGciOiJIUzI1NiJ9...
+
+    AuthenticationResponse:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+      description: |
+        Không có field `expiresIn` trong response — TTL lấy từ claim `exp`
+        của access token.
+
+    RefreshTokenResponse:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken: { type: string }
+
+    # ── User / Role / Permission ───────────────────────────────────────────────
+    User:
+      type: object
+      required: [id, username, email, isActive, roles]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        fullName: { type: string, nullable: true }
+        isActive: { type: boolean, nullable: true }
+        roles:
+          type: array
+          description: |
+            Role rút gọn — `permissions` luôn `null` khi embed trong User để
+            tránh đệ quy vô hạn. Gọi `/roles/{id}` nếu cần danh sách permission.
+          items: { $ref: '#/components/schemas/Role' }
+
+    UserCreateRequest:
+      type: object
+      required: [username, password, email]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50 }
+        password: { type: string, format: password, minLength: 6, maxLength: 100 }
+        email: { type: string, format: email }
+        phone: { type: string, minLength: 1, maxLength: 20, nullable: true }
+        fullName: { type: string, maxLength: 100, nullable: true }
+        isActive: { type: boolean, default: true }
+        roleIds:
+          type: array
+          items: { type: string, format: uuid }
+          description: Chỉ caller có `ROLE_ADMIN` mới được gán role `ADMIN`.
+
+    UserUpdateRequest:
+      type: object
+      description: Mọi field đều tuỳ chọn — chỉ field có mặt mới được cập nhật.
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50 }
+        password: { type: string, format: password, minLength: 6, maxLength: 100 }
+        email: { type: string, format: email }
+        phone: { type: string, minLength: 1, maxLength: 20, nullable: true }
+        fullName: { type: string, maxLength: 100, nullable: true }
+        isActive: { type: boolean, nullable: true }
+        roleIds:
+          type: array
+          items: { type: string, format: uuid }
+
+    Role:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name:
+          type: string
+          description: Tên role đã chuẩn hoá, luôn có prefix `ROLE_`.
+          example: ROLE_CUSTOMER
+        displayName: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        permissions:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/Permission' }
+
+    RoleCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 50
+          description: |
+            Raw name **không** kèm prefix `ROLE_`; service tự thêm.
+            Bắt buộc UPPER_SNAKE_CASE.
+          example: GARAGE_OWNER
+        displayName: { type: string, maxLength: 100, nullable: true }
+        description: { type: string, maxLength: 255, nullable: true }
+
+    RoleUpdateRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 2, maxLength: 50 }
+        displayName: { type: string, maxLength: 100, nullable: true }
+        description: { type: string, maxLength: 255, nullable: true }
+
+    Permission:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name:
+          type: string
+          description: Tên authority, dùng trong `@PreAuthorize`.
+          example: USER_READ
+        displayName: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+
+    PermissionCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 50, example: GARAGE_OWNER }
+        displayName: { type: string, maxLength: 100, nullable: true }
+        description: { type: string, maxLength: 255, nullable: true }
+
+    PermissionUpdateRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 2, maxLength: 50 }
+        displayName: { type: string, maxLength: 100, nullable: true }
+        description: { type: string, maxLength: 255, nullable: true }
+
+    # ── Phân trang ─────────────────────────────────────────────────────────────
+    PageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages, hasNext, hasPrevious]
+      properties:
+        items: { type: array, items: {} }
+        page: { type: integer, description: 'Trang hiện tại, 0-based', example: 0 }
+        size: { type: integer, example: 20 }
+        totalElements: { type: integer, format: int64, example: 137 }
+        totalPages: { type: integer, example: 7 }
+        hasNext: { type: boolean }
+        hasPrevious: { type: boolean }
+
+    # ── Envelope đã bọc ────────────────────────────────────────────────────────
+    ApiResponseAuth:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result: { $ref: '#/components/schemas/AuthenticationResponse' }
+    ApiResponseRefresh:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result: { $ref: '#/components/schemas/RefreshTokenResponse' }
+    ApiResponseVoid:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result: { type: object, nullable: true }
+    ApiResponseUser:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result: { $ref: '#/components/schemas/User' }
+    ApiResponseRole:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result: { $ref: '#/components/schemas/Role' }
+    ApiResponsePermission:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result: { $ref: '#/components/schemas/Permission' }
+    ApiResponseUserPage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result:
+              allOf:
+                - $ref: '#/components/schemas/PageResponse'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: { $ref: '#/components/schemas/User' }
+    ApiResponseRolePage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result:
+              allOf:
+                - $ref: '#/components/schemas/PageResponse'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: { $ref: '#/components/schemas/Role' }
+    ApiResponsePermissionPage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            result:
+              allOf:
+                - $ref: '#/components/schemas/PageResponse'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: { $ref: '#/components/schemas/Permission' }
+    ApiResponseError:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            code: { $ref: '#/components/schemas/ErrorCode' }

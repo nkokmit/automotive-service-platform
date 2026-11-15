@@ -1,5 +1,261 @@
 openapi: 3.0.3
 info:
-  title: Content API
+  title: Content Service API
+  description: |
+    Quản lý tin tức / bài viết về ô tô, phục vụ trang chủ và gợi ý nội dung.
   version: 0.1.0
-paths: {}
+  contact:
+    name: Thành viên 3
+servers:
+  - url: http://localhost:8084/api/v1
+    description: Local dev (direct)
+  - url: http://localhost:4000/api/v1/news
+    description: Qua API Gateway
+tags:
+  - name: Articles
+    description: Bài viết / tin tức
+  - name: Categories
+    description: Chuyên mục
+  - name: Admin
+    description: CRUD dành cho Admin
+
+paths:
+  /news:
+    get:
+      tags: [Articles]
+      summary: Danh sách bài viết
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: isFeatured
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticlePage'
+    post:
+      tags: [Admin, Articles]
+      summary: Tạo bài viết
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleCreateRequest'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+
+  /news/{slug}:
+    get:
+      tags: [Articles]
+      summary: Chi tiết bài viết
+      parameters:
+        - $ref: '#/components/parameters/SlugParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleDetail'
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Admin, Articles]
+      summary: Cập nhật bài viết
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/SlugParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleUpdateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+    delete:
+      tags: [Admin, Articles]
+      summary: Xoá bài viết
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/SlugParam'
+      responses:
+        '204': { description: Đã xoá }
+
+  /news/featured:
+    get:
+      tags: [Articles]
+      summary: Bài viết nổi bật (dùng cho trang chủ)
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 5, maximum: 20 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Article' }
+
+  /categories:
+    get:
+      tags: [Categories]
+      summary: Danh sách chuyên mục
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Category' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    SlugParam:
+      in: path
+      name: slug
+      required: true
+      schema: { type: string }
+    PageParam:
+      in: query
+      name: page
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSizeParam:
+      in: query
+      name: pageSize
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    NotFound:
+      description: Không tìm thấy
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    Article:
+      type: object
+      required: [id, slug, title, summary, category, status, publishedAt]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        summary: { type: string, maxLength: 500 }
+        thumbnailUrl: { type: string, format: uri, nullable: true }
+        category: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        authorName: { type: string }
+        viewCount: { type: integer, minimum: 0 }
+        isFeatured: { type: boolean, default: false }
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, ARCHIVED]
+        publishedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ArticleDetail:
+      allOf:
+        - $ref: '#/components/schemas/Article'
+        - type: object
+          properties:
+            content: { type: string, description: 'Nội dung HTML/Markdown đầy đủ' }
+            relatedArticles:
+              type: array
+              items: { $ref: '#/components/schemas/Article' }
+
+    ArticleCreateRequest:
+      type: object
+      required: [title, summary, content, category]
+      properties:
+        title: { type: string, minLength: 5, maxLength: 200 }
+        summary: { type: string, minLength: 10, maxLength: 500 }
+        content: { type: string, minLength: 50 }
+        thumbnailUrl: { type: string, format: uri, nullable: true }
+        category: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        isFeatured: { type: boolean, default: false }
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, ARCHIVED]
+          default: DRAFT
+
+    ArticleUpdateRequest:
+      type: object
+      properties:
+        title: { type: string }
+        summary: { type: string }
+        content: { type: string }
+        thumbnailUrl: { type: string, format: uri, nullable: true }
+        category: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        isFeatured: { type: boolean }
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, ARCHIVED]
+
+    Category:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string, example: 'Bảo dưỡng' }
+        slug: { type: string, example: 'bao-duong' }
+        articleCount: { type: integer }
+
+    ArticlePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Article' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    ErrorResponse:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true, nullable: true }
+        timestamp: { type: string, format: date-time }
