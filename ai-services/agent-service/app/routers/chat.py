@@ -6,7 +6,7 @@ from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
 
 from app.agent.graph import build_agent_graph
@@ -140,6 +140,8 @@ async def chat(
         "messages": [HumanMessage(content=user_text)],
         "session_id": req.session_id,
         "user_id": req.user_id,
+        "route_queue": [],
+        "active_agent": None,
     }
     config = {"configurable": {"thread_id": req.session_id}}
 
@@ -155,17 +157,27 @@ async def chat(
         final_message = messages[-1]
 
         current_turn_tools = []
+        turn_ai_texts = []
         for m in reversed(messages):
             if isinstance(m, HumanMessage):
                 break
             if hasattr(m, "name") and hasattr(m, "tool_call_id"):
                 current_turn_tools.append(m.name)
+            elif isinstance(m, AIMessage) and not getattr(m, "tool_calls", None):
+                txt = _extract_text(m.content).strip()
+                if txt:
+                    turn_ai_texts.append(txt)
         current_turn_tools.reverse()
+        turn_ai_texts.reverse()
 
         if has_image and "analyze_vehicle_damage" not in current_turn_tools and "report" in damage_capture:
             current_turn_tools.append("analyze_vehicle_damage")
 
-        response_text = _extract_text(final_message.content)
+        response_text = (
+            "\n\n---\n\n".join(turn_ai_texts)
+            if turn_ai_texts
+            else _extract_text(final_message.content)
+        )
         if not response_text.strip() and "formatted_text" in damage_capture:
             response_text = damage_capture["formatted_text"]
 
@@ -194,7 +206,10 @@ async def _stream_response(
     yield f"data: {{\"session_id\": \"{session_id}\"}}\n\n"
     async for event in graph.astream_events(initial_state, config=config, version="v2"):
         kind = event.get("event")
+        node_name = (event.get("metadata") or {}).get("langgraph_node")
         if kind == "on_chat_model_stream":
+            if node_name == "router":
+                continue
             chunk = event["data"]["chunk"]
             text = _extract_text(chunk.content)
             if text:

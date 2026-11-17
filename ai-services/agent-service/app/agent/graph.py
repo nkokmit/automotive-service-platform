@@ -1,74 +1,36 @@
-"""LangGraph ReAct agent graph for the automotive platform."""
+"""LangGraph multi-agent graph (Intent Router + Specialized Subgraphs) for the automotive platform."""
 from __future__ import annotations
-import logging
-from datetime import datetime
 from typing import Any
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage
-from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode, tools_condition
 import httpx
+from langgraph.graph import END, StateGraph
 from qdrant_client import AsyncQdrantClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.agent.prompts import (
+    ADVISOR_SYSTEM_PROMPT,
+    BOOKING_SYSTEM_PROMPT,
+    DAMAGE_SYSTEM_PROMPT,
+)
+from app.agent.router import (
+    dispatch_next_node,
+    make_router_node,
+    route_to_active_agent,
+)
 from app.agent.state import AgentState
-from app.agent.prompts import SYSTEM_PROMPT
-from app.config import get_settings
+from app.agent.subagents import (
+    ADVISOR_AGENT,
+    BOOKING_AGENT,
+    DAMAGE_AGENT,
+    build_react_subgraph,
+)
 from app.tools import (
+    make_booking_tools,
+    make_customer_vehicle_tools,
+    make_damage_analysis_tool,
     make_search_car_news_tool,
     make_search_used_cars_tool,
-    make_booking_tools,
-    make_damage_analysis_tool,
-    make_customer_vehicle_tools,
 )
-
-logger = logging.getLogger(__name__)
-settings = get_settings()
-
-
-def _create_llm_with_tools(tools: list[Any]):
-    """Instantiate Google Gemini (with multi-model fallbacks for 503/429 resilience) or OpenAI LLM."""
-    gemini_key = (
-        settings.gemini_api_key.get_secret_value().strip()
-        if settings.gemini_api_key
-        else ""
-    )
-    if gemini_key:
-        api_key = gemini_key
-        candidate_models = [
-            settings.gemini_model,
-            "gemini-3-flash-preview",
-            "gemini-3.1-flash-lite-preview",
-            "gemini-flash-lite-latest",
-            "gemini-flash-latest",
-        ]
-        unique_models = list(dict.fromkeys(candidate_models))
-        bound_llms = [
-            ChatGoogleGenerativeAI(
-                model=m,
-                google_api_key=api_key,
-                temperature=0.1,
-                max_retries=2,
-            ).bind_tools(tools)
-            for m in unique_models
-        ]
-        primary = bound_llms[0]
-        if len(bound_llms) > 1:
-            return primary.with_fallbacks(bound_llms[1:])
-        return primary
-
-    openai_key = (
-        settings.openai_api_key.get_secret_value().strip()
-        if settings.openai_api_key
-        else ""
-    )
-    return ChatOpenAI(
-        model=settings.openai_model,
-        api_key=openai_key,
-        temperature=0.1,
-    ).bind_tools(tools)
 
 
 def build_agent_graph(
@@ -81,12 +43,16 @@ def build_agent_graph(
     attached_vehicle_brand: str | None = None,
     attached_vehicle_segment: str | None = None,
     damage_capture: dict[str, Any] | None = None,
+    router_llm: Any | None = None,
+    advisor_llm: Any | None = None,
+    damage_llm: Any | None = None,
+    booking_llm: Any | None = None,
 ) -> Any:
-    """Build and compile the LangGraph ReAct agent with 7 tools (including customer-vehicle-service)."""
+    """Build and compile the Approach A multi-agent graph (Intent Router + 3 Subgraphs)."""
     search_news = make_search_car_news_tool(qdrant_client)
     search_cars = make_search_used_cars_tool(db_session_factory)
-    check_slots_tool, create_booking_tool = make_booking_tools(http_client)
     lookup_vehicle_tool, record_history_tool = make_customer_vehicle_tools(db_session_factory)
+    check_slots_tool, create_booking_tool = make_booking_tools(http_client)
     damage_tool = make_damage_analysis_tool(
         http_client,
         attached_image_url=attached_image_url,
@@ -96,41 +62,46 @@ def build_agent_graph(
         damage_capture=damage_capture,
     )
 
-    tools = [
-        search_news,
-        search_cars,
-        lookup_vehicle_tool,
-        record_history_tool,
-        check_slots_tool,
-        create_booking_tool,
-        damage_tool,
-    ]
+    advisor_subgraph = build_react_subgraph(
+        name=ADVISOR_AGENT,
+        system_prompt=ADVISOR_SYSTEM_PROMPT,
+        tools=[search_news, search_cars, lookup_vehicle_tool, record_history_tool],
+        llm=advisor_llm,
+    )
+    damage_subgraph = build_react_subgraph(
+        name=DAMAGE_AGENT,
+        system_prompt=DAMAGE_SYSTEM_PROMPT,
+        tools=[damage_tool],
+        llm=damage_llm,
+    )
+    booking_subgraph = build_react_subgraph(
+        name=BOOKING_AGENT,
+        system_prompt=BOOKING_SYSTEM_PROMPT,
+        tools=[check_slots_tool, create_booking_tool],
+        llm=booking_llm,
+    )
 
-    llm = _create_llm_with_tools(tools)
-
-    async def agent_node(state: AgentState) -> dict:
-        """Call the LLM with current messages."""
-        system = SystemMessage(
-            content=SYSTEM_PROMPT.format(
-                current_time=datetime.now().strftime("%d/%m/%Y %H:%M")
-            )
-        )
-        messages = [system] + state["messages"]
-        response = await llm.ainvoke(messages)
-        return {"messages": [response]}
-
-    tool_node = ToolNode(tools)
+    has_attached_image = bool(attached_image_url or attached_image_base64)
+    route_edges = {
+        ADVISOR_AGENT: ADVISOR_AGENT,
+        DAMAGE_AGENT: DAMAGE_AGENT,
+        BOOKING_AGENT: BOOKING_AGENT,
+        END: END,
+    }
 
     graph = StateGraph(AgentState)
-    graph.add_node("agent", agent_node)
-    graph.add_node("tools", tool_node)
+    graph.add_node("router", make_router_node(router_llm=router_llm, has_attached_image=has_attached_image))
+    graph.add_node(ADVISOR_AGENT, advisor_subgraph)
+    graph.add_node(DAMAGE_AGENT, damage_subgraph)
+    graph.add_node(BOOKING_AGENT, booking_subgraph)
+    graph.add_node("dispatch_next", dispatch_next_node)
 
-    graph.set_entry_point("agent")
-    graph.add_conditional_edges(
-        "agent",
-        tools_condition,
-        {"tools": "tools", END: END},
-    )
-    graph.add_edge("tools", "agent")
+    graph.set_entry_point("router")
+    graph.add_conditional_edges("router", route_to_active_agent, route_edges)
+
+    for agent_name in (ADVISOR_AGENT, DAMAGE_AGENT, BOOKING_AGENT):
+        graph.add_edge(agent_name, "dispatch_next")
+
+    graph.add_conditional_edges("dispatch_next", route_to_active_agent, route_edges)
 
     return graph.compile(checkpointer=checkpointer)
