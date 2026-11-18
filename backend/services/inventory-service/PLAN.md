@@ -278,9 +278,14 @@ Tên cột trong API phải khớp đúng tên cột trong schema (`duration_min
   * **Consumer sự kiện hủy lệnh sửa chữa:** Tự động gọi nghiệp vụ nội bộ
     `releaseParts()` nếu lệnh sửa chữa bị hủy; không gọi
     `POST /api/parts/release`.
-  * **Idempotency:** mỗi lần xử lý event phải ghi đủ `inventory_transactions`
-    với `reference_type` + `reference_id` để không trừ tồn kho hai lần khi
-    Kafka redeliver.
+  * **Inbox / idempotency theo luồng hiện tại:**
+    * `PartsReservationRequestedEvent` được dedupe theo `eventId`; bảng Inbox
+      `processed_events` lưu kết quả reservation để redelivery trả lại cùng
+      kết quả mà không reserve tồn kho lần nữa. Migration V4 đổi tên bảng
+      `processed_reservation_requests` sang convention `processed_events`,
+      giữ nguyên dữ liệu và các cột trạng thái reservation.
+    * `PartsReleaseRequestedEvent` chưa ghi Inbox theo event ID; lệnh tồn kho
+      được bảo vệ bởi idempotency key ở `inventory_transactions`.
 - [ ] **4.2. Kafka Producers (Phát sự kiện của Inventory Service)**
   * **`StockDeducted` Producer:** Phát event khi xuất kho phụ tùng thành công.
   * **`InsufficientStock` Producer:** Phát event báo thiếu hàng khi không đủ tồn kho phục vụ lệnh.

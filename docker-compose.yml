@@ -10,6 +10,7 @@ services:
       INVENTORY_MYSQL_DATABASE: ${INVENTORY_MYSQL_DATABASE:-inventory_service}
       BOOKING_MYSQL_DATABASE: ${BOOKING_MYSQL_DATABASE:-booking_service}
       WORK_ORDER_MYSQL_DATABASE: ${WORK_ORDER_MYSQL_DATABASE:-work_order_service}
+      BILLING_MYSQL_DATABASE: ${BILLING_MYSQL_DATABASE:-billing_service}
       MYSQL_USER: ${MYSQL_USER:-app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
     ports:
@@ -41,6 +42,7 @@ services:
       INVENTORY_MYSQL_DATABASE: ${INVENTORY_MYSQL_DATABASE:-inventory_service}
       BOOKING_MYSQL_DATABASE: ${BOOKING_MYSQL_DATABASE:-booking_service}
       WORK_ORDER_MYSQL_DATABASE: ${WORK_ORDER_MYSQL_DATABASE:-work_order_service}
+      BILLING_MYSQL_DATABASE: ${BILLING_MYSQL_DATABASE:-billing_service}
       MYSQL_USER: ${MYSQL_USER:-app}
       MYSQL_BOOTSTRAP_TCP: "true"
     volumes:
@@ -363,6 +365,47 @@ services:
       retries: 12
       start_period: 90s
 
+  billing-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE_PATH: services/billing-service
+    restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8087
+      DB_URL: jdbc:mysql://mysql:3306/${BILLING_MYSQL_DATABASE:-billing_service}
+      DB_USERNAME: ${MYSQL_USER:-app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 JWT_SECRET (at least 32 decoded bytes) in .env}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
+      EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      WORK_ORDER_SERVICE_URL: http://work-order-service:8086
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS_CONTAINER:-kafka:19092}
+    ports:
+      - "${BILLING_SERVICE_PORT:-8087}:8087"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mysql-bootstrap:
+        condition: service_completed_successfully
+      discovery-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      work-order-service:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8087/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
   api-gateway:
     build:
       context: ./backend
@@ -393,6 +436,8 @@ services:
       booking-service:
         condition: service_healthy
       work-order-service:
+        condition: service_healthy
+      billing-service:
         condition: service_healthy
     networks:
       - platform

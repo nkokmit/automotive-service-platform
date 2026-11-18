@@ -9,7 +9,9 @@ import com.example.work_order_service.exception.ApiException;
 import com.example.work_order_service.exception.ErrorCode;
 import com.example.work_order_service.messaging.event.PartReservationItem;
 import com.example.work_order_service.messaging.event.PartsReleaseRequestedEvent;
+import com.example.work_order_service.messaging.event.WorkOrderCanceledEvent;
 import com.example.work_order_service.messaging.producer.PartsReleaseRequestPublisher;
+import com.example.work_order_service.messaging.producer.WorkOrderCanceledEventPublisher;
 import com.example.work_order_service.repository.WorkOrderPartLineRepository;
 import com.example.work_order_service.repository.WorkOrderRepository;
 import com.example.work_order_service.repository.WorkOrderStatusHistoryRepository;
@@ -28,6 +30,7 @@ public class WorkOrderCancellationTransaction {
     private final WorkOrderPartLineRepository partLineRepository;
     private final WorkOrderStatusHistoryRepository historyRepository;
     private final PartsReleaseRequestPublisher releaseRequestPublisher;
+    private final WorkOrderCanceledEventPublisher canceledEventPublisher;
 
     @Transactional
     public void cancel(UUID workOrderId, UUID changedBy) {
@@ -50,6 +53,8 @@ public class WorkOrderCancellationTransaction {
                 .changedBy(changedBy)
                 .note("Work Order canceled")
                 .build());
+        canceledEventPublisher.publish(new WorkOrderCanceledEvent(
+                UUID.randomUUID(), workOrderId, java.time.Instant.now(), "Work Order canceled"));
 
         List<PartReservationItem> reservedParts =
                 partLineRepository.findByEstimate_WorkOrder_IdOrderByCreatedAtAsc(workOrderId).stream()

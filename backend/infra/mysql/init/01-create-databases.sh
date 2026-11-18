@@ -17,6 +17,7 @@ STAFF_DB="${STAFF_MYSQL_DATABASE:-staff_service}"
 INVENTORY_DB="${INVENTORY_MYSQL_DATABASE:-inventory_service}"
 BOOKING_DB="${BOOKING_MYSQL_DATABASE:-booking_service}"
 WORK_ORDER_DB="${WORK_ORDER_MYSQL_DATABASE:-work_order_service}"
+BILLING_DB="${BILLING_MYSQL_DATABASE:-billing_service}"
 APP_USER="${MYSQL_USER:-app}"
 
 if [[ "${MYSQL_BOOTSTRAP_TCP:-false}" == "true" ]]; then
@@ -38,7 +39,9 @@ MYSQL_PWD="${MYSQL_ROOT_PASSWORD}" mysql "${mysql_connection[@]}" -uroot <<-EOSQ
 	GRANT ALL PRIVILEGES ON \`${BOOKING_DB}\`.* TO '${APP_USER}'@'%';
 	CREATE DATABASE IF NOT EXISTS \`${WORK_ORDER_DB}\`;
 	GRANT ALL PRIVILEGES ON \`${WORK_ORDER_DB}\`.* TO '${APP_USER}'@'%';
+	CREATE DATABASE IF NOT EXISTS \`${BILLING_DB}\`;
+	GRANT ALL PRIVILEGES ON \`${BILLING_DB}\`.* TO '${APP_USER}'@'%';
 	FLUSH PRIVILEGES;
 EOSQL
 
-echo "Initialized databases '${USER_DB}', '${CUSTOMER_VEHICLE_DB}', '${STAFF_DB}', '${INVENTORY_DB}', '${BOOKING_DB}', and '${WORK_ORDER_DB}' for user '${APP_USER}'."
+echo "Initialized databases '${USER_DB}', '${CUSTOMER_VEHICLE_DB}', '${STAFF_DB}', '${INVENTORY_DB}', '${BOOKING_DB}', '${WORK_ORDER_DB}', and '${BILLING_DB}' for user '${APP_USER}'."
