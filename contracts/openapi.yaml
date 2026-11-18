@@ -1,0 +1,533 @@
+openapi: 3.0.3
+info:
+  title: Automotive Service Platform — Unified API
+  description: |
+    Tổng hợp OpenAPI của 5 microservice trong hệ thống.
+    Tất cả endpoint đều truy cập qua API Gateway: `http://localhost:4000/api/v1/...`
+
+    **Services:**
+    - **Auth/User** (`/auth/*`, `/users/*`)        → user-service     :8081
+    - **Garage** (`/services/*`, `/garages/*`, `/cars/*`, `/bookings/*`) → garage-service :8082
+    - **Commerce** (`/parts/*`, `/cart/*`, `/orders/*`)  → commerce-service  :8083
+    - **Content** (`/news/*`)                     → content-service  :8084
+    - **AI** (`/ai/damage/*`, `/ai/recommend/*`, `/ai/assistant/*`) → ai-services :9001/9002/9003
+
+    **Auth**: Gửi `Authorization: Bearer <jwt>` cho các endpoint yêu cầu.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:4000/api/v1
+    description: API Gateway (local)
+  - url: https://api.staging.autocare.vn/api/v1
+    description: Staging
+  - url: https://api.autocare.vn/api/v1
+    description: Production
+
+security:
+  - bearerAuth: []
+
+paths:
+  # Healthcheck
+  /healthz:
+    get:
+      tags: [System]
+      summary: Health check Gateway
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: 'UP' }
+                  gateway: { type: string, example: 'UP' }
+                  upstreams:
+                    type: object
+                    additionalProperties: { type: string }
+                    example:
+                      userService: 'UP'
+                      garageService: 'UP'
+                      commerceService: 'UP'
+                      contentService: 'UP'
+                      damageDetection: 'UP'
+                      recommendation: 'UP'
+                      agentService: 'UP'
+
+  # ===========================================================
+  # AUTH & USER (forward tới user-service)
+  # ===========================================================
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Đăng ký
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: './auth-api.yaml#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: './auth-api.yaml#/components/schemas/AuthResponse' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Đăng nhập
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: './auth-api.yaml#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: OK
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh token
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Đăng xuất
+      responses:
+        '204': { description: OK }
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Hồ sơ cá nhân
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: './auth-api.yaml#/components/schemas/User' }
+    patch:
+      tags: [Users]
+      summary: Cập nhật hồ sơ
+      responses:
+        '200': { description: OK }
+
+  /users/me/vehicles:
+    get:
+      tags: [Users]
+      summary: Danh sách xe
+    post:
+      tags: [Users]
+      summary: Thêm xe
+      responses:
+        '201': { description: OK }
+
+  /users/me/addresses:
+    get:
+      tags: [Users]
+      summary: Danh sách địa chỉ
+    post:
+      tags: [Users]
+      summary: Thêm địa chỉ
+      responses:
+        '201': { description: OK }
+
+  # ===========================================================
+  # GARAGE
+  # ===========================================================
+  /services:
+    get:
+      tags: [Services]
+      summary: Danh sách dịch vụ
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: './garage-api.yaml#/components/schemas/ServicePage' }
+    post:
+      tags: [Services]
+      summary: Tạo dịch vụ (Admin)
+      responses:
+        '201': { description: OK }
+
+  /services/categories:
+    get:
+      tags: [Services]
+      summary: Danh sách category
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /services/{slug}:
+    get:
+      tags: [Services]
+      summary: Chi tiết dịch vụ
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: './garage-api.yaml#/components/schemas/Service' }
+    patch:
+      tags: [Services]
+      summary: Cập nhật (Admin)
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Services]
+      summary: Xoá (Admin)
+      responses:
+        '204': { description: OK }
+
+  /garages:
+    get:
+      tags: [Garages]
+      summary: Danh sách gara
+      security: []
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Garages]
+      summary: Tạo gara (Admin)
+      responses:
+        '201': { description: OK }
+
+  /garages/{slug}:
+    get:
+      tags: [Garages]
+      summary: Chi tiết gara
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+    patch:
+      tags: [Garages]
+      summary: Cập nhật (Admin)
+      responses:
+        '200': { description: OK }
+
+  /garages/{slug}/services:
+    get:
+      tags: [Garages]
+      summary: Dịch vụ của gara
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+
+  /cars:
+    get:
+      tags: [Cars]
+      summary: Danh sách xe
+      security: []
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Cars]
+      summary: Thêm xe (Admin)
+      responses:
+        '201': { description: OK }
+
+  /cars/{slug}:
+    get:
+      tags: [Cars]
+      summary: Chi tiết xe
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+
+  /timeslots:
+    get:
+      tags: [Bookings]
+      summary: Khung giờ trống
+      security: []
+      parameters:
+        - { name: garageId, in: query, required: true, schema: { type: string } }
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200': { description: OK }
+
+  /bookings:
+    get:
+      tags: [Bookings]
+      summary: Lịch sửa chữa của tôi
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Bookings]
+      summary: Đặt lịch mới
+      responses:
+        '201': { description: OK }
+        '409':
+          description: Trùng khung giờ
+
+  /bookings/{id}:
+    get:
+      tags: [Bookings]
+      summary: Chi tiết booking
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+    patch:
+      tags: [Bookings]
+      summary: Cập nhật trạng thái
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+
+  # ===========================================================
+  # COMMERCE
+  # ===========================================================
+  /parts:
+    get:
+      tags: [Parts]
+      summary: Danh sách phụ tùng
+      security: []
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Parts]
+      summary: Thêm phụ tùng (Admin)
+      responses:
+        '201': { description: OK }
+
+  /parts/{slug}:
+    get:
+      tags: [Parts]
+      summary: Chi tiết phụ tùng
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Giỏ hàng của tôi
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Cart]
+      summary: Xoá giỏ
+      responses:
+        '204': { description: OK }
+
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Thêm vào giỏ
+      responses:
+        '200': { description: OK }
+
+  /cart/items/{itemId}:
+    patch:
+      tags: [Cart]
+      summary: Cập nhật số lượng
+      parameters:
+        - { name: itemId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Cart]
+      summary: Xoá item
+      parameters:
+        - { name: itemId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: OK }
+
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Lịch sử đơn hàng
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Orders]
+      summary: Tạo đơn
+      responses:
+        '201': { description: OK }
+
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Chi tiết đơn
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+    patch:
+      tags: [Orders]
+      summary: Cập nhật trạng thái
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+
+  # ===========================================================
+  # CONTENT
+  # ===========================================================
+  /news:
+    get:
+      tags: [Articles]
+      summary: Danh sách bài viết
+      security: []
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Articles]
+      summary: Tạo bài viết (Admin)
+      responses:
+        '201': { description: OK }
+
+  /news/featured:
+    get:
+      tags: [Articles]
+      summary: Bài viết nổi bật
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /news/{slug}:
+    get:
+      tags: [Articles]
+      summary: Chi tiết bài viết
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+    patch:
+      tags: [Articles]
+      summary: Cập nhật (Admin)
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Articles]
+      summary: Xoá (Admin)
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: OK }
+
+  /categories:
+    get:
+      tags: [Articles]
+      summary: Danh sách chuyên mục
+      security: []
+      responses:
+        '200': { description: OK }
+
+  # ===========================================================
+  # AI
+  # ===========================================================
+  /ai/damage/detect:
+    post:
+      tags: [AI - Damage Detection]
+      summary: Upload ảnh + nhận diện hư hỏng
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, format: binary }
+                vehicleId: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /ai/damage/history:
+    get:
+      tags: [AI - Damage Detection]
+      summary: Lịch sử detect
+      responses:
+        '200': { description: OK }
+
+  /ai/recommend:
+    get:
+      tags: [AI - Recommendation]
+      summary: Gợi ý mặc định
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [AI - Recommendation]
+      summary: Gợi ý theo context
+      responses:
+        '200': { description: OK }
+
+  /ai/assistant/message:
+    post:
+      tags: [AI - Assistant]
+      summary: Chat với AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: './ai-api.yaml#/components/schemas/ChatMessageRequest' }
+      responses:
+        '200': { description: OK }
+
+  /ai/assistant/conversations:
+    get:
+      tags: [AI - Assistant]
+      summary: Danh sách cuộc hội thoại
+      responses:
+        '200': { description: OK }
+
+  /ai/assistant/conversations/{id}:
+    get:
+      tags: [AI - Assistant]
+      summary: Chi tiết 1 cuộc hội thoại
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [AI - Assistant]
+      summary: Xoá cuộc hội thoại
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: OK }
+
+  /ai/assistant/booking-suggestion:
+    post:
+      tags: [AI - Assistant]
+      summary: AI gợi ý khung giờ đặt lịch
+      responses:
+        '200': { description: OK }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Header: `Authorization: Bearer <jwt>`
+        - Gateway verify chữ ký + exp
+        - Forward header + chèn X-User-Id, X-User-Role, X-User-Email xuống service

@@ -37,7 +37,7 @@ AI_CONTEXT.md
 
 ## 3. Công nghệ
 
--   Java 21
+-   Java 25
 -   Spring Boot 4.x
 -   MySQL 9.7
 -   Docker / Docker Compose
