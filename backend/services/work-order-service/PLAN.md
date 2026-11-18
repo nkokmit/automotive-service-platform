@@ -1924,6 +1924,27 @@ CLOSED
 
 ---
 
+## 18.3. Inbox và Transactional Outbox
+
+Tất cả event do `work-order-service` phát (`PartsReservationRequestedEvent`,
+`PartsReleaseRequestedEvent`, `WorkOrderCanceledEvent`, `WorkOrderCompletedEvent`)
+được ghi vào `outbox_events` trong cùng transaction với cập nhật nghiệp vụ.
+Worker polling mỗi giây lấy tối đa 50 bản ghi `PENDING` bằng
+`FOR UPDATE SKIP LOCKED`, gửi đồng bộ với Kafka, dùng `workOrderId` làm
+partition key và gắn header `X-Event-Id`. Lỗi được retry với exponential
+backoff; sau 10 lần chuyển sang `FAILED`.
+
+Các consumer hiện có (`VehicleCheckedInEvent`, `PartsReservedEvent`,
+`PartsReservationFailedEvent`) ghi `eventId` vào `processed_events` cùng
+transaction với xử lý nghiệp vụ. Event trùng được bỏ qua; lỗi nghiệp vụ
+rollback cả Inbox marker để Kafka retry. Bản ghi Inbox cũ hơn 30 ngày được
+dọn hằng ngày.
+
+`inventory-service` giữ Inbox reservation hiện có theo event ID; bảng được
+đặt tên `processed_events` bằng migration mới, bảo toàn dữ liệu và các cột
+kết quả reservation. Cơ chế này không thay thế idempotency của listener
+release trong Inventory.
+
 # 📌 Pha 19: Authorization
 
 Các actor chính:
@@ -2109,15 +2130,10 @@ nhiều lần:
 
 ## 20.4. Event Idempotency
 
-Kafka Consumer phải xử lý duplicate event an toàn.
-
-Ví dụ:
-
-```text
-PaymentCompletedEvent x2
-```
-
-không được gây lỗi hoặc tạo state transition sai.
+Các Kafka consumer phải xử lý duplicate event an toàn. Work Order dùng Inbox
+để chỉ chạy nghiệp vụ một lần cho mỗi `eventId`; outbox có thể phát lại message
+nếu tiến trình lỗi sau khi Kafka nhận message nhưng trước khi trạng thái `SENT`
+được commit. Vì vậy, consumer phía nhận vẫn phải dedupe theo `eventId`.
 
 ---
 
@@ -2419,11 +2435,13 @@ Kafka được sử dụng cho:
 
 ```text
 Reserve
-Release
-Issue
+Release reservation request
 ```
 
 Reservation failure phải được xử lý.
+
+Issue và release số lượng reservation ở từng Part Line hiện gọi Inventory
+đồng bộ bằng Feign; không phải Kafka.
 
 ---
 

@@ -121,6 +121,11 @@ permissions. `ADMIN` and `MANAGER` receive all Work Order permissions;
 `CUSTOMER` receives none. MANAGER covers Advisor operations because the current
 role seed does not contain a separate `ADVISOR` role.
 
+`V15__seed_billing_service_permissions.sql` adds the `CASHIER` role and billing
+permissions. `ADMIN` and `MANAGER` receive all billing permissions; `CASHIER`
+can read invoices/payments and record payments, but cannot edit or void invoices
+or refund payments.
+
 Granting more permissions is a schema/data decision: add a new Flyway
 migration. Do not edit `V4__seed_data.sql`.
 
