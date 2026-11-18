@@ -71,6 +71,16 @@ spring:
               predicates:
                 - Path=/api/work-order-service-lines,/api/work-order-service-lines/**
 
+            - id: billing-service-invoices
+              uri: lb://billing-service
+              predicates:
+                - Path=/api/invoices,/api/invoices/**
+
+            - id: billing-service-payments
+              uri: lb://billing-service
+              predicates:
+                - Path=/api/payments,/api/payments/**
+
             - id: staff-service-staff
               uri: lb://staff-service
               predicates:

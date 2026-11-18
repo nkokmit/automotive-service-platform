@@ -25,6 +25,7 @@ import com.example.work_order_service.integration.contract.InternalPartCatalogCo
 import com.example.work_order_service.mapper.EstimateMapper;
 import com.example.work_order_service.messaging.event.PartsReservationRequestedEvent;
 import com.example.work_order_service.messaging.producer.PartsReservationRequestPublisher;
+import com.example.work_order_service.messaging.producer.WorkOrderCanceledEventPublisher;
 import com.example.work_order_service.repository.EstimateRepository;
 import com.example.work_order_service.repository.WorkOrderPartLineRepository;
 import com.example.work_order_service.repository.WorkOrderRepository;
@@ -69,6 +70,8 @@ class EstimateTransactionTest {
     @Mock
     private PartsReservationRequestPublisher reservationRequestPublisher;
     @Mock
+    private WorkOrderCanceledEventPublisher canceledEventPublisher;
+    @Mock
     private WorkOrderPartTransaction workOrderPartTransaction;
 
     private EstimateTransaction transaction;
@@ -86,7 +89,8 @@ class EstimateTransactionTest {
                 serviceLineRepository,
                 partLineRepository,
                 new EstimateMapper(),
-                reservationRequestPublisher);
+                reservationRequestPublisher,
+                canceledEventPublisher);
         estimate = Estimate.builder()
                 .id(ESTIMATE_ID)
                 .code("EST-" + ESTIMATE_ID)
@@ -504,6 +508,7 @@ class EstimateTransactionTest {
         assertEquals(EstimateStatus.REJECTED, result.status());
         assertEquals(WorkOrderStatus.CANCELED, workOrder.getStatus());
         verify(statusHistoryRepository).save(any());
+        verify(canceledEventPublisher).publish(any());
     }
 
     @Test

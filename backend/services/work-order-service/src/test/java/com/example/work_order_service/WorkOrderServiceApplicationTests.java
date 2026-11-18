@@ -11,6 +11,7 @@ import org.springframework.test.context.TestPropertySource;
 		"spring.datasource.password=",
 		"spring.datasource.driver-class-name=org.h2.Driver",
 		"spring.flyway.enabled=false",
+		"app.kafka.outbox.initial-delay-ms=60000",
 		"eureka.client.enabled=false",
 		"jwt.secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 })

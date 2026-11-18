@@ -28,7 +28,9 @@ import com.example.work_order_service.integration.contract.InternalServiceCatalo
 import com.example.work_order_service.mapper.EstimateMapper;
 import com.example.work_order_service.messaging.event.PartReservationItem;
 import com.example.work_order_service.messaging.event.PartsReservationRequestedEvent;
+import com.example.work_order_service.messaging.event.WorkOrderCanceledEvent;
 import com.example.work_order_service.messaging.producer.PartsReservationRequestPublisher;
+import com.example.work_order_service.messaging.producer.WorkOrderCanceledEventPublisher;
 import com.example.work_order_service.repository.EstimateRepository;
 import com.example.work_order_service.repository.WorkOrderPartLineRepository;
 import com.example.work_order_service.repository.WorkOrderRepository;
@@ -57,6 +59,7 @@ public class EstimateTransaction {
     private final WorkOrderPartLineRepository partLineRepository;
     private final EstimateMapper mapper;
     private final PartsReservationRequestPublisher reservationRequestPublisher;
+    private final WorkOrderCanceledEventPublisher canceledEventPublisher;
 
     @Transactional
     public EstimateResponse create(UUID workOrderId, CreateEstimateRequest request, UUID createdBy) {
@@ -320,6 +323,9 @@ public class EstimateTransaction {
                 .changedBy(decidedBy)
                 .note("Initial Estimate rejected by customer")
                 .build());
+        canceledEventPublisher.publish(new WorkOrderCanceledEvent(
+                UUID.randomUUID(), workOrder.getId(), java.time.Instant.now(),
+                "Initial Estimate rejected by customer"));
         workOrderPartTransaction.releaseOutstandingParts(workOrder.getId(), decidedBy);
     }
 

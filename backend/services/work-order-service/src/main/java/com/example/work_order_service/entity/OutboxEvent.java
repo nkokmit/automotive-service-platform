@@ -1,0 +1,92 @@
+package com.example.work_order_service.entity;
+
+import com.example.work_order_service.enums.OutboxEventStatus;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "outbox_events")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class OutboxEvent {
+
+    @Id
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "id", length = 36, updatable = false, nullable = false)
+    private UUID id;
+
+    @Column(name = "aggregate_type", length = 50, nullable = false)
+    private String aggregateType;
+
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "aggregate_id", length = 36, nullable = false)
+    private UUID aggregateId;
+
+    @Column(name = "topic", length = 100, nullable = false)
+    private String topic;
+
+    @Column(name = "event_type", length = 100, nullable = false)
+    private String eventType;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "payload", nullable = false, columnDefinition = "JSON")
+    private JsonNode payload;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.ENUM)
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private OutboxEventStatus status = OutboxEventStatus.PENDING;
+
+    @Column(name = "retry_count", nullable = false)
+    @Builder.Default
+    private Integer retryCount = 0;
+
+    @Column(name = "last_error", columnDefinition = "TEXT")
+    private String lastError;
+
+    @Column(name = "next_retry_at", nullable = false)
+    private Instant nextRetryAt;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "sent_at")
+    private Instant sentAt;
+
+    @PrePersist
+    void onCreate() {
+        Instant now = Instant.now();
+        if (nextRetryAt == null) {
+            nextRetryAt = now;
+        }
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (status == null) {
+            status = OutboxEventStatus.PENDING;
+        }
+        if (retryCount == null) {
+            retryCount = 0;
+        }
+    }
+}

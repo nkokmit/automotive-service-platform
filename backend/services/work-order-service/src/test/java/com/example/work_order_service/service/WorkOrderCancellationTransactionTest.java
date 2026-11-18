@@ -10,6 +10,7 @@ import com.example.work_order_service.exception.ErrorCode;
 import com.example.work_order_service.messaging.event.PartReservationItem;
 import com.example.work_order_service.messaging.event.PartsReleaseRequestedEvent;
 import com.example.work_order_service.messaging.producer.PartsReleaseRequestPublisher;
+import com.example.work_order_service.messaging.producer.WorkOrderCanceledEventPublisher;
 import com.example.work_order_service.repository.WorkOrderPartLineRepository;
 import com.example.work_order_service.repository.WorkOrderRepository;
 import com.example.work_order_service.repository.WorkOrderStatusHistoryRepository;
@@ -42,13 +43,16 @@ class WorkOrderCancellationTransactionTest {
     private WorkOrderStatusHistoryRepository historyRepository;
     @Mock
     private PartsReleaseRequestPublisher releaseRequestPublisher;
+    @Mock
+    private WorkOrderCanceledEventPublisher canceledEventPublisher;
 
     private WorkOrderCancellationTransaction transaction;
 
     @BeforeEach
     void setUp() {
         transaction = new WorkOrderCancellationTransaction(
-                workOrderRepository, partLineRepository, historyRepository, releaseRequestPublisher);
+                workOrderRepository, partLineRepository, historyRepository,
+                releaseRequestPublisher, canceledEventPublisher);
     }
 
     @Test
@@ -143,6 +147,7 @@ class WorkOrderCancellationTransactionTest {
         assertEquals(initialStatus.name(), historyCaptor.getValue().getStatusFrom());
         assertEquals(WorkOrderStatus.CANCELED.name(), historyCaptor.getValue().getStatusTo());
         assertEquals(actorId, historyCaptor.getValue().getChangedBy());
+        verify(canceledEventPublisher).publish(any());
     }
 
     private WorkOrder workOrder(UUID id, WorkOrderStatus status) {
