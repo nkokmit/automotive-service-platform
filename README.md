@@ -1,27 +1,32 @@
 # automotive-service-platform
 
-Nền tảng dịch vụ sửa chữa ô tô, kiến trúc microservices với Spring Boot, Spring Cloud
-Gateway, Eureka và MySQL.
+Nền tảng dịch vụ chăm sóc và sửa chữa ô tô thông minh, kết hợp kiến trúc **Microservices (Spring Boot / Spring Cloud / MySQL / Kafka)** và **AI Services (LangGraph ReAct Agent / YOLOv8 ONNX / Qdrant Hybrid Search)**.
 
-## Thành phần trong phạm vi hiện tại
+---
 
-| Service                    | Vai trò                              | Port (host)                  |
-|----------------------------|--------------------------------------|------------------------------|
-| `api-gateway`              | Entry point, routing, xác thực JWT   | 8000                         |
-| `discovery-server`         | Service registry (Eureka)            | 8761                         |
-| `user-service`             | User / role / permission, đăng nhập | 8081                         |
-| `customer-vehicle-service` | Customer / vehicle / lịch sử bảo dưỡng | 8082                       |
-| `staff-service`            | Hồ sơ nhân viên và lịch làm việc     | 8083                         |
-| `inventory-service`        | Catalog, kho và reservation          | 8084                         |
-| `booking-service`          | Lịch hẹn                              | 8085                         |
-| `work-order-service`       | Work Order và tiến độ sửa chữa       | 8086 (dev/debug)             |
-| `mysql`                    | MySQL cho các microservice            | 3306                         |
-| `kafka`                    | Kafka                                | 9092                         |
+## Danh sách Services & Ports
 
-Backend dùng chung multi-stage `backend/Dockerfile`. Trong dev/debug, các business service publish host port; . Khi deploy production, bỏ toàn bộ port mapping trực tiếp của các business service và truy
-cập API qua API Gateway.
+| Service | Công nghệ / Vai trò | Port (Host) |
+|---|---|---|
+| `api-gateway` | Spring Cloud Gateway, JWT authentication, routing | 8000 |
+| `discovery-server` | Netflix Eureka Service Registry | 8761 |
+| `user-service` | Quản lý người dùng, phân quyền, xác thực | 8081 |
+| `customer-vehicle-service` | Quản lý thông tin khách hàng, xe và lịch sử bảo dưỡng | 8082 |
+| `staff-service` | Hồ sơ nhân viên và lịch làm việc | 8083 |
+| `inventory-service` | Catalog, kho và reservation | 8084 |
+| `booking-service` | Lịch hẹn | 8085 |
+| `work-order-service` | Work Order và tiến độ sửa chữa | 8086 (dev/debug) |
+| `damage-detection-service` | Nhận diện hư hỏng ngoại thất xe (YOLOv8s-seg ONNX) | 8001 |
+| `agent-service` | Trợ lý AI hội thoại ReAct (LangGraph + FastAPI) | 8002 |
+| `mysql` | Cơ sở dữ liệu quan hệ cho các services | 3306 |
+| `kafka` | Message broker chế độ KRaft single-node | 9092 |
+| `qdrant` | Vector database cho hybrid search tin tức / bảo dưỡng | 6333 |
 
-## Chạy bằng Docker Compose
+Backend dùng chung multi-stage `backend/Dockerfile`. Trong dev/debug, các business service publish host port; khi deploy production, bỏ toàn bộ port mapping trực tiếp của các business service và truy cập API qua API Gateway.
+
+---
+
+## Hướng dẫn Khởi chạy với Docker Compose
 
 Yêu cầu Docker Engine và Docker Compose plugin đang chạy, đủ RAM và dung lượng
 cho các service, kết nối mạng để tải image/dependency lần đầu, và các host
@@ -29,7 +34,7 @@ port trong `.env.example` còn trống.
 Sau khi clone, cần tạo `.env` một lần trước khi chạy Compose; các giá trị bí mật
 không được lưu sẵn trong repository.
 
-### 1. Chuẩn bị `.env`
+### 1. Chuẩn bị file `.env`
 
 ```bash
 cp .env.example .env
@@ -46,19 +51,12 @@ dùng múi giờ IANA khác.
 
 `JWT_SECRET` được dùng chung cho API Gateway và các microservice xác thực JWT.
 
-Sinh `JWT_SECRET`:
+Tạo `JWT_SECRET` bằng `openssl rand -base64 48`. AI Agent có thể dùng
+`OPENAI_API_KEY` hoặc `GEMINI_API_KEY`; cả hai đều tùy chọn.
+`.env` đã nằm trong `.gitignore`; không commit file này. Nếu bỏ trống các biến
+bắt buộc, `docker compose up` sẽ báo lỗi thay vì chạy với secret mặc định yếu.
 
-```bash
-openssl rand -base64 48
-```
-
-`.env` đã nằm trong `.gitignore`. Không commit file này; chỉ commit
-`.env.example`.
-
-Nếu bỏ trống các biến bắt buộc, `docker compose up` sẽ báo lỗi ngay thay vì
-chạy với secret mặc định yếu.
-
-### 2. Khởi động
+### 2. Khởi động toàn bộ nền tảng
 
 ```bash
 docker compose up --build
@@ -77,6 +75,16 @@ Thứ tự khởi động được điều khiển bằng healthcheck. Work Orde
 MySQL, Kafka, Eureka và các service tích hợp (Booking, Customer Vehicle,
 Inventory, Staff); API Gateway chờ các service đã healthy.
 Lần build và khởi động đầu tiên có thể mất vài phút.
+Hoặc chỉ khởi động riêng các nhóm dịch vụ:
+```bash
+# Chỉ chạy Core Backend (MySQL, Kafka, Discovery, Gateway, Services):
+docker compose up mysql mysql-bootstrap kafka discovery-server user-service customer-vehicle-service staff-service inventory-service booking-service work-order-service api-gateway
+
+# Chỉ chạy AI Services (Qdrant, Damage Detection, Agent Service):
+docker compose up qdrant damage-detection-service agent-service
+```
+
+---
 
 ### 3. Địa chỉ
 
@@ -95,141 +103,73 @@ Lần build và khởi động đầu tiên có thể mất vài phút.
 | OpenAPI staff service | http://localhost:8000/v3/api-docs/staff-service |
 | MySQL                 | localhost:3306 (các database service được bootstrap ở trên) |
 | Kafka broker          | localhost:9092 (PLAINTEXT, không auth)                |
+| Damage Detection API Docs | http://localhost:8001/docs |
+| AI Agent API Docs | http://localhost:8002/docs |
+| Qdrant Vector DB REST | http://localhost:6333/dashboard |
 
-### 4. Đăng nhập thử
+---
 
-Migration `V4__seed_data.sql` tạo sẵn dữ liệu cho môi trường dev:
+## Kiểm tra nhanh hệ thống (Smoke Test)
 
-``` text
-username: admin
-password: Admin@123
-```
-
+### 1. Đăng nhập Backend qua API Gateway
+Dữ liệu seed sẵn cho môi trường dev: `username: admin` / `password: Admin@123`
 ```bash
 curl -X POST http://localhost:8000/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"Admin@123"}'
 ```
 
-Lưu ý: mật khẩu seed là hash BCrypt cố định trong file migration, **không** được
-điều khiển bởi biến môi trường. Không chạy migration này trên production.
-
-Mọi request cần token:
-
+### 2. Thử nghiệm AI Agent (ReAct)
+Gửi câu hỏi tư vấn xe hoặc đặt lịch sửa chữa:
 ```bash
-curl http://localhost:8000/api/users \
-  -H "Authorization: Bearer <accessToken>"
+curl -X POST http://localhost:8002/api/v1/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message": "Tìm xe Toyota đời 2022 giá dưới 1.2 tỷ"}'
 ```
 
-Staff Service kiểm tra quyền trên claim JWT `authorities` cho từng API.
-Migration V9 của User Service cấp toàn quyền quản lý hồ sơ và lịch cho
-`ADMIN`/`MANAGER`; `MECHANIC` chỉ được đọc hồ sơ nhân viên, ca làm và lịch.
-`CUSTOMER` không có quyền Staff Service. Cần đăng nhập lại sau khi thay đổi
-quyền của role để token có authorities mới.
-
-### 5. Kiểm tra nhanh
-
-```bash
-scripts/run-dev/smoke-test.sh
+### 3. Thử nghiệm nhận diện hư hỏng xe (YOLOv8 ONNX)
+Model hỗ trợ 6 lớp tổn thương: `dent`, `scratch`, `crack`, `glass shatter`, `lamp broken`, `tire flat`.
+Chạy test trực tiếp từ terminal:
+```powershell
+& "C:\code\vehicle-damage-detection-assessment\env\Scripts\python.exe" scripts/test-damage-model.py
 ```
 
-Script kiểm tra health, phạm vi Actuator, đăng nhập qua gateway, RBAC, Swagger
-aggregation và Eureka registration.
+---
 
-## Actuator
-
-Chỉ `health` được expose; `readiness` dùng cho healthcheck của Docker:
-
-``` text
-/actuator/health/readiness
-```
-
-Trong `api-gateway`, `user-service`, `customer-vehicle-service` và
-`staff-service`, chỉ `/actuator/health/**` được permit — các Actuator endpoint
-khác vẫn yêu cầu xác thực.
-
-Lưu ý: `readiness` phản ánh trạng thái ứng dụng, **không** tự chứng minh kết nối
-DB hay route qua gateway đang hoạt động.
-
-## Chạy service từ IDE
-
-Các service đọc cấu hình qua biến môi trường. Khi chạy ngoài Docker, cần override
-tên service về `localhost`:
+## Cấu trúc thư mục dự án
 
 ```text
-DB_URL=jdbc:mysql://localhost:3306/user_service
-DB_USERNAME=app
-DB_PASSWORD=<MYSQL_PASSWORD>
-JWT_SECRET=<JWT_SECRET>
-EUREKA_SERVER_URL=http://localhost:8761/eureka/
+automotive-service-platform/
+├── ai-services/
+│   ├── agent-service/               # LangGraph ReAct Agent (FastAPI, 5 tools)
+│   └── damage-detection-service/    # YOLOv8s-seg ONNX inference service
+├── backend/
+│   ├── api-gateway/                 # Spring Cloud Gateway
+│   ├── discovery-server/            # Netflix Eureka Server
+│   ├── infra/mysql/init/            # Script khởi tạo nhiều database
+│   └── services/
+│       ├── user-service/            # Auth, User, Role
+│       └── customer-vehicle-service/# Quản lý khách hàng, xe, lịch sử bảo dưỡng
+├── contracts/                       # OpenAPI 3.1 specifications
+├── scripts/
+│   ├── run-local.ps1                # Chạy AI services local không cần Docker
+│   ├── test-damage-model.py         # Script test trực tiếp ONNX model
+│   └── test-agent-chat.py           # Script test hội thoại Agent
+├── docker-compose.yml               # File compose hợp nhất toàn bộ hệ thống
+└── .env.example                     # File biến môi trường mẫu
 ```
 
-Cho `customer-vehicle-service`, thay `DB_URL` bằng database của service:
-
-``` text
-DB_URL=jdbc:mysql://localhost:3306/customer_vehicle_service
-```
-
-Cho `staff-service`, dùng database riêng và thêm múi giờ lịch:
-
-```text
-DB_URL=jdbc:mysql://localhost:3306/staff_service
-SCHEDULE_ZONE_ID=Asia/Ho_Chi_Minh
-```
-
-Service đang dùng Kafka thì thêm:
-
-``` text
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-```
-
-Giá trị mặc định trong `application.yaml` đã là `localhost:9092`, nên khi chạy
-từ IDE thường không cần khai báo. Chỉ cần override nếu bạn đổi `KAFKA_PORT`.
-Lưu ý chỉ có **hạ tầng Kafka** (broker + producer/consumer config); chưa có
-service nào phát hoặc nhận event, nên topic sẽ không tự xuất hiện.
-
-Ngoài ra:
-
-- `user-service`, `customer-vehicle-service` và `staff-service` yêu cầu
-  `JWT_SECRET`, `DB_USERNAME`, `DB_PASSWORD`; `staff-service` cũng yêu cầu
-  `SCHEDULE_ZONE_ID`. Ứng dụng sẽ fail fast khi thiếu cấu hình bắt buộc.
-- Các service dùng Flyway để tạo schema và Hibernate `ddl-auto: validate` để
-  xác nhận schema khi khởi động.
-- Test `contextLoads` cần MySQL sẵn sàng; chạy MySQL qua
-  `docker compose up mysql` rồi mới chạy test.
-- Warm-up: sau khi `user-service` healthy, gateway cần vài giây để registry đồng bộ.
-
-## Cấu trúc thư mục
-
-``` text
-backend/
-├── Dockerfile              # Multi-stage, dùng chung, chọn module bằng ARG MODULE_PATH
-├── discovery-server/
-├── api-gateway/
-├── infra/
-│   └── mysql/init/         # Script entrypoint MySQL, chỉ chạy khi volume trống
-├── services/
-│   ├── user-service/
-│   ├── customer-vehicle-service/
-│   └── staff-service/
-└── automotive-ai-context/  # Quy ước kiến trúc (GLOBAL_RULES, ARCHITECTURE)
-```
-
-Mỗi module có POM riêng; không có aggregator POM ở `backend/`.
+---
 
 ## Lệnh thường dùng
 
 ```bash
-docker compose up --build              # build và chạy toàn bộ
-docker compose up -d                   # chạy nền
-docker compose ps                      # trạng thái + health
-docker compose logs -f user-service    # log service
-docker compose down                    # dừng, giữ dữ liệu
-
-# Xóa volume, database bị reset và Flyway chạy lại từ V1:
-docker compose down -v
+docker compose up -d                   # Khởi động ngầm toàn bộ service
+docker compose ps                      # Xem trạng thái container và healthcheck
+docker compose logs -f agent-service   # Theo dõi log service
+docker compose down                    # Dừng hệ thống (giữ nguyên volumes)
+docker compose down -v                 # Dừng và xóa toàn bộ dữ liệu database/volume
 ```
-
 ## Lưu ý vận hành
 
 - Đổi `JWT_SECRET` sẽ làm mất hiệu lực các token đang chạy.
