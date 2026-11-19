@@ -9,9 +9,28 @@
  * - Mỗi thao tác write đều dispatch event "autocare:cart:changed" để
  *   các component có thể subscribe (đỡ phải prop-drill).
  */
-import { parts, type Part } from "./mock";
+import { mockParts } from "./mock";
+import type { CatalogPart } from "./catalogTypes";
 
 export const CART_KEY = "autocare:cart";
+
+// =========================
+// Registry phụ tùng của catalog đang hiển thị
+// =========================
+// Giỏ hàng lưu trong localStorage chỉ partId + qty. Để tra cứu được tên/giá
+// khi catalog là dữ liệu THẬT từ inventory-service (id khác với dữ liệu mẫu),
+// `CatalogProvider` đăng ký danh sách phụ tùng hiện tại vào đây.
+let catalogParts: CatalogPart[] = mockParts;
+
+/** Đăng ký catalog phụ tùng đang hiển thị (gọi từ CatalogProvider). */
+export function registerCatalogParts(parts: CatalogPart[]) {
+  catalogParts = parts.length > 0 ? parts : mockParts;
+}
+
+/** Tìm phụ tùng theo id trong catalog đang hiển thị, fallback về dữ liệu mẫu. */
+export function findPart(partId: string): CatalogPart | undefined {
+  return catalogParts.find((p) => p.id === partId) ?? mockParts.find((p) => p.id === partId);
+}
 export const CART_EVENT = "autocare:cart:changed";
 
 export type CartItem = {
@@ -97,14 +116,14 @@ export function getCartCount(): number {
 
 export function getCartTotal(): number {
   return readCart().reduce((sum, i) => {
-    const part = parts.find((p) => p.id === i.partId);
+    const part = findPart(i.partId);
     return part ? sum + part.priceVND * i.qty : sum;
   }, 0);
 }
 
 // Cart item kèm thông tin part (dùng cho UI)
 export type CartLine = {
-  part: Part;
+  part: CatalogPart;
   qty: number;
   lineTotal: number;
 };
@@ -112,7 +131,7 @@ export type CartLine = {
 export function getCartLines(): CartLine[] {
   return readCart()
     .map((i) => {
-      const part = parts.find((p) => p.id === i.partId);
+      const part = findPart(i.partId);
       if (!part) return null;
       return { part, qty: i.qty, lineTotal: part.priceVND * i.qty };
     })
@@ -132,7 +151,7 @@ export function formatFullVND(n: number): string {
   return new Intl.NumberFormat("vi-VN").format(n) + " đ";
 }
 
-export function getPartDiscountPercent(p: Part): number {
+export function getPartDiscountPercent(p: CatalogPart): number {
   if (!p.originalPriceVND || p.originalPriceVND <= p.priceVND) return 0;
   return Math.round(
     ((p.originalPriceVND - p.priceVND) / p.originalPriceVND) * 100,

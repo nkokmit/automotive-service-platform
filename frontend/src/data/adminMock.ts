@@ -9,9 +9,8 @@
 
 import {
   cars,
-  parts,
-  services,
-  featuredGarages,
+  mockParts,
+  mockServices,
   mockUsers,
   type Order,
   type OrderStatus,
@@ -108,43 +107,43 @@ export interface TopProduct {
 
 export const topParts: TopProduct[] = [
   {
-    id: parts[0].id,
-    name: parts[0].name,
-    image: parts[0].image,
+    id: mockParts[0].id,
+    name: mockParts[0].name,
+    image: mockParts[0].image,
     sold: 487,
-    revenue: parts[0].priceVND * 487,
+    revenue: mockParts[0].priceVND * 487,
     growth: 14.2,
   },
   {
-    id: parts[2].id,
-    name: parts[2].name,
-    image: parts[2].image,
+    id: mockParts[2].id,
+    name: mockParts[2].name,
+    image: mockParts[2].image,
     sold: 612,
-    revenue: parts[2].priceVND * 612,
+    revenue: mockParts[2].priceVND * 612,
     growth: 8.7,
   },
   {
-    id: parts[7].id,
-    name: parts[7].name,
-    image: parts[7].image,
+    id: mockParts[7].id,
+    name: mockParts[7].name,
+    image: mockParts[7].image,
     sold: 198,
-    revenue: parts[7].priceVND * 198,
+    revenue: mockParts[7].priceVND * 198,
     growth: 22.1,
   },
   {
-    id: parts[1].id,
-    name: parts[1].name,
-    image: parts[1].image,
+    id: mockParts[1].id,
+    name: mockParts[1].name,
+    image: mockParts[1].image,
     sold: 342,
-    revenue: parts[1].priceVND * 342,
+    revenue: mockParts[1].priceVND * 342,
     growth: -3.4,
   },
   {
-    id: parts[4].id,
-    name: parts[4].name,
-    image: parts[4].image,
+    id: mockParts[4].id,
+    name: mockParts[4].name,
+    image: mockParts[4].image,
     sold: 156,
-    revenue: parts[4].priceVND * 156,
+    revenue: mockParts[4].priceVND * 156,
     growth: 5.9,
   },
 ];
@@ -162,7 +161,7 @@ export interface TopService {
   rating: number;
 }
 
-export const topServices: TopService[] = services
+export const topServices: TopService[] = mockServices
   .slice()
   .sort((a, b) => b.bookingsCount - a.bookingsCount)
   .slice(0, 5)
@@ -214,7 +213,7 @@ export const recentActivities: Activity[] = [
     id: "a2",
     kind: "service_booked",
     title: "Đặt lịch thay dầu",
-    description: "Garage Minh Anh — 03/10 09:00",
+    description: "AutoCare Workshop — 03/10 09:00",
     actor: "Trần Thị B",
     timestamp: "2026-10-03T09:45:00Z",
     tone: "accent",
@@ -230,9 +229,9 @@ export const recentActivities: Activity[] = [
   },
   {
     id: "a4",
-    kind: "new_garage",
-    title: "Garage mới đăng ký",
-    description: "Garage Hoàng Long — Hà Nội — chờ duyệt",
+    kind: "new_user",
+    title: "Khách hàng đăng ký tại xưởng",
+    description: "Lê Văn C — Hà Nội — chờ duyệt hồ sơ",
     actor: "Lê Văn C",
     timestamp: "2026-10-02T22:18:00Z",
     tone: "neutral",
@@ -250,7 +249,7 @@ export const recentActivities: Activity[] = [
     id: "a6",
     kind: "review_posted",
     title: "Đánh giá 5★ mới",
-    description: "Bảo dưỡng định kỳ tại Garage Minh Anh",
+    description: "Bảo dưỡng định kỳ tại AutoCare Workshop",
     actor: "Hoàng Thị D",
     timestamp: "2026-10-02T16:30:00Z",
     tone: "accent",
@@ -354,7 +353,7 @@ export interface AdminUser {
   totalOrders: number;
   totalSpentVND: number;
   status: "active" | "suspended";
-  /** Chỉ dùng cho role=garage_owner */
+  /** Chỉ dùng cho role=garage_owner (nhân viên của AutoCare Workshop) */
   garageName?: string;
 }
 
@@ -384,21 +383,21 @@ export const adminUsers: AdminUser[] = [
     totalSpentVND: u.orders.reduce((s, o) => s + o.totalVND, 0),
     status: "active",
   })),
-  // garage owners
-  ...featuredGarages.map<AdminUser>((g) => ({
-    id: g.id,
-    name: g.name + " — Chủ garage",
-    email: `owner@${g.slug}.vn`,
-    phone: g.phone,
-    avatar: IMG(avatarSeeds[parseInt(g.id.replace("g", "")) % avatarSeeds.length]),
+  // Chủ xưởng AutoCare (web chỉ phục vụ một xưởng duy nhất)
+  {
+    id: "owner1",
+    name: "Trần Minh Quân — Chủ xưởng AutoCare",
+    email: "owner@autocare.vn",
+    phone: "024 3876 1234",
+    avatar: IMG(avatarSeeds[1]),
     role: "garage_owner",
-    city: g.city,
-    joinedAt: "01/0" + (parseInt(g.id.replace("g", "")) + 4) + "/2025",
-    totalOrders: g.reviewsCount,
-    totalSpentVND: g.priceFrom * g.reviewsCount,
-    status: g.openNow ? "active" : "active",
-    garageName: g.name,
-  })),
+    city: "Hà Nội",
+    joinedAt: "01/04/2025",
+    totalOrders: 184,
+    totalSpentVND: 42_000_000,
+    status: "active",
+    garageName: "AutoCare Workshop",
+  },
   // admin user (chính mình)
   {
     id: "admin1",
@@ -476,7 +475,7 @@ export function getRoleLabel(role: AdminUserRole): string {
     case "customer":
       return "Khách hàng";
     case "garage_owner":
-      return "Chủ garage";
+      return "Nhân viên xưởng";
     case "admin":
       return "Quản trị viên";
   }
@@ -500,5 +499,5 @@ export function relativeTime(iso: string): string {
 // Re-exports — dùng cho admin pages
 // =========================
 
-export { cars, parts, services, featuredGarages, mockUsers };
+export { cars, mockParts, mockServices, mockUsers };
 export type { Order };

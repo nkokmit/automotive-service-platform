@@ -15,6 +15,7 @@ import {
 import Button from "./Button";
 import { useCartCount } from "../data/cartStore";
 import { useAuth } from "../data/authStore";
+import { GARAGE } from "../config/garage";
 
 const navItems = [
   { to: "/cars", label: "Mua xe" },
@@ -68,7 +69,7 @@ export default function Header() {
           <span className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center">
             <IconCar size={20} />
           </span>
-          <span className="hidden sm:inline text-primary">AutoCare</span>
+          <span className="hidden sm:inline text-primary">{GARAGE.brand}</span>
         </Link>
 
         {/* Desktop nav */}
@@ -182,7 +183,7 @@ export default function Header() {
           <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 w-full">
             <IconSearch size={18} className="text-ink-muted" />
             <input
-              placeholder="Tìm garage, dịch vụ..."
+              placeholder="Tìm dịch vụ, phụ tùng..."
               className="flex-1 bg-transparent outline-none text-sm placeholder:text-ink-muted"
             />
           </div>
@@ -341,7 +342,7 @@ export default function Header() {
             <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 mb-2">
               <IconSearch size={18} className="text-ink-muted" />
               <input
-                placeholder="Tìm garage, dịch vụ..."
+                placeholder="Tìm dịch vụ, phụ tùng..."
                 className="flex-1 bg-transparent outline-none text-sm"
               />
             </div>

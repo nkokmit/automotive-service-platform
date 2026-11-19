@@ -49,7 +49,7 @@ const navGroups: NavGroup[] = [
       { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
       { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
       { to: "/admin/services", label: "Dịch vụ", icon: IconWrench },
-      { to: "/admin/garages", label: "Garage", icon: IconBuilding },
+      { to: "/admin/garage", label: "Hồ sơ xưởng", icon: IconBuilding },
       { to: "/admin/users", label: "Người dùng", icon: IconUsers },
     ],
   },
@@ -106,7 +106,7 @@ export default function AdminLayout() {
             <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 w-full focus-within:bg-white focus-within:border-primary transition-colors">
               <IconSearch size={16} className="text-ink-muted" />
               <input
-                placeholder="Tìm đơn hàng, khách hàng, garage..."
+                placeholder="Tìm đơn hàng, khách hàng, dịch vụ..."
                 className="flex-1 bg-transparent outline-none text-sm placeholder:text-ink-muted"
               />
               <kbd className="hidden lg:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border border-ink/15 bg-white text-ink-muted">

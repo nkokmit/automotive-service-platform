@@ -331,10 +331,10 @@ export default function AdminDashboard() {
           </h2>
           <div className="grid grid-cols-2 gap-2">
             <QuickLink
-              to="/admin/garages"
+              to="/admin/garage"
               icon={<IconBuilding size={18} />}
-              label="Garage"
-              desc="4 đang hoạt động"
+              label="Xưởng"
+              desc="AutoCare Workshop"
               tone="primary"
             />
             <QuickLink

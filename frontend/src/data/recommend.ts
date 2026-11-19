@@ -23,7 +23,8 @@
  *  - "service-related":    service category → recommend related parts
  */
 
-import { parts, type Part } from "./mock";
+import { mockParts } from "./mock";
+import type { CatalogPart } from "./catalogTypes";
 
 // =========================
 // Types
@@ -36,7 +37,7 @@ export type RecommendVariant =
   | "service-related";
 
 export type ScoredPart = {
-  part: Part;
+  part: CatalogPart;
   score: number;
   /** Lý do gợi ý (debug/UI hint) */
   reasons: string[];
@@ -50,10 +51,13 @@ export interface RecommendContext {
   currentPartId?: string;
   /** Service category hiện tại (cho variant="service-related"). */
   serviceCategory?: string;
-  /** Service provider garage city (cho "service-related" — ưu tiên part hợp với garage). */
-  providerCity?: string;
   /** Số lượng item trả về. */
   limit?: number;
+  /**
+   * Pool phụ tùng để gợi ý. Mặc định là dữ liệu mẫu; component thường truyền
+   * `parts` từ `useCatalog()` để gợi ý bám theo catalog thật của inventory-service.
+   */
+  parts?: CatalogPart[];
   /** Nếu true, dùng deterministic seed (cho SSR/testing). */
   deterministic?: boolean;
 }
@@ -76,7 +80,7 @@ const SERVICE_TO_PART_CATEGORIES: Record<string, string[]> = {
 // =========================
 
 function compatibilityOverlap(
-  candidate: Part,
+  candidate: CatalogPart,
   sourceCompatibles: string[],
 ): { score: number; count: number } {
   if (!candidate.compatibleCars || candidate.compatibleCars.length === 0)
@@ -98,7 +102,7 @@ function compatibilityOverlap(
   return { score: Math.min(60, count * 30), count };
 }
 
-function getDiscountPercent(p: Part): number {
+function getDiscountPercent(p: CatalogPart): number {
   if (!p.originalPriceVND || p.originalPriceVND <= p.priceVND) return 0;
   return Math.round(
     ((p.originalPriceVND - p.priceVND) / p.originalPriceVND) * 100,
@@ -109,7 +113,7 @@ function getDiscountPercent(p: Part): number {
  * Core scoring — tính điểm cho 1 candidate dựa trên context.
  */
 function scoreCandidate(
-  candidate: Part,
+  candidate: CatalogPart,
   ctx: RecommendContext,
 ): ScoredPart | null {
   // Không recommend chính nó
@@ -122,14 +126,16 @@ function scoreCandidate(
   const reasons: string[] = [];
 
   // ----- Source signals (từ giỏ hàng / part hiện tại / service) -----
-  const sourceParts: Part[] = [];
+  const pool = ctx.parts ?? mockParts;
+
+  const sourceParts: CatalogPart[] = [];
   if (ctx.cartPartIds) {
-    for (const p of parts) {
+    for (const p of pool) {
       if (ctx.cartPartIds.has(p.id)) sourceParts.push(p);
     }
   }
   if (ctx.currentPartId) {
-    const cur = parts.find((p) => p.id === ctx.currentPartId);
+    const cur = pool.find((p) => p.id === ctx.currentPartId);
     if (cur) sourceParts.push(cur);
   }
 
@@ -243,7 +249,7 @@ export function getRecommendations(ctx: RecommendContext): ScoredPart[] {
   const limit = ctx.limit ?? 4;
 
   const scored: ScoredPart[] = [];
-  for (const candidate of parts) {
+  for (const candidate of ctx.parts ?? mockParts) {
     const result = scoreCandidate(candidate, ctx);
     if (result) scored.push(result);
   }
@@ -268,11 +274,13 @@ export function getRecommendations(ctx: RecommendContext): ScoredPart[] {
 export function recommendForCart(
   cartPartIds: Set<string>,
   limit = 4,
+  parts?: CatalogPart[],
 ): ScoredPart[] {
   return getRecommendations({
     variant: "cart-cross-sell",
     cartPartIds,
     limit,
+    parts,
   });
 }
 
@@ -282,22 +290,29 @@ export function recommendForCart(
 export function recommendForCheckout(
   cartPartIds: Set<string>,
   limit = 4,
+  parts?: CatalogPart[],
 ): ScoredPart[] {
   return getRecommendations({
     variant: "checkout-upsell",
     cartPartIds,
     limit,
+    parts,
   });
 }
 
 /**
  * Lấy related parts cho PartDetail.
  */
-export function recommendForPart(currentPartId: string, limit = 4): ScoredPart[] {
+export function recommendForPart(
+  currentPartId: string,
+  limit = 4,
+  parts?: CatalogPart[],
+): ScoredPart[] {
   return getRecommendations({
     variant: "part-related",
     currentPartId,
     limit,
+    parts,
   });
 }
 
@@ -307,10 +322,12 @@ export function recommendForPart(currentPartId: string, limit = 4): ScoredPart[]
 export function recommendForService(
   serviceCategory: string,
   limit = 4,
+  parts?: CatalogPart[],
 ): ScoredPart[] {
   return getRecommendations({
     variant: "service-related",
     serviceCategory,
     limit,
+    parts,
   });
 }

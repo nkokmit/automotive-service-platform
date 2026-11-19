@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import {
   IconUser,
@@ -32,7 +32,14 @@ import {
   getUserAddresses,
   getUserVehicles,
 } from "../../data/authStore";
-import type { CustomerResponse } from "../../api/types";
+import type {
+  AvailabilitySlotResponse,
+  BookingResponse,
+  BookingStatus,
+  CustomerResponse,
+} from "../../api/types";
+import { bookingApi } from "../../api/endpoints/booking";
+import { GARAGE } from "../../config/garage";
 import type {
   Order,
   OrderStatus,
@@ -44,11 +51,12 @@ import { formatCompactVND, formatFullVND } from "../../data/cartStore";
 // =========================
 // Tab definitions
 // =========================
-type TabId = "info" | "orders" | "vehicles" | "addresses";
+type TabId = "info" | "orders" | "bookings" | "vehicles" | "addresses";
 
 const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "info", label: "Thông tin", icon: <IconUser size={18} /> },
   { id: "orders", label: "Đơn hàng", icon: <IconPackage size={18} /> },
+  { id: "bookings", label: "Lịch hẹn", icon: <IconCalendar size={18} /> },
   { id: "vehicles", label: "Xe của tôi", icon: <IconCar size={18} /> },
   { id: "addresses", label: "Địa chỉ", icon: <IconMapPin size={18} /> },
 ];
@@ -201,6 +209,7 @@ export default function Profile() {
       <div>
         {activeTab === "info" && <InfoTab />}
         {activeTab === "orders" && <OrdersTab orders={orders} />}
+        {activeTab === "bookings" && <BookingsTab />}
         {activeTab === "vehicles" && (
           <VehiclesTab vehicles={vehicles} />
         )}
@@ -320,10 +329,10 @@ function InfoTab() {
                   Tài khoản chưa liên kết hồ sơ khách hàng
                 </h3>
                 <p className="text-sm text-ink-light mb-3">
-                  Tài khoản của bạn đã đăng nhập thành công nhưng chưa được gara
-                  liên kết với hồ sơ khách hàng. Vui lòng liên hệ gara để được
-                  hỗ trợ kích hoạt — sau khi liên kết, các dịch vụ đặt lịch và
-                  lịch sử bảo dưỡng sẽ được đồng bộ.
+                  Tài khoản của bạn đã đăng nhập thành công nhưng chưa được{" "}
+                  {GARAGE.name} liên kết với hồ sơ khách hàng. Vui lòng liên hệ{" "}
+                  {GARAGE.name} để được hỗ trợ kích hoạt — sau khi liên kết, các
+                  dịch vụ đặt lịch và lịch sử bảo dưỡng sẽ được đồng bộ.
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   <Button
@@ -341,7 +350,7 @@ function InfoTab() {
                   <Link to="/services">
                     <Button variant="outline" size="sm">
                       <IconMapPin size={14} />
-                      Tìm gara
+                      Xem dịch vụ
                     </Button>
                   </Link>
                 </div>
@@ -484,7 +493,7 @@ function InfoTab() {
               {customerStatus === "linked"
                 ? `Mã hồ sơ: ${customer?.id?.slice(0, 8) ?? ""}…`
                 : customerStatus === "unlinked"
-                  ? "Liên hệ gara để kích hoạt hồ sơ."
+                  ? `Liên hệ ${GARAGE.name} để kích hoạt hồ sơ.`
                   : "Đang đồng bộ…"}
             </p>
           </div>
@@ -656,6 +665,369 @@ function CustomerStatusBadge({
   return (
     <Badge tone="default">
       <IconRefresh size={11} className="animate-spin" /> Đang đồng bộ
+    </Badge>
+  );
+}
+
+// =========================
+// Tab: Lịch hẹn (bookings)
+// =========================
+function BookingsTab() {
+  const t = useToast();
+  const [bookings, setBookings] = useState<BookingResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await bookingApi.getMyBookings();
+      setBookings(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setBookings([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Không tải được danh sách lịch hẹn từ máy chủ",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleCancel = async (id: string) => {
+    setBusyId(id);
+    try {
+      await bookingApi.cancelBooking(id, "Khách hàng huỷ lịch");
+      t.success("Đã huỷ lịch hẹn");
+      await load();
+    } catch (err) {
+      t.error(err instanceof Error ? err.message : "Không huỷ được lịch hẹn");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReschedule = async (id: string, startAt: string) => {
+    setBusyId(id);
+    try {
+      await bookingApi.rescheduleBooking(id, startAt);
+      t.success("Đã đổi lịch hẹn thành công");
+      await load();
+    } catch (err) {
+      t.error(err instanceof Error ? err.message : "Không đổi được lịch hẹn");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-32 bg-bgsoft rounded-2xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <div className="p-10 text-center">
+          <p className="font-semibold mb-2">Không tải được lịch hẹn</p>
+          <p className="text-sm text-ink-light mb-5">{error}</p>
+          <Button variant="outline" onClick={() => void load()}>
+            <IconRefresh size={14} /> Thử lại
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (bookings.length === 0) {
+    return (
+      <Card>
+        <div className="p-12 text-center">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-bgsoft flex items-center justify-center mb-4">
+            <IconCalendar size={32} className="text-ink-muted" />
+          </div>
+          <p className="font-semibold text-lg mb-1">Chưa có lịch hẹn nào</p>
+          <p className="text-sm text-ink-light mb-5 max-w-sm mx-auto">
+            Đặt lịch dịch vụ tại {GARAGE.name} để bắt đầu.
+          </p>
+          <Link to="/services">
+            <Button>Đặt lịch sửa chữa</Button>
+          </Link>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {bookings.map((b) => (
+        <BookingCard
+          key={b.id}
+          booking={b}
+          busy={busyId === b.id}
+          onCancel={() => void handleCancel(b.id)}
+          onReschedule={(startAt) => void handleReschedule(b.id, startAt)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function BookingCard({
+  booking,
+  busy,
+  onCancel,
+  onReschedule,
+}: {
+  booking: BookingResponse;
+  busy: boolean;
+  onCancel: () => void;
+  onReschedule: (startAt: string) => void;
+}) {
+  const [showReschedule, setShowReschedule] = useState(false);
+
+  const start = new Date(booking.startAt);
+  const end = new Date(booking.endAt);
+  const fmt = (d: Date) =>
+    d.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  const canCancel = ["CONFIRMED", "CHECKED_IN"].includes(booking.status);
+
+  return (
+    <Card>
+      <div className="p-4 md:p-5">
+        {/* Header */}
+        <div className="flex items-start gap-3 flex-wrap mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h3 className="font-semibold text-ink">
+                {booking.services[0]?.serviceNameSnapshot ??
+                  "Dịch vụ sửa chữa"}
+              </h3>
+              <BookingStatusBadge status={booking.status} />
+            </div>
+            <div className="text-xs text-ink-muted flex items-center gap-3 flex-wrap">
+              <span className="flex items-center gap-1">
+                <IconCalendar size={12} />
+                {fmt(start)}
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <IconClock size={12} />
+                ~{Math.round((end.getTime() - start.getTime()) / 60000)} phút
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <IconCar size={12} />
+                {booking.licensePlateSnapshot}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Danh sách dịch vụ */}
+        {booking.services.length > 0 && (
+          <ul className="space-y-1 mb-3">
+            {booking.services.map((s) => (
+              <li key={s.serviceId} className="text-sm text-ink-light flex gap-2">
+                <span className="text-primary">•</span>
+                <span>
+                  {s.serviceNameSnapshot}
+                  {s.estimatedDurationMinutes
+                    ? ` — ~${s.estimatedDurationMinutes} phút`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {booking.customerNote && (
+          <div className="bg-bgsoft/60 rounded-lg p-2.5 text-sm text-ink-light mb-3">
+            <span className="font-medium text-ink">Ghi chú: </span>
+            {booking.customerNote}
+          </div>
+        )}
+
+        {/* Actions */}
+        {canCancel && (
+          <div className="flex flex-wrap gap-2 pt-3 border-t border-ink/8">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => setShowReschedule((v) => !v)}
+            >
+              <IconRefresh size={14} />
+              Đổi lịch
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={onCancel}
+              className="text-red-600 hover:bg-red-50"
+            >
+              <IconClose size={14} />
+              Huỷ lịch
+            </Button>
+          </div>
+        )}
+
+        {showReschedule && canCancel && (
+          <ReschedulePanel
+            serviceIds={booking.services.map((s) => s.serviceId)}
+            onPick={onReschedule}
+            onClose={() => setShowReschedule(false)}
+          />
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ReschedulePanel({
+  serviceIds,
+  onPick,
+  onClose,
+}: {
+  serviceIds: string[];
+  onPick: (startAt: string) => void;
+  onClose: () => void;
+}) {
+  const [slots, setSlots] = useState<AvailabilitySlotResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const today = new Date();
+    const from = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const toDate = new Date(today);
+    toDate.setDate(toDate.getDate() + 7);
+    const to = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, "0")}-${String(toDate.getDate()).padStart(2, "0")}`;
+
+    bookingApi
+      .getAvailability({ from, to, serviceIds })
+      .then((data) => {
+        if (!cancelled) setSlots(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Không tải được lịch trống",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [serviceIds]);
+
+  return (
+    <div className="mt-3 p-3 bg-bgsoft/60 rounded-xl">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium">Chọn khung giờ mới</span>
+        <button
+          onClick={onClose}
+          className="text-xs text-ink-muted hover:text-primary"
+        >
+          Đóng
+        </button>
+      </div>
+      {loading ? (
+        <div className="h-9 bg-white rounded animate-pulse" />
+      ) : error ? (
+        <p className="text-xs text-red-600">{error}</p>
+      ) : slots.length === 0 ? (
+        <p className="text-xs text-ink-muted">
+          Không còn khung giờ trống trong tuần tới.
+        </p>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+          {slots.map((s) => (
+            <button
+              key={s.startAt}
+              onClick={() => onPick(s.startAt)}
+              className="py-1.5 text-xs rounded-lg border border-ink/15 bg-white hover:border-primary hover:text-primary transition-colors"
+            >
+              {new Date(s.startAt).toLocaleString("vi-VN", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BookingStatusBadge({ status }: { status: BookingStatus }) {
+  const config: Record<
+    BookingStatus,
+    { tone: "default" | "primary" | "warning" | "accent"; label: string; icon: React.ReactNode }
+  > = {
+    CONFIRMED: {
+      tone: "primary",
+      label: "Đã xác nhận",
+      icon: <IconCheckCircle size={11} />,
+    },
+    CHECKED_IN: {
+      tone: "accent",
+      label: "Đã nhận xe",
+      icon: <IconCheckCircle size={11} />,
+    },
+    FULFILLED: {
+      tone: "accent",
+      label: "Hoàn thành",
+      icon: <IconCheckCircle size={11} />,
+    },
+    CANCELLED: {
+      tone: "default",
+      label: "Đã huỷ",
+      icon: <IconClose size={11} />,
+    },
+    NO_SHOW: {
+      tone: "warning",
+      label: "Không đến",
+      icon: <IconWarning size={11} />,
+    },
+  };
+  const c = config[status] ?? {
+    tone: "default" as const,
+    label: status,
+    icon: <IconClock size={11} />,
+  };
+  return (
+    <Badge tone={c.tone}>
+      {c.icon} {c.label}
     </Badge>
   );
 }

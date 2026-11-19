@@ -11,7 +11,8 @@ import {
   type AdminTableFilter,
   type AdminFormProps,
 } from "../../components/AdminTable";
-import { parts, type Part } from "../../data/mock";
+import { mockParts } from "../../data/mock";
+import type { CatalogPart } from "../../data/catalog";
 import {
   formatCompactVND as compactVND,
   getPartDiscountPercent,
@@ -21,7 +22,7 @@ import {
 // AdminParts — quản lý phụ tùng (kho)
 // =========================
 
-const columns: AdminTableColumn<Part>[] = [
+const columns: AdminTableColumn<CatalogPart>[] = [
   {
     key: "name",
     label: "Phụ tùng",
@@ -120,14 +121,14 @@ const columns: AdminTableColumn<Part>[] = [
   },
 ];
 
-const filters: AdminTableFilter<Part>[] = [
+const filters: AdminTableFilter<CatalogPart>[] = [
   { id: "low", label: "Tồn kho thấp", predicate: (p) => p.stockQty < 50 },
   { id: "discount", label: "Đang giảm giá", predicate: (p) => getPartDiscountPercent(p) > 0 },
   { id: "bestseller", label: "Bán chạy", predicate: (p) => !!p.isBestSeller },
   { id: "featured", label: "Nổi bật", predicate: (p) => !!p.isFeatured },
 ];
 
-const form: AdminFormProps<Part> = {
+const form: AdminFormProps<CatalogPart> = {
   addTitle: "Thêm phụ tùng mới",
   editTitle: "Chỉnh sửa phụ tùng",
   fields: [
@@ -152,13 +153,13 @@ const form: AdminFormProps<Part> = {
 };
 
 export default function AdminParts() {
-  const lowStockCount = parts.filter((p) => p.stockQty < 50).length;
+  const lowStockCount = mockParts.filter((p) => p.stockQty < 50).length;
   return (
     <AdminTable
       title="Quản lý phụ tùng"
-      subtitle={`${parts.length} sản phẩm trong kho${lowStockCount > 0 ? ` · ${lowStockCount} sắp hết hàng` : ""}`}
+      subtitle={`${mockParts.length} sản phẩm trong kho${lowStockCount > 0 ? ` · ${lowStockCount} sắp hết hàng` : ""}`}
       icon={<IconPackage size={20} />}
-      data={parts}
+      data={mockParts}
       columns={columns}
       searchKey="name"
       filters={filters}

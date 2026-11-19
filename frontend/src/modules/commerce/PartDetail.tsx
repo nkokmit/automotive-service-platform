@@ -22,7 +22,8 @@ import Button from "../../components/Button";
 import { Skeleton } from "../../components/Loading";
 import { useToast } from "../../components/Toast";
 import RecommendationWidget from "../../components/RecommendationWidget";
-import { parts, type Part } from "../../data/mock";
+import { GARAGE } from "../../config/garage";
+import { useCatalog, type CatalogPart } from "../../data/catalog";
 import { recommendForPart } from "../../data/recommend";
 import {
   addToCart,
@@ -149,7 +150,7 @@ function QtySelector({
 // =========================
 // Sub-component: PartCard (dùng cho similar)
 // =========================
-function PartCardSmall({ part }: { part: Part }) {
+function PartCardSmall({ part }: { part: CatalogPart }) {
   const discount = getPartDiscountPercent(part);
   return (
     <Link to={`/parts/${part.slug}`} className="group block h-full">
@@ -194,19 +195,12 @@ function PartCardSmall({ part }: { part: Part }) {
 export default function PartDetail() {
   const { slug } = useParams();
   const t = useToast();
+  const { parts, loading: catalogLoading, usingFallback } = useCatalog();
 
-  // Loading giả lập
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    setLoading(true);
-    const id = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(id);
-  }, [slug]);
-
-  // Tìm part theo slug — kết hợp với loading để TypeScript narrow đúng
+  // Tìm part theo slug trong catalog đang hiển thị (API thật hoặc fallback)
   const part = useMemo(
-    () => (loading ? null : parts.find((p) => p.slug === slug) ?? null),
-    [slug, loading],
+    () => parts.find((p) => p.slug === slug) ?? null,
+    [parts, slug],
   );
 
   // Qty state
@@ -225,7 +219,7 @@ export default function PartDetail() {
   // RENDER BRANCHES
   // =========================
 
-  if (loading) {
+  if (catalogLoading) {
     return (
       <div className="container-page py-6 md:py-8">
         <div className="grid lg:grid-cols-[1fr_380px] gap-6">
@@ -280,10 +274,10 @@ export default function PartDetail() {
   const discount = getPartDiscountPercent(part);
   const inStock = part.stockQty > 0;
 
-  // Similar: dùng RecommendationWidget (smart engine)
+  // Similar: dùng RecommendationWidget (smart engine) trên pool catalog hiện tại
   const similarRecommendations = useMemo(
-    () => recommendForPart(part.id, 4),
-    [part.id],
+    () => recommendForPart(part.id, 4, parts),
+    [part.id, parts],
   );
 
   const handleAddToCart = (showModal: boolean = false) => {
@@ -325,6 +319,13 @@ export default function PartDetail() {
         <span className="text-ink line-clamp-1">{part.name}</span>
       </nav>
 
+      {usingFallback && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Đang hiển thị sản phẩm mẫu. Giá và tồn kho sẽ cập nhật khi kết nối
+          được máy chủ.
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-[1fr_380px] gap-6">
         {/* ============= LEFT ============= */}
         <div>
@@ -363,25 +364,27 @@ export default function PartDetail() {
             </h1>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-light">
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <IconStar
-                    key={s}
-                    size={16}
-                    className={
-                      s <= Math.round(part.rating)
-                        ? "text-accent-hover"
-                        : "text-ink/15"
-                    }
-                  />
-                ))}
-                <span className="font-semibold text-ink ml-1">
-                  {part.rating}
-                </span>
-                <span className="text-ink-muted">
-                  ({part.reviewsCount} đánh giá)
-                </span>
-              </div>
+              {part.rating > 0 && (
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <IconStar
+                      key={s}
+                      size={16}
+                      className={
+                        s <= Math.round(part.rating)
+                          ? "text-accent-hover"
+                          : "text-ink/15"
+                      }
+                    />
+                  ))}
+                  <span className="font-semibold text-ink ml-1">
+                    {part.rating}
+                  </span>
+                  <span className="text-ink-muted">
+                    ({part.reviewsCount} đánh giá)
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -405,6 +408,16 @@ export default function PartDetail() {
                 />
                 <SpecRow
                   icon={<IconPackage size={16} />}
+                  label="Mã sản phẩm"
+                  value={part.sku}
+                />
+                <SpecRow
+                  icon={<IconShoppingBag size={16} />}
+                  label="Đơn vị"
+                  value={part.unit}
+                />
+                <SpecRow
+                  icon={<IconPackage size={16} />}
                   label="Tình trạng kho"
                   value={
                     inStock
@@ -412,11 +425,13 @@ export default function PartDetail() {
                       : "Hết hàng"
                   }
                 />
-                <SpecRow
-                  icon={<IconStar size={16} />}
-                  label="Đánh giá"
-                  value={`${part.rating} / 5 (${part.reviewsCount} reviews)`}
-                />
+                {part.rating > 0 && (
+                  <SpecRow
+                    icon={<IconStar size={16} />}
+                    label="Đánh giá"
+                    value={`${part.rating} / 5 (${part.reviewsCount} reviews)`}
+                  />
+                )}
                 {part.isBestSeller && (
                   <SpecRow
                     icon={<IconCheck size={16} />}
@@ -452,9 +467,9 @@ export default function PartDetail() {
                 quốc.
               </p>
               <p className="text-ink-light leading-relaxed mt-3">
-                Hỗ trợ lắp đặt tại hệ thống garage liên kết AutoCare trên
-                toàn quốc. Liên hệ hotline <strong>1900 6868</strong> để được
-                tư vấn chi tiết.
+                Lắp đặt tại <strong>{GARAGE.name}</strong> — {GARAGE.address},{" "}
+                {GARAGE.district}. Liên hệ hotline <strong>{GARAGE.hotline}</strong>{" "}
+                để được tư vấn chi tiết.
               </p>
             </div>
           </div>
@@ -521,7 +536,7 @@ export default function PartDetail() {
                     size={16}
                     className="text-primary shrink-0 mt-0.5"
                   />
-                  Hỗ trợ lắp đặt tại garage liên kết trên toàn quốc.
+                  Lắp đặt và bảo hành tại {GARAGE.name}.
                 </li>
               </ul>
             </div>
@@ -621,7 +636,7 @@ export default function PartDetail() {
                 <div className="flex items-center justify-between gap-2">
                   <QtySelector
                     value={qty}
-                    max={part.stockQty}
+                    max={Math.max(1, part.stockQty)}
                     onChange={setQty}
                     disabled={!inStock}
                   />
@@ -725,9 +740,7 @@ export default function PartDetail() {
               </button>
             </div>
             <h3 className="font-bold text-lg mb-1">{showSuccess.title}</h3>
-            <p className="text-sm text-ink-light mb-6">
-              {showSuccess.message}
-            </p>
+            <p className="text-sm text-ink-light mb-6">{showSuccess.message}</p>
             <div className="space-y-2">
               <Link to="/cart" className="block">
                 <Button fullWidth size="lg" onClick={() => setShowSuccess(null)}>

@@ -207,6 +207,139 @@ export interface ServiceHistoryCreateRequest {
   garageName?: string | null;
 }
 
+// ── Inventory service (inventory-service) ─────────────────────────────────────
+/** Khớp CategoryResponse.java — dùng chung cho nhóm dịch vụ và nhóm phụ tùng. */
+export interface CategoryResponse {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+}
+
+/**
+ * Khớp ServiceResponse.java.
+ *
+ * Lưu ý tên field: backend serialize snake_case (`duration_minutes`,
+ * `required_techs`, `base_labor_price`) — xem @JsonProperty trong record.
+ */
+export interface ServiceResponse {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  code: string;
+  name: string;
+  duration_minutes: number;
+  required_techs: number;
+  /** BigDecimal — serialize thành number. */
+  baseLaborPrice: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp PartResponse.java. */
+export interface PartResponse {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  sku: string;
+  oemCode: string | null;
+  name: string;
+  brand: string | null;
+  unit: string;
+  costPrice: number;
+  sellingPrice: number;
+  onHandStock: number;
+  reservedStock: number;
+  availableStock: number;
+  minStockLevel: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp ServiceBomResponse.java — định mức phụ tùng của một dịch vụ. */
+export interface ServiceBomResponse {
+  id: string;
+  serviceId: string;
+  partId: string;
+  partSku: string;
+  partName: string;
+  partUnit: string;
+  default_quantity: number;
+  note: string | null;
+}
+
+/** Khớp PartCompatibilityResponse.java — dòng xe mà phụ tùng lắp được. */
+export interface PartCompatibilityResponse {
+  id: string;
+  partId: string;
+  vehicleBrand: string;
+  vehicleModel: string;
+  yearFrom: number | null;
+  yearTo: number | null;
+  createdAt: string;
+}
+
+// ── Booking service (booking-service) ─────────────────────────────────────────
+/** Khớp BookingStatus.java. */
+export type BookingStatus =
+  | "CONFIRMED"
+  | "CANCELLED"
+  | "NO_SHOW"
+  | "CHECKED_IN"
+  | "FULFILLED";
+
+/** Khớp BookingServiceResponse.java — dịch vụ đã chốt trong 1 lịch hẹn. */
+export interface BookingServiceResponse {
+  serviceId: string;
+  serviceNameSnapshot: string;
+  estimatedDurationMinutes: number | null;
+  requiredTechniciansSnapshot: number | null;
+  sequenceNumber: number;
+}
+
+/** Khớp BookingResponse.java. */
+export interface BookingResponse {
+  id: string;
+  customerId: string;
+  vehicleId: string | null;
+  licensePlateSnapshot: string;
+  startAt: string;
+  endAt: string;
+  status: BookingStatus;
+  customerNote: string | null;
+  services: BookingServiceResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp AvailabilitySlotResponse.java. */
+export interface AvailabilitySlotResponse {
+  startAt: string;
+  endAt: string;
+}
+
+/** Khớp BookingCreateRequest.java. */
+export interface BookingCreateRequest {
+  /** ISO-8601 instant, ví dụ "2026-11-20T02:00:00Z". */
+  startAt: string;
+  serviceIds: string[];
+  licensePlate: string;
+  customerNote?: string;
+}
+
+/** Khớp BookingRescheduleRequest.java. */
+export interface BookingRescheduleRequest {
+  startAt: string;
+}
+
+/** Khớp BookingCancelRequest.java. */
+export interface BookingCancelRequest {
+  reason?: string;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 /** Kiểm tra user có authority cụ thể không (role ADMIN ⇒ ROLE_ADMIN). */
 export function hasAuthority(user: UserResponse | null, authority: string): boolean {

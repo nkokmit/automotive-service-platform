@@ -42,7 +42,7 @@ import { IconArrowLeft, IconSparkles, IconSettings } from "./components/icons";
 import "./styles/globals.css";
 
 import AdminDashboard from "./modules/admin/AdminDashboard";
-import AdminGarages from "./modules/admin/AdminGarages";
+import AdminGarageProfile from "./modules/admin/AdminGarageProfile";
 import AdminServices from "./modules/admin/AdminServices";
 import AdminParts from "./modules/admin/AdminParts";
 import AdminOrders from "./modules/admin/AdminOrders";
@@ -112,7 +112,7 @@ hydrateUser().finally(() => {
               }
             >
               <Route index element={<AdminDashboard />} />
-              <Route path="garages" element={<AdminGarages />} />
+              <Route path="garage" element={<AdminGarageProfile />} />
               <Route path="services" element={<AdminServices />} />
               <Route path="parts" element={<AdminParts />} />
               <Route path="orders" element={<AdminOrders />} />
@@ -123,7 +123,7 @@ hydrateUser().finally(() => {
                 element={
                   <ComingSoon
                     title="Báo cáo & Thống kê"
-                    desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo garage, hiệu suất dịch vụ, cohort khách hàng..."
+                    desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo dịch vụ, hiệu suất kỹ thuật viên, cohort khách hàng..."
                   />
                 }
               />

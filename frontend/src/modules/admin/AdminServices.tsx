@@ -11,7 +11,9 @@ import {
   type AdminTableFilter,
   type AdminFormProps,
 } from "../../components/AdminTable";
-import { services, type Service } from "../../data/mock";
+import { mockServices } from "../../data/mock";
+import type { CatalogService } from "../../data/catalog";
+import { GARAGE } from "../../config/garage";
 import {
   formatCompactVND as compactVND,
 } from "../../data/cartStore";
@@ -20,7 +22,7 @@ import {
 // AdminServices — quản lý dịch vụ
 // =========================
 
-const columns: AdminTableColumn<Service>[] = [
+const columns: AdminTableColumn<CatalogService>[] = [
   {
     key: "name",
     label: "Dịch vụ",
@@ -39,7 +41,7 @@ const columns: AdminTableColumn<Service>[] = [
             {s.name}
           </Link>
           <div className="text-xs text-ink-muted line-clamp-1">
-            {s.provider.name}
+            {GARAGE.name}
           </div>
         </div>
       </div>
@@ -109,13 +111,13 @@ const columns: AdminTableColumn<Service>[] = [
   },
 ];
 
-const filters: AdminTableFilter<Service>[] = [
+const filters: AdminTableFilter<CatalogService>[] = [
   { id: "popular", label: "Phổ biến", predicate: (s) => !!s.isPopular },
   { id: "featured", label: "Nổi bật", predicate: (s) => !!s.isFeatured },
   { id: "warranty", label: "Có BH", predicate: (s) => s.warrantyMonths > 0 },
 ];
 
-const form: AdminFormProps<Service> = {
+const form: AdminFormProps<CatalogService> = {
   addTitle: "Thêm dịch vụ mới",
   editTitle: "Chỉnh sửa dịch vụ",
   fields: [
@@ -141,9 +143,9 @@ export default function AdminServices() {
   return (
     <AdminTable
       title="Quản lý dịch vụ"
-      subtitle={`${services.length} dịch vụ đang được cung cấp`}
+      subtitle={`${mockServices.length} dịch vụ đang được cung cấp`}
       icon={<IconWrench size={20} />}
-      data={services}
+      data={mockServices}
       columns={columns}
       searchKey="name"
       filters={filters}

@@ -14,7 +14,7 @@ import Button from "../../components/Button";
 import Input from "../../components/Input";
 import { SkeletonGrid } from "../../components/Loading";
 import { useToast } from "../../components/Toast";
-import { parts, type Part } from "../../data/mock";
+import { useCatalog, type CatalogPart } from "../../data/catalog";
 import {
   addToCart,
   formatCompactVND as compactVND,
@@ -22,19 +22,6 @@ import {
   getPartDiscountPercent,
   useCartCount,
 } from "../../data/cartStore";
-
-// =========================
-// Filter options (derived từ mock data)
-// =========================
-const allCategories = Array.from(new Set(parts.map((p) => p.category))).sort();
-const allBrands = Array.from(new Set(parts.map((p) => p.brand))).sort();
-
-// Price range từ data
-const minPrice = Math.min(...parts.map((p) => p.priceVND));
-const maxPrice = Math.max(...parts.map((p) => p.priceVND));
-
-// Bước nhảy cho price slider (50k)
-const PRICE_STEP = 50_000;
 
 // =========================
 // Sort options
@@ -66,34 +53,50 @@ const statusOptions: { id: StatusFilter; label: string }[] = [
 export default function PartsList() {
   const [params, setParams] = useSearchParams();
   const t = useToast();
+  const { parts, loading, usingFallback } = useCatalog();
 
-  // Filter state
   const [filters, setFilters] = useState({
     category: "Tất cả" as string,
     brand: "Tất cả" as string,
-    maxPrice: maxPrice,
+    maxPrice: 0,
     status: "all" as StatusFilter,
   });
   const [sort, setSort] = useState<SortId>("popular");
   const [query, setQuery] = useState("");
 
-  // Loading state (giả lập API call)
-  const [loading, setLoading] = useState(true);
+  // Danh sách danh mục / thương hiệu — suy ra từ catalog đang hiển thị
+  const allCategories = useMemo(
+    () => Array.from(new Set(parts.map((p) => p.category))).sort(),
+    [parts],
+  );
+  const allBrands = useMemo(
+    () => Array.from(new Set(parts.map((p) => p.brand))).sort(),
+    [parts],
+  );
 
+  // Khoảng giá — bám theo dữ liệu hiện tại
+  const minPrice = useMemo(
+    () => (parts.length ? Math.min(...parts.map((p) => p.priceVND)) : 0),
+    [parts],
+  );
+  const maxPrice = useMemo(
+    () => (parts.length ? Math.max(...parts.map((p) => p.priceVND)) : 0),
+    [parts],
+  );
+
+  // Đồng bộ giới hạn giá khi catalog thay đổi (fallback ↔ API thật)
   useEffect(() => {
-    setLoading(true);
-    const id = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(id);
-  }, []);
+    setFilters((f) => ({ ...f, maxPrice: maxPrice || f.maxPrice }));
+  }, [maxPrice]);
 
   // Đọc ?category= từ URL
   useEffect(() => {
     const category = params.get("category");
-    if (category && allCategories.includes(category as Part["category"])) {
+    if (category && allCategories.includes(category)) {
       setFilters((f) => ({ ...f, category }));
       setParams({}, { replace: true });
     }
-  }, [params, setParams]);
+  }, [params, setParams, allCategories]);
 
   // Cart state — tự động re-render khi cart thay đổi
   const cartCount = useCartCount();
@@ -103,7 +106,7 @@ export default function PartsList() {
       if (filters.category !== "Tất cả" && p.category !== filters.category)
         return false;
       if (filters.brand !== "Tất cả" && p.brand !== filters.brand) return false;
-      if (p.priceVND > filters.maxPrice) return false;
+      if (maxPrice > 0 && p.priceVND > filters.maxPrice) return false;
       if (filters.status === "inStock" && p.stockQty <= 0) return false;
       if (filters.status === "discount" && getPartDiscountPercent(p) <= 0)
         return false;
@@ -148,7 +151,7 @@ export default function PartsList() {
         });
     }
     return result;
-  }, [filters, sort, query]);
+  }, [parts, filters, sort, query, maxPrice]);
 
   const resetFilters = () => {
     setFilters({
@@ -165,13 +168,13 @@ export default function PartsList() {
     let count = 0;
     if (filters.category !== "Tất cả") count++;
     if (filters.brand !== "Tất cả") count++;
-    if (filters.maxPrice < maxPrice) count++;
+    if (maxPrice > 0 && filters.maxPrice < maxPrice) count++;
     if (filters.status !== "all") count++;
     if (query) count++;
     return count;
-  }, [filters, query]);
+  }, [filters, query, maxPrice]);
 
-  const handleAddToCart = (p: Part, e: React.MouseEvent) => {
+  const handleAddToCart = (p: CatalogPart, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     addToCart(p.id, 1);
@@ -218,6 +221,13 @@ export default function PartsList() {
           </Link>
         )}
       </div>
+
+      {usingFallback && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Đang hiển thị danh mục phụ tùng mẫu. Hệ thống sẽ tự đồng bộ dữ liệu
+          thật khi máy chủ sẵn sàng.
+        </div>
+      )}
 
       {/* Top bar */}
       <div className="flex flex-col md:flex-row gap-3 mb-6">
@@ -329,26 +339,28 @@ export default function PartsList() {
             </div>
           </FilterSection>
 
-          <FilterSection title="Giá tối đa">
-            <div className="text-sm font-medium text-primary mb-2">
-              {fullVND(filters.maxPrice)}
-            </div>
-            <input
-              type="range"
-              min={minPrice}
-              max={maxPrice}
-              step={PRICE_STEP}
-              value={filters.maxPrice}
-              onChange={(e) =>
-                setFilters({ ...filters, maxPrice: Number(e.target.value) })
-              }
-              className="w-full accent-primary"
-            />
-            <div className="flex justify-between text-xs text-ink-muted mt-1">
-              <span>{compactVND(minPrice)}</span>
-              <span>{compactVND(maxPrice)}</span>
-            </div>
-          </FilterSection>
+          {maxPrice > 0 && (
+            <FilterSection title="Giá tối đa">
+              <div className="text-sm font-medium text-primary mb-2">
+                {fullVND(filters.maxPrice)}
+              </div>
+              <input
+                type="range"
+                min={minPrice}
+                max={maxPrice}
+                step={50000}
+                value={Math.min(filters.maxPrice, maxPrice)}
+                onChange={(e) =>
+                  setFilters({ ...filters, maxPrice: Number(e.target.value) })
+                }
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-xs text-ink-muted mt-1">
+                <span>{compactVND(minPrice)}</span>
+                <span>{compactVND(maxPrice)}</span>
+              </div>
+            </FilterSection>
+          )}
 
           <Button variant="outline" fullWidth onClick={resetFilters}>
             Xoá bộ lọc
@@ -360,7 +372,7 @@ export default function PartsList() {
           {loading ? (
             <SkeletonGrid count={6} lines={2} />
           ) : filtered.length === 0 ? (
-            <EmptyState onReset={resetFilters} />
+            <EmptyState onReset={resetFilters} total={parts.length} />
           ) : (
             <>
               {/* Toolbar trên cùng (mobile) — quick category chips */}
@@ -405,8 +417,8 @@ function PartCard({
   part,
   onAddToCart,
 }: {
-  part: Part;
-  onAddToCart: (p: Part, e: React.MouseEvent) => void;
+  part: CatalogPart;
+  onAddToCart: (p: CatalogPart, e: React.MouseEvent) => void;
 }) {
   const discount = getPartDiscountPercent(part);
   const inStock = part.stockQty > 0;
@@ -451,9 +463,13 @@ function PartCard({
           </p>
 
           <div className="flex items-center gap-1 mb-3 text-xs">
-            <IconStar size={14} className="text-accent-hover" />
-            <span className="font-semibold text-ink">{part.rating}</span>
-            <span className="text-ink-muted">({part.reviewsCount})</span>
+            {part.rating > 0 && (
+              <>
+                <IconStar size={14} className="text-accent-hover" />
+                <span className="font-semibold text-ink">{part.rating}</span>
+                <span className="text-ink-muted">({part.reviewsCount})</span>
+              </>
+            )}
             {inStock && (
               <>
                 <span className="text-ink-muted mx-1">·</span>
@@ -506,7 +522,13 @@ function FilterSection({
   );
 }
 
-function EmptyState({ onReset }: { onReset: () => void }) {
+function EmptyState({
+  onReset,
+  total,
+}: {
+  onReset: () => void;
+  total: number;
+}) {
   return (
     <Card>
       <div className="p-10 text-center">
@@ -517,8 +539,8 @@ function EmptyState({ onReset }: { onReset: () => void }) {
           Không tìm thấy phụ kiện phù hợp
         </p>
         <p className="text-sm text-ink-light mb-5 max-w-sm mx-auto">
-          Thử điều chỉnh bộ lọc hoặc xoá bộ lọc để xem tất cả {parts.length}{" "}
-          sản phẩm đang bán.
+          Thử điều chỉnh bộ lọc hoặc xoá bộ lọc để xem tất cả {total} sản phẩm
+          đang bán.
         </p>
         <Button variant="outline" onClick={onReset}>
           <IconClose size={16} /> Xoá bộ lọc

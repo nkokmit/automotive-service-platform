@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   IconMapPin,
   IconStar,
@@ -10,13 +10,21 @@ import {
   IconCheck,
   IconWrench,
   IconShield,
+  IconRefresh,
+  IconWarning,
 } from "../../components/icons";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
+import { useToast } from "../../components/Toast";
 import RecommendationWidget from "../../components/RecommendationWidget";
-import { services } from "../../data/mock";
+import { GARAGE } from "../../config/garage";
+import { useCatalog } from "../../data/catalog";
 import { recommendForService } from "../../data/recommend";
+import { bookingApi } from "../../api/endpoints/booking";
+import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
+import type { AvailabilitySlotResponse } from "../../api/types";
+import { useAuth } from "../../data/authStore";
 
 const formatVND = (n: number) =>
   new Intl.NumberFormat("vi-VN").format(n) + "đ";
@@ -41,7 +49,7 @@ const mockReviews = [
     rating: 4,
     date: "05/09/2026",
     content:
-      "Giá hơi cao một chút nhưng chất lượng ổn. Garage sạch sẽ, có phòng chờ máy lạnh.",
+      "Giá hơi cao một chút nhưng chất lượng ổn. Xưởng sạch sẽ, có phòng chờ máy lạnh.",
   },
   {
     id: "rv3",
@@ -51,45 +59,110 @@ const mockReviews = [
     rating: 5,
     date: "28/08/2026",
     content:
-      "Đặt lịch online tiện lợi, garage xác nhận nhanh. Kỹ thuật viên tay nghề cao.",
+      "Đặt lịch online tiện lợi, xưởng xác nhận nhanh. Kỹ thuật viên tay nghề cao.",
   },
 ];
 
-// Sinh danh sách 7 ngày tới
-function getNext7Days() {
-  const days: { iso: string; date: Date; label: string; weekday: string }[] =
-    [];
-  const today = new Date("2026-10-03"); // mock today cho demo
-  for (let i = 0; i < 7; i++) {
+type TabId = "description" | "includes" | "policy" | "reviews";
+
+/** Khoảng ngày mà backend booking-service cho phép tra cứu (≤ 14 ngày). */
+const AVAILABILITY_WINDOW_DAYS = 7;
+
+/** Sinh danh sách N ngày tới (bắt đầu từ hôm nay). */
+function getNextDays(count: number) {
+  const days: { iso: string; label: string; weekday: string }[] = [];
+  const today = new Date();
+  for (let i = 0; i < count; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const weekday = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d.getDay()];
-    const label = `${d.getDate()}/${d.getMonth() + 1}`;
-    days.push({ iso, date: d, label, weekday });
+    days.push({ iso, label: `${d.getDate()}/${d.getMonth() + 1}`, weekday });
   }
   return days;
 }
 
-type TabId = "description" | "includes" | "policy" | "reviews";
-
 export default function ServiceDetail() {
   const { slug } = useParams();
-  const service =
-    services.find((s) => s.slug === slug) || services[0];
+  const navigate = useNavigate();
+  const t = useToast();
+  const { user } = useAuth();
+  const { services, loading: catalogLoading, usingFallback } = useCatalog();
+
+  const service = useMemo(
+    () => services.find((s) => s.slug === slug) ?? null,
+    [services, slug],
+  );
 
   const [tab, setTab] = useState<TabId>("description");
-  const [selectedDate, setSelectedDate] = useState<string>(
-    Object.keys(service.slotsByDate)[0] || ""
-  );
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [licensePlate, setLicensePlate] = useState("");
+  const [customerNote, setCustomerNote] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const days = useMemo(() => getNext7Days(), []);
-  const availableDays = days.filter(
-    (d) => service.slotsByDate[d.iso]?.length
+  const days = useMemo(() => getNextDays(AVAILABILITY_WINDOW_DAYS), []);
+  const [slots, setSlots] = useState<AvailabilitySlotResponse[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+
+  // Chọn ngày đầu tiên khi có dịch vụ
+  useEffect(() => {
+    if (!selectedDate && days.length > 0) setSelectedDate(days[0].iso);
+  }, [days, selectedDate]);
+
+  // Nạp lịch trống thật từ booking-service
+  const loadSlots = useCallback(
+    async (date: string) => {
+      if (!service || !date) return;
+      setSlotsLoading(true);
+      setSlotsError(null);
+      try {
+        const data = await bookingApi.getAvailability({
+          from: date,
+          to: date,
+          serviceIds: [service.id],
+        });
+        setSlots(data);
+      } catch (err) {
+        setSlots([]);
+        setSlotsError(
+          err instanceof Error
+            ? err.message
+            : "Không tải được lịch trống từ máy chủ",
+        );
+      } finally {
+        setSlotsLoading(false);
+      }
+    },
+    [service],
   );
-  const slots = service.slotsByDate[selectedDate] || [];
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    setSelectedSlot("");
+    void loadSlots(selectedDate);
+  }, [selectedDate, loadSlots]);
+
+  // Gợi ý biển số từ hồ sơ xe của khách
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    customerVehicleApi
+      .listVehicles({ isActive: true, size: 20 })
+      .then((page) => {
+        if (cancelled) return;
+        const first = page.items?.[0];
+        if (first?.licensePlate) setLicensePlate(first.licensePlate);
+      })
+      .catch(() => {
+        /* không có xe — để user nhập tay */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "description", label: "Mô tả" },
@@ -97,6 +170,87 @@ export default function ServiceDetail() {
     { id: "policy", label: "Chính sách" },
     { id: "reviews", label: `Đánh giá (${mockReviews.length})` },
   ];
+
+  // =========================
+  // RENDER: không tìm thấy
+  // =========================
+  if (!catalogLoading && !service) {
+    return (
+      <div className="container-page py-12">
+        <div className="bg-white border border-ink/10 rounded-2xl p-10 text-center max-w-md mx-auto">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-bgsoft flex items-center justify-center mb-4">
+            <IconWrench size={32} className="text-ink-muted" />
+          </div>
+          <p className="text-xs uppercase tracking-wider text-primary font-semibold mb-2">
+            404 — Không tìm thấy dịch vụ
+          </p>
+          <h1 className="text-xl font-bold mb-2">
+            Dịch vụ không tồn tại hoặc đã ngừng cung cấp
+          </h1>
+          <p className="text-sm text-ink-light mb-6">
+            Slug <code className="bg-bgsoft px-1.5 py-0.5 rounded">{slug}</code>{" "}
+            không có trong danh mục.
+          </p>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <Link to="/services">
+              <Button>Xem dịch vụ khác</Button>
+            </Link>
+            <Link to="/">
+              <Button variant="outline">Về trang chủ</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!service) {
+    return (
+      <div className="container-page py-12">
+        <div className="h-64 bg-bgsoft rounded-2xl animate-pulse" />
+      </div>
+    );
+  }
+
+  // =========================
+  // Đặt lịch
+  // =========================
+  const handleConfirmBooking = async () => {
+    if (!user) {
+      t.info("Vui lòng đăng nhập để đặt lịch");
+      navigate("/login");
+      return;
+    }
+    if (!selectedSlot) {
+      t.info("Vui lòng chọn khung giờ");
+      return;
+    }
+    if (!licensePlate.trim()) {
+      t.info("Vui lòng nhập biển số xe");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await bookingApi.createBooking({
+        startAt: selectedSlot,
+        serviceIds: [service.id],
+        licensePlate: licensePlate.trim(),
+        customerNote: customerNote.trim() || undefined,
+      });
+      setShowConfirm(false);
+      t.success("Đặt lịch thành công! Chúng tôi sẽ xác nhận trong 30 phút.");
+      navigate("/profile?tab=bookings");
+    } catch (err) {
+      t.error(
+        err instanceof Error
+          ? err.message
+          : "Không đặt được lịch. Vui lòng thử lại.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="container-page py-6 md:py-8">
@@ -112,6 +266,13 @@ export default function ServiceDetail() {
         <span>/</span>
         <span className="text-ink line-clamp-1">{service.name}</span>
       </nav>
+
+      {usingFallback && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Đang hiển thị dịch vụ mẫu. Đặt lịch sẽ được ghi nhận khi hệ thống kết
+          nối được máy chủ.
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-6">
         {/* LEFT: thông tin dịch vụ */}
@@ -153,31 +314,29 @@ export default function ServiceDetail() {
                     />
                   ))}
                   <span className="font-semibold ml-1">{service.rating}</span>
-                  <span className="text-ink-muted text-sm">
-                    ({service.bookingsCount} lượt đặt)
-                  </span>
+                  {service.bookingsCount > 0 && (
+                    <span className="text-ink-muted text-sm">
+                      ({service.bookingsCount} lượt đặt)
+                    </span>
+                  )}
                 </div>
 
-                {/* Provider info */}
+                {/* Thông tin xưởng — dùng chung hồ sơ GARAGE */}
                 <div className="bg-bgsoft rounded-xl p-3 space-y-1.5 text-sm">
                   <div className="font-medium text-ink">
-                    Cung cấp bởi{" "}
-                    <span className="text-primary">
-                      {service.provider.name}
-                    </span>
+                    Thực hiện tại{" "}
+                    <span className="text-primary">{GARAGE.name}</span>
                   </div>
                   <div className="flex items-center gap-1 text-xs text-ink-muted">
                     <IconMapPin size={12} />
-                    {service.provider.address}, {service.provider.city}
+                    {GARAGE.address}, {GARAGE.district}, {GARAGE.city}
                   </div>
                   <div className="flex items-center gap-3 text-xs">
                     <div className="flex items-center gap-1 text-ink-light">
                       <IconStar size={12} className="text-accent-hover" />
-                      <span className="font-medium">
-                        {service.provider.rating}
-                      </span>
+                      <span className="font-medium">{GARAGE.rating}</span>
                       <span className="text-ink-muted">
-                        ({service.provider.reviewsCount})
+                        ({GARAGE.reviewsCount})
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-ink-muted">
@@ -198,18 +357,18 @@ export default function ServiceDetail() {
           {/* Tabs */}
           <div className="border-b border-ink/10 mt-6 mb-5 sticky top-16 bg-white z-10">
             <div className="flex gap-1 overflow-x-auto">
-              {tabs.map((t) => (
+              {tabs.map((t2) => (
                 <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
+                  key={t2.id}
+                  onClick={() => setTab(t2.id)}
                   className={[
                     "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                    tab === t.id
+                    tab === t2.id
                       ? "border-primary text-primary"
                       : "border-transparent text-ink-muted hover:text-ink",
                   ].join(" ")}
                 >
-                  {t.label}
+                  {t2.label}
                 </button>
               ))}
             </div>
@@ -227,20 +386,27 @@ export default function ServiceDetail() {
           {tab === "includes" && (
             <div>
               <h3 className="font-semibold mb-3">Dịch vụ bao gồm</h3>
-              <ul className="space-y-2">
-                {service.includes.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-2 text-sm text-ink-light"
-                  >
-                    <span className="w-5 h-5 mt-0.5 rounded-full bg-accent text-ink flex items-center justify-center shrink-0">
-                      <IconCheck size={12} />
-                    </span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              {service.requirements && service.requirements.length > 0 && (
+              {service.includes.length > 0 ? (
+                <ul className="space-y-2">
+                  {service.includes.map((item) => (
+                    <li
+                      key={item}
+                      className="flex items-start gap-2 text-sm text-ink-light"
+                    >
+                      <span className="w-5 h-5 mt-0.5 rounded-full bg-accent text-ink flex items-center justify-center shrink-0">
+                        <IconCheck size={12} />
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-ink-light">
+                  Danh mục chưa có mô tả chi tiết. Vui lòng liên hệ{" "}
+                  {GARAGE.name} qua hotline {GARAGE.hotline} để được tư vấn.
+                </p>
+              )}
+              {service.requirements.length > 0 && (
                 <div className="mt-6 p-4 bg-bgsoft rounded-xl">
                   <h4 className="font-semibold text-sm mb-2">
                     Yêu cầu / Lưu ý
@@ -262,17 +428,16 @@ export default function ServiceDetail() {
                   Chính sách hủy lịch
                 </h4>
                 <p>
-                  Miễn phí hủy lịch trước{" "}
-                  <strong>24 giờ</strong> so với giờ hẹn. Sau thời gian này,
-                  có thể áp dụng phí 30% giá trị dịch vụ.
+                  Miễn phí hủy lịch trước <strong>24 giờ</strong> so với giờ
+                  hẹn. Sau thời gian này, có thể áp dụng phí 30% giá trị dịch
+                  vụ.
                 </p>
               </div>
               <div>
                 <h4 className="font-semibold text-ink mb-1">Bảo hành</h4>
                 <p>
-                  Bảo hành{" "}
-                  <strong>{service.warrantyMonths} tháng</strong> cho dịch vụ
-                  và phụ tùng chính hãng. Áp dụng tại garage đã thực hiện.
+                  Bảo hành <strong>{service.warrantyMonths} tháng</strong> cho
+                  dịch vụ và phụ tùng chính hãng. Áp dụng tại {GARAGE.name}.
                 </p>
               </div>
               <div>
@@ -297,9 +462,7 @@ export default function ServiceDetail() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium">{r.author}</span>
-                        <span className="text-xs text-ink-muted">
-                          {r.date}
-                        </span>
+                        <span className="text-xs text-ink-muted">{r.date}</span>
                       </div>
                       <div className="flex items-center gap-1 mb-2">
                         {[1, 2, 3, 4, 5].map((s) => (
@@ -351,64 +514,74 @@ export default function ServiceDetail() {
                   <IconCalendar size={14} />
                   Chọn ngày
                 </label>
-                {availableDays.length === 0 ? (
-                  <p className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg">
-                    Chưa có lịch trống trong tuần tới.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2">
-                    {availableDays.map((d) => {
-                      const count = service.slotsByDate[d.iso].length;
-                      const isSelected = selectedDate === d.iso;
-                      return (
-                        <button
-                          key={d.iso}
-                          onClick={() => {
-                            setSelectedDate(d.iso);
-                            setSelectedSlot("");
-                          }}
-                          className={[
-                            "py-2 px-1 rounded-lg border text-center transition-colors",
-                            isSelected
-                              ? "bg-primary text-white border-primary"
-                              : "border-ink/15 hover:border-primary/40",
-                          ].join(" ")}
-                        >
-                          <div className="text-[10px] uppercase opacity-80">
-                            {d.weekday}
-                          </div>
-                          <div className="text-sm font-bold">{d.label}</div>
-                          <div
-                            className={[
-                              "text-[10px]",
-                              isSelected
-                                ? "text-white/80"
-                                : "text-ink-muted",
-                            ].join(" ")}
-                          >
-                            {count} slot
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                <div className="grid grid-cols-4 gap-2">
+                  {days.map((d) => {
+                    const isSelected = selectedDate === d.iso;
+                    return (
+                      <button
+                        key={d.iso}
+                        onClick={() => setSelectedDate(d.iso)}
+                        className={[
+                          "py-2 px-1 rounded-lg border text-center transition-colors",
+                          isSelected
+                            ? "bg-primary text-white border-primary"
+                            : "border-ink/15 hover:border-primary/40",
+                        ].join(" ")}
+                      >
+                        <div className="text-[10px] uppercase opacity-80">
+                          {d.weekday}
+                        </div>
+                        <div className="text-sm font-bold">{d.label}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Slot picker */}
-              {slots.length > 0 && (
-                <div className="mb-4">
-                  <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-                    <IconClock size={14} />
-                    Chọn khung giờ
-                  </label>
+              {/* Slot picker — dữ liệu thật từ booking-service */}
+              <div className="mb-4">
+                <label className="text-sm font-medium mb-2 block flex items-center gap-1">
+                  <IconClock size={14} />
+                  Chọn khung giờ
+                </label>
+                {slotsLoading ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div
+                        key={i}
+                        className="py-2 rounded-lg bg-bgsoft animate-pulse h-9"
+                      />
+                    ))}
+                  </div>
+                ) : slotsError ? (
+                  <div className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg flex items-start gap-2">
+                    <IconWarning size={14} className="shrink-0 mt-0.5" />
+                    <span>
+                      {slotsError}
+                      <button
+                        onClick={() => void loadSlots(selectedDate)}
+                        className="ml-2 text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        <IconRefresh size={12} /> Thử lại
+                      </button>
+                    </span>
+                  </div>
+                ) : slots.length === 0 ? (
+                  <p className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg">
+                    Ngày này đã kín lịch. Vui lòng chọn ngày khác.
+                  </p>
+                ) : (
                   <div className="grid grid-cols-3 gap-2">
                     {slots.map((slot) => {
-                      const isSelected = selectedSlot === slot;
+                      const isSelected = selectedSlot === slot.startAt;
+                      const time = new Date(slot.startAt).toLocaleTimeString(
+                        "vi-VN",
+                        { hour: "2-digit", minute: "2-digit" },
+                      );
                       return (
                         <button
-                          key={slot}
-                          onClick={() => setSelectedSlot(slot)}
+                          key={slot.startAt}
+                          onClick={() => setSelectedSlot(slot.startAt)}
                           className={[
                             "py-2 text-sm rounded-lg border transition-colors",
                             isSelected
@@ -416,24 +589,28 @@ export default function ServiceDetail() {
                               : "border-ink/15 hover:border-primary/40",
                           ].join(" ")}
                         >
-                          {slot}
+                          {time}
                         </button>
                       );
                     })}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Optional fields */}
               <div className="space-y-2 mb-4">
                 <input
                   type="text"
-                  placeholder="Biển số xe (VD: 50A-123.45)"
+                  value={licensePlate}
+                  onChange={(e) => setLicensePlate(e.target.value)}
+                  placeholder="Biển số xe (VD: 30A-123.45)"
                   className="w-full h-10 px-3 rounded-lg border border-ink/15 bg-white text-sm outline-none focus:border-primary"
                 />
                 <input
                   type="text"
-                  placeholder="Hãng xe / Dòng xe (VD: Toyota Vios)"
+                  value={customerNote}
+                  onChange={(e) => setCustomerNote(e.target.value)}
+                  placeholder="Ghi chú cho kỹ thuật viên (tuỳ chọn)"
                   className="w-full h-10 px-3 rounded-lg border border-ink/15 bg-white text-sm outline-none focus:border-primary"
                 />
               </div>
@@ -441,7 +618,7 @@ export default function ServiceDetail() {
               <Button
                 size="lg"
                 fullWidth
-                disabled={!selectedSlot}
+                disabled={!selectedSlot || submitting}
                 onClick={() => setShowConfirm(true)}
               >
                 {selectedSlot ? "Xác nhận đặt lịch" : "Chọn ngày & giờ"}
@@ -449,7 +626,7 @@ export default function ServiceDetail() {
               </Button>
 
               <p className="text-xs text-ink-muted text-center mt-3">
-                Garage sẽ xác nhận trong vòng 30 phút qua SMS/email
+                {GARAGE.name} sẽ xác nhận trong vòng 30 phút qua SMS/email
               </p>
             </div>
           </Card>
@@ -457,16 +634,16 @@ export default function ServiceDetail() {
           {/* Contact card */}
           <Card className="mt-4" hover={false}>
             <div className="p-4">
-              <h4 className="font-semibold text-sm mb-2">Liên hệ garage</h4>
+              <h4 className="font-semibold text-sm mb-2">Liên hệ xưởng</h4>
               <a
-                href="tel:02438761234"
+                href={GARAGE.telHref}
                 className="flex items-center gap-2 text-sm text-primary hover:underline"
               >
                 <IconPhone size={16} />
-                024 3876 1234
+                {GARAGE.phone}
               </a>
               <p className="text-xs text-ink-muted mt-2">
-                Giờ mở cửa: 08:00 - 19:00 (T2 - CN)
+                Giờ mở cửa: {GARAGE.workingHours}
               </p>
             </div>
           </Card>
@@ -491,11 +668,20 @@ export default function ServiceDetail() {
             </h3>
             <div className="bg-bgsoft rounded-xl p-3 mb-4 text-sm space-y-1.5">
               <div className="font-semibold">{service.name}</div>
+              <div className="text-ink-light">📍 {GARAGE.name}</div>
               <div className="text-ink-light">
-                📍 {service.provider.name}
+                📅 {selectedDate} ·{" "}
+                {selectedSlot
+                  ? new Date(selectedSlot).toLocaleString("vi-VN", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      day: "2-digit",
+                      month: "2-digit",
+                    })
+                  : ""}
               </div>
               <div className="text-ink-light">
-                📅 {selectedDate} · 🕐 {selectedSlot}
+                🚗 Biển số: {licensePlate || "(chưa nhập)"}
               </div>
               <div className="text-primary font-bold">
                 {formatVND(service.priceFrom)}
@@ -508,17 +694,16 @@ export default function ServiceDetail() {
               <Button
                 fullWidth
                 size="lg"
-                onClick={() => {
-                  setShowConfirm(false);
-                  alert("Đặt lịch thành công! (mock)");
-                }}
+                disabled={submitting}
+                onClick={handleConfirmBooking}
               >
-                Xác nhận đặt lịch
+                {submitting ? "Đang đặt lịch..." : "Xác nhận đặt lịch"}
               </Button>
               <Button
                 fullWidth
                 size="lg"
                 variant="outline"
+                disabled={submitting}
                 onClick={() => setShowConfirm(false)}
               >
                 Huỷ

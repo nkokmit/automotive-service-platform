@@ -605,7 +605,7 @@ export default function DamageUpload() {
 
                 <Link to="/services?category=S%E1%BB%ADa%20ch%E1%BB%AFa" className="block">
                   <Button fullWidth size="lg">
-                    Tìm garage sửa chữa gần bạn
+                    Đặt lịch sửa chữa tại xưởng
                     <IconArrowRight size={16} />
                   </Button>
                 </Link>

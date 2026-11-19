@@ -21,7 +21,7 @@ import Button from "../../components/Button";
 import Input from "../../components/Input";
 import { useToast } from "../../components/Toast";
 import RecommendationWidget from "../../components/RecommendationWidget";
-import { type Part } from "../../data/mock";
+import type { CatalogPart } from "../../data/catalog";
 import {
   useCartLines,
   clearCart,
@@ -893,7 +893,7 @@ void IconStar;
 function CheckoutUpsell({
   cartLines,
 }: {
-  cartLines: { part: Part; qty: number; lineTotal: number }[];
+  cartLines: { part: CatalogPart; qty: number; lineTotal: number }[];
 }) {
   const cartPartIds = useMemo(
     () => new Set(cartLines.map((l) => l.part.id)),

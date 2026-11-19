@@ -27,7 +27,7 @@ import {
 const ROLE_FILTERS: { id: "all" | AdminUserRole; label: string }[] = [
   { id: "all", label: "Tất cả" },
   { id: "customer", label: "Khách hàng" },
-  { id: "garage_owner", label: "Chủ garage" },
+  { id: "garage_owner", label: "Nhân viên xưởng" },
   { id: "admin", label: "Quản trị viên" },
 ];
 
@@ -66,7 +66,7 @@ export default function AdminUsers() {
     return {
       total: adminUsers.length,
       customers: adminUsers.filter((u) => u.role === "customer").length,
-      garages: adminUsers.filter((u) => u.role === "garage_owner").length,
+      staff: adminUsers.filter((u) => u.role === "garage_owner").length,
       suspended: adminUsers.filter((u) => u.status === "suspended").length,
     };
   }, []);
@@ -84,7 +84,7 @@ export default function AdminUsers() {
           </h1>
           <p className="text-sm text-ink-muted mt-1">
             {stats.total} tài khoản · {stats.customers} khách hàng ·{" "}
-            {stats.garages} chủ garage
+            {stats.staff} nhân viên xưởng
             {stats.suspended > 0 && (
               <span className="text-red-500"> · {stats.suspended} bị khoá</span>
             )}
@@ -108,8 +108,8 @@ export default function AdminUsers() {
         />
         <StatCard
           icon={<IconBuilding size={16} className="text-white" />}
-          label="Chủ garage"
-          value={stats.garages}
+          label="Nhân viên xưởng"
+          value={stats.staff}
           color="bg-amber-500"
         />
         <StatCard

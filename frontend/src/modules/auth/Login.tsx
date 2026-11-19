@@ -5,6 +5,7 @@ import Input from "../../components/Input";
 import { useToast } from "../../components/Toast";
 import { IconCar, IconCheck } from "../../components/icons";
 import { useAuth } from "../../data/authStore";
+import { GARAGE } from "../../config/garage";
 
 export default function Login() {
   const [params] = useSearchParams();
@@ -63,7 +64,7 @@ export default function Login() {
             <span className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center">
               <IconCar size={22} />
             </span>
-            <span className="font-bold text-lg text-primary">AutoCare</span>
+            <span className="font-bold text-lg text-primary">{GARAGE.brand}</span>
           </div>
 
           <h1 className="text-2xl md:text-3xl font-bold mb-2">
@@ -236,15 +237,15 @@ export default function Login() {
             <IconCar size={26} />
           </div>
           <h2 className="text-3xl font-bold leading-tight mb-4">
-            AutoCare — người bạn đồng hành tin cậy của chủ xe
+            {GARAGE.name} — người bạn đồng hành tin cậy của chủ xe
           </h2>
           <p className="text-white/85 mb-8">
-            Hơn 500 garage uy tín, đặt lịch trong 30 giây, trợ lý AI phân tích
-            hư hỏng tức thì.
+            Xưởng sửa chữa chuyên nghiệp tại {GARAGE.city}, đặt lịch trong 30
+            giây, trợ lý AI phân tích hư hỏng tức thì.
           </p>
           <ul className="space-y-3 text-sm">
             {[
-              "Tìm garage gần bạn với bản đồ",
+              "Dịch vụ & phụ tùng chính hãng tại xưởng",
               "Đặt lịch trực tuyến, xác nhận tức thì",
               "AI phân tích hư hỏng từ ảnh",
               "Lịch sử bảo dưỡng đầy đủ",

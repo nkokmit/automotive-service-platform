@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { IconCar } from "./icons";
+import { IconCar, IconMapPin, IconPhone } from "./icons";
+import { GARAGE } from "../config/garage";
 
 export default function Footer() {
   return (
@@ -10,11 +11,10 @@ export default function Footer() {
             <span className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center">
               <IconCar size={20} />
             </span>
-            AutoCare
+            {GARAGE.brand}
           </div>
           <p className="text-sm text-ink-light leading-relaxed">
-            Nền tảng kết nối garage uy tín với chủ xe. Tìm kiếm, đặt lịch và
-            chăm sóc xe dễ dàng.
+            {GARAGE.description}
           </p>
         </div>
 
@@ -23,7 +23,12 @@ export default function Footer() {
           <ul className="space-y-2 text-sm text-ink-light">
             <li>
               <Link to="/services" className="hover:text-primary">
-                Tìm dịch vụ
+                Dịch vụ sửa chữa
+              </Link>
+            </li>
+            <li>
+              <Link to="/parts" className="hover:text-primary">
+                Phụ kiện &amp; phụ tùng
               </Link>
             </li>
             <li>
@@ -51,15 +56,26 @@ export default function Footer() {
         <div>
           <h4 className="font-semibold mb-3">Liên hệ</h4>
           <ul className="space-y-2 text-sm text-ink-light">
-            <li>Email: support@autocare.vn</li>
-            <li>Hotline: 1900 6868</li>
-            <li>TP.HCM, Việt Nam</li>
+            <li className="flex items-start gap-1.5">
+              <IconMapPin size={14} className="shrink-0 mt-0.5" />
+              <span>
+                {GARAGE.address}, {GARAGE.district}, {GARAGE.city}
+              </span>
+            </li>
+            <li className="flex items-center gap-1.5">
+              <IconPhone size={14} className="shrink-0" />
+              <span>
+                {GARAGE.hotline} · {GARAGE.phone}
+              </span>
+            </li>
+            <li>Email: {GARAGE.email}</li>
+            <li>Giờ mở cửa: {GARAGE.workingHours}</li>
           </ul>
         </div>
       </div>
       <div className="border-t border-ink/8 py-4">
         <div className="container-page text-center text-xs text-ink-muted">
-          © 2026 AutoCare. Đồ án tốt nghiệp — Nhóm 3.
+          © 2026 {GARAGE.name}. Đồ án tốt nghiệp — Nhóm 3.
         </div>
       </div>
     </footer>
