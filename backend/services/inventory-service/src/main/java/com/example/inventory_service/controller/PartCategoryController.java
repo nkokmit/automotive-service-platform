@@ -41,7 +41,7 @@ public class PartCategoryController {
     private final PartCategoryService partCategoryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PART_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Danh sách nhóm phụ tùng",
             description = "Phân trang và lọc theo keyword trong mã hoặc tên nhóm.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
@@ -58,7 +58,7 @@ public class PartCategoryController {
     }
 
     @GetMapping("/{categoryId}")
-    @PreAuthorize("hasAuthority('PART_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Chi tiết nhóm phụ tùng")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về chi tiết nhóm phụ tùng.")

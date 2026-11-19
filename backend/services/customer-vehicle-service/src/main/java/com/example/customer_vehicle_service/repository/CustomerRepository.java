@@ -55,7 +55,7 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
      * tài khoản đã gắn với một hồ sơ lịch sử.
      */
     @Query(value = "SELECT COUNT(*) FROM customers WHERE user_id = :userId", nativeQuery = true)
-    long countByUserIdIncludingDeleted(@Param("userId") UUID userId);
+    long countByUserIdIncludingDeleted(@Param("userId") String userId);
 
     /**
      * Tìm các hồ sơ chưa gắn tài khoản khớp email hoặc phone để giữ lại lịch sử
@@ -73,7 +73,11 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     /**
      * Lấy khách hàng theo ID kể cả khi đã soft delete (native query để bypass
      * {@code @SQLRestriction}).
+     *
+     * <p>Tham số nhận dạng {@link String} (hex 36 ký tự) vì Hibernate bind
+     * {@link UUID} trong native query thành binary 16 byte, không khớp cột
+     * {@code varchar(36)}.
      */
     @Query(value = "SELECT * FROM customers WHERE id = :id", nativeQuery = true)
-    Optional<Customer> findByIdRaw(@Param("id") UUID id);
+    Optional<Customer> findByIdRaw(@Param("id") String id);
 }

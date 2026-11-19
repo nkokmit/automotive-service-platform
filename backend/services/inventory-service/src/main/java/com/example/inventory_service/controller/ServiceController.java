@@ -45,7 +45,7 @@ public class ServiceController {
     private final ServiceCatalogService serviceCatalogService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Danh sách dịch vụ",
             description = "Phân trang và lọc theo keyword, nhóm dịch vụ hoặc trạng thái hoạt động.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
@@ -64,7 +64,7 @@ public class ServiceController {
     }
 
     @GetMapping("/{serviceId}")
-    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Chi tiết dịch vụ",
             description = "Trả về chi tiết dịch vụ kèm thời lượng và số kỹ thuật viên yêu cầu "
                     + "(contract với booking-service).")
@@ -114,7 +114,7 @@ public class ServiceController {
     }
 
     @GetMapping("/{serviceId}/bom")
-    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Định mức phụ tùng của dịch vụ",
             description = "Trả về danh sách phụ tùng mặc định kèm theo dịch vụ (BOM).")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",

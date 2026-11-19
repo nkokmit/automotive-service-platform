@@ -14,6 +14,7 @@ import {
 import Button from "./Button";
 import SearchBox from "./SearchBox";
 import { useCartCount } from "../data/cartStore";
+import { useToast } from "./Toast";
 import { useAuth } from "../data/authStore";
 import { GARAGE } from "../config/garage";
 
@@ -46,8 +47,27 @@ export default function Header() {
   const [aiMenu, setAiMenu] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
   const cartCount = useCartCount();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const t = useToast();
+
+  /**
+   * Đăng xuất thật: revoke token phía server + xoá phiên cục bộ.
+   * Trước đây nút này chỉ `navigate("/login")` nên token vẫn nằm trong
+   * localStorage → header vẫn hiện tài khoản sau khi "đăng xuất".
+   */
+  const handleLogout = async () => {
+    setUserMenu(false);
+    setOpen(false);
+    try {
+      await logout();
+      t.info("Đã đăng xuất");
+    } catch {
+      // authApi.logout luôn clear token cục bộ dù server lỗi.
+      t.info("Đã đăng xuất");
+    }
+    navigate("/");
+  };
 
   // Đóng AI menu khi click-outside
   useEffect(() => {
@@ -290,10 +310,7 @@ export default function Header() {
                       Đơn hàng của tôi
                     </Link>
                     <button
-                      onClick={() => {
-                        setUserMenu(false);
-                        navigate("/login");
-                      }}
+                      onClick={handleLogout}
                       className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
                       <IconClose size={14} />
@@ -304,16 +321,11 @@ export default function Header() {
               )}
             </div>
           ) : (
-            <>
-              <Link to="/login">
-                <Button variant="ghost" size="sm">
-                  Đăng nhập
-                </Button>
-              </Link>
-              <Link to="/login?mode=register">
-                <Button size="sm">Đăng ký</Button>
-              </Link>
-            </>
+            <Link to="/login">
+              <Button variant="ghost" size="sm">
+                Đăng nhập
+              </Button>
+            </Link>
           )}
         </div>
 
@@ -434,29 +446,17 @@ export default function Header() {
                   <IconArrowRight size={14} className="ml-auto" />
                 </Link>
                 <button
-                  onClick={() => {
-                    setOpen(false);
-                    navigate("/login");
-                  }}
+                  onClick={handleLogout}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50"
                 >
                   Đăng xuất
                 </button>
               </>
             ) : (
-              <div className="flex gap-2 pt-2 border-t border-ink/8 mt-2">
-                <Link to="/login" className="flex-1" onClick={() => setOpen(false)}>
+              <div className="pt-2 border-t border-ink/8 mt-2">
+                <Link to="/login" onClick={() => setOpen(false)}>
                   <Button variant="outline" fullWidth size="sm">
                     Đăng nhập
-                  </Button>
-                </Link>
-                <Link
-                  to="/login?mode=register"
-                  className="flex-1"
-                  onClick={() => setOpen(false)}
-                >
-                  <Button fullWidth size="sm">
-                    Đăng ký
                   </Button>
                 </Link>
               </div>

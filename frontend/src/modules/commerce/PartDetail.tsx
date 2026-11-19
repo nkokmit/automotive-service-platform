@@ -24,6 +24,7 @@ import { useToast } from "../../components/Toast";
 import RecommendationWidget from "../../components/RecommendationWidget";
 import { GARAGE } from "../../config/garage";
 import { useCatalog, type CatalogPart } from "../../data/catalog";
+import { useAuth } from "../../data/authStore";
 import { recommendForPart } from "../../data/recommend";
 import { inventoryApi } from "../../api/endpoints/inventory";
 import type { PartCompatibilityResponse } from "../../api/types";
@@ -199,6 +200,7 @@ export default function PartDetail() {
   const t = useToast();
   const navigate = useNavigate();
   const { parts, loading: catalogLoading, usingFallback } = useCatalog();
+  const { user } = useAuth();
 
   // Tìm part theo slug trong catalog đang hiển thị (API thật hoặc fallback)
   const part = useMemo(
@@ -321,6 +323,12 @@ export default function PartDetail() {
   const inStock = part.stockQty > 0;
 
   const handleAddToCart = (showModal: boolean = false) => {
+    // Chưa đăng nhập thì không cho thêm hàng — dẫn sang trang đăng nhập.
+    if (!user) {
+      t.info("Vui lòng đăng nhập để mua phụ tùng");
+      navigate("/login", { state: { from: `/parts/${slug}` } });
+      return;
+    }
     addToCart(part.id, qty);
     if (showModal) {
       setShowSuccess({
@@ -333,6 +341,11 @@ export default function PartDetail() {
   };
 
   const handleBuyNow = () => {
+    if (!user) {
+      t.info("Vui lòng đăng nhập để mua phụ tùng");
+      navigate("/login", { state: { from: `/parts/${slug}` } });
+      return;
+    }
     // Đảm bảo giỏ có đúng số lượng người dùng chọn rồi chuyển sang checkout
     setCartQty(part.id, qty);
     t.success(`Đã chuyển ${qty} × "${part.name}" sang trang thanh toán`);

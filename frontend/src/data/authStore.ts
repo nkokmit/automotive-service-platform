@@ -123,6 +123,11 @@ export async function hydrateUser(): Promise<Session | null> {
 
 export function readSession(): Session | null {
   try {
+    // Không có access token → không phải phiên đăng nhập hợp lệ.
+    // Session trong localStorage có thể là dữ liệu mock từ lúc dev trước
+    // (chưa có token) — nếu trả về, Header sẽ hiển thị user giả.
+    if (!getAccessToken()) return null;
+
     const raw = localStorage.getItem(AUTH_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Session;
@@ -152,7 +157,7 @@ export function writeSession(session: Session | null) {
 
 /**
  * Đăng nhập thật qua `POST /api/auth/login`.
- * Lưu ý: backend xác thực bằng **username**, không phải email.
+ * `username` nhận **username hoặc email** — backend tự tra cứu cả hai.
  */
 export async function login(username: string, password: string): Promise<Session> {
   await authApi.login({ username, password });

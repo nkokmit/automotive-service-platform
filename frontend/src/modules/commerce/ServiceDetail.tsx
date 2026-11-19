@@ -257,7 +257,7 @@ export default function ServiceDetail() {
   const handleConfirmBooking = async () => {
     if (!user) {
       t.info("Vui lòng đăng nhập để đặt lịch");
-      navigate("/login");
+      navigate("/login", { state: { from: `/services/${slug}` } });
       return;
     }
     if (!selectedSlot) {

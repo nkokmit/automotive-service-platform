@@ -41,7 +41,7 @@ public class ServiceCategoryController {
     private final ServiceCategoryService serviceCategoryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Danh sách nhóm dịch vụ",
             description = "Phân trang và lọc theo keyword trong mã hoặc tên nhóm.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
@@ -58,7 +58,7 @@ public class ServiceCategoryController {
     }
 
     @GetMapping("/{categoryId}")
-    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Chi tiết nhóm dịch vụ")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về chi tiết nhóm dịch vụ.")

@@ -18,8 +18,12 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 
     /**
      * Lấy role theo ID kể cả khi đã soft delete (native query để bypass {@code @SQLRestriction}).
+     *
+     * <p>Tham số nhận dạng {@link String} (hex 36 ký tự) vì Hibernate bind
+     * {@link UUID} trong native query thành binary 16 byte, không khớp cột
+     * {@code varchar(36)}.
      */
     @Query(value = "SELECT * FROM roles WHERE id = :id", nativeQuery = true)
-    Optional<Role> findByIdRaw(@Param("id") UUID id);
+    Optional<Role> findByIdRaw(@Param("id") String id);
 }
 

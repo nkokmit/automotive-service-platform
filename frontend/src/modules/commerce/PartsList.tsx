@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   IconSearch,
   IconStar,
@@ -15,6 +15,7 @@ import Input from "../../components/Input";
 import { SkeletonGrid } from "../../components/Loading";
 import { useToast } from "../../components/Toast";
 import { useCatalog, type CatalogPart } from "../../data/catalog";
+import { useAuth } from "../../data/authStore";
 import {
   addToCart,
   formatCompactVND as compactVND,
@@ -54,6 +55,8 @@ export default function PartsList() {
   const [params, setParams] = useSearchParams();
   const t = useToast();
   const { parts, loading, usingFallback, error } = useCatalog();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
     category: "Tất cả" as string,
@@ -177,6 +180,12 @@ export default function PartsList() {
   const handleAddToCart = (p: CatalogPart, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Chưa đăng nhập thì không cho thêm hàng — dẫn sang trang đăng nhập.
+    if (!user) {
+      t.info("Vui lòng đăng nhập để mua phụ tùng");
+      navigate("/login", { state: { from: "/parts" } });
+      return;
+    }
     addToCart(p.id, 1);
     t.success(`Đã thêm "${p.name}" vào giỏ hàng`);
   };

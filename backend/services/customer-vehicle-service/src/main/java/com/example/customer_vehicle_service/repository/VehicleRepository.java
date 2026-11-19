@@ -81,7 +81,11 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     /**
      * Lấy xe theo ID kể cả khi đã soft delete (native query để bypass
      * {@code @SQLRestriction}).
+     *
+     * <p>Tham số nhận dạng {@link String} (hex 36 ký tự) vì Hibernate bind
+     * {@link UUID} trong native query thành binary 16 byte, không khớp cột
+     * {@code varchar(36)}.
      */
     @Query(value = "SELECT * FROM vehicles WHERE id = :id", nativeQuery = true)
-    Optional<Vehicle> findByIdRaw(@Param("id") UUID id);
+    Optional<Vehicle> findByIdRaw(@Param("id") String id);
 }

@@ -10,4 +10,10 @@ import java.util.UUID;
 @Repository
 public interface AuthUserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByUsername(String username);
+
+    /**
+     * Tìm user theo email — dùng cho đăng nhập "tài khoản hoặc email".
+     * Email đã unique nên tối đa 1 kết quả.
+     */
+    Optional<User> findByEmail(String email);
 }

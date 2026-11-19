@@ -4,6 +4,7 @@ import com.example.inventory_service.exception.CustomAccessDeniedHandler;
 import com.example.inventory_service.exception.CustomAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -32,6 +33,18 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+
+                        // ── Catalog công khai ──────────────────────────────────────
+                        // Khách chưa đăng nhập vẫn xem được danh mục dịch vụ và phụ
+                        // tùng (trang /services, /parts là trang public của storefront).
+                        // Chỉ GET mới mở — mọi thao tác ghi vẫn cần authority.
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/services/**",
+                                "/api/service-categories/**",
+                                "/api/parts/**",
+                                "/api/part-categories/**"
+                        ).permitAll()
+
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex

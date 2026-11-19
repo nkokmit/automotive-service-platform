@@ -148,7 +148,8 @@ public class UserServiceImpl implements UserService {
     @Override
     public void deleteUser(UUID id) {
         // Dùng native query để bypass @SQLRestriction — idempotent nếu user đã bị xoá trước đó.
-        User user = userRepository.findByIdRaw(id)
+        // `id.toString()` vì native query bind UUID thành binary 16 byte, không khớp cột varchar(36).
+        User user = userRepository.findByIdRaw(id.toString())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng với id: " + id));
 
         if (user.getDeletedAt() != null) {
@@ -245,7 +246,7 @@ public class UserServiceImpl implements UserService {
         if (email != null) {
             long count = excludeUserId == null
                     ? userRepository.countByEmailIncludingDeleted(email)
-                    : userRepository.countByEmailAndIdNotIncludingDeleted(email, excludeUserId);
+                    : userRepository.countByEmailAndIdNotIncludingDeleted(email, excludeUserId.toString());
             if (count > 0) {
                 throw new UserEmailAlreadyExistsException("Email đã tồn tại: " + email);
             }
@@ -253,7 +254,7 @@ public class UserServiceImpl implements UserService {
         if (phone != null) {
             long count = excludeUserId == null
                     ? userRepository.countByPhoneIncludingDeleted(phone)
-                    : userRepository.countByPhoneAndIdNotIncludingDeleted(phone, excludeUserId);
+                    : userRepository.countByPhoneAndIdNotIncludingDeleted(phone, excludeUserId.toString());
             if (count > 0) {
                 throw new UserPhoneAlreadyExistsException("Số điện thoại đã tồn tại: " + phone);
             }

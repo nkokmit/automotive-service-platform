@@ -84,7 +84,8 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     public void deletePermission(UUID id) {
         // Native query để bypass @SQLRestriction — idempotent nếu permission đã bị xoá trước đó.
-        Permission permission = permissionRepository.findByIdRaw(id)
+        // `id.toString()` vì native query bind UUID thành binary 16 byte, không khớp cột varchar(36).
+        Permission permission = permissionRepository.findByIdRaw(id.toString())
                 .orElseThrow(() -> new PermissionNotFoundException("Không tìm thấy permission với id: " + id));
 
         if (permission.getDeletedAt() != null) {
