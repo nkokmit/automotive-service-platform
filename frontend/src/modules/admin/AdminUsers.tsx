@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   IconUsers,
   IconBuilding,
@@ -6,22 +7,25 @@ import {
   IconSearch,
   IconCheck,
   IconClose,
+  IconRefresh,
+  IconTrash,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { ConfirmModal } from "../../components/AdminTable";
+import { useToast } from "../../components/Toast";
+import { adminUserApi } from "../../api/endpoints/user";
+import type { UserResponse } from "../../api/types";
 import {
-  adminUsers,
   getRoleLabel,
   type AdminUser,
   type AdminUserRole,
 } from "../../data/adminMock";
-import {
-  formatCompactVND as compactVND,
-} from "../../data/cartStore";
 
 // =========================
 // AdminUsers — quản lý người dùng
+// Nguồn dữ liệu: GET /api/users (cần USER_READ)
+// Khoá / mở khoá: PUT /api/users/{id} (cần USER_UPDATE)
 // =========================
 
 const ROLE_FILTERS: { id: "all" | AdminUserRole; label: string }[] = [
@@ -37,16 +41,94 @@ const ROLE_TONE: Record<AdminUserRole, "default" | "primary" | "accent" | "warni
   admin: "warning",
 };
 
+/** Avatar tạm theo tên (backend chưa có trường avatar). */
+function avatarFor(seed: string): string {
+  const hash = Array.from(seed).reduce((a, c) => a + c.charCodeAt(0), 0);
+  const seeds = [
+    "photo-1535713875002-d1d0cf377fde",
+    "photo-1438761681033-6461ffad8d80",
+    "photo-1500648767791-00dcc994a43e",
+    "photo-1507003211169-0a1dd7228f2d",
+    "photo-1494790108377-be9c29b29330",
+  ];
+  const pick = seeds[hash % seeds.length];
+  return `https://images.unsplash.com/${pick}?auto=format&fit=crop&w=200&q=70`;
+}
+
+/** Map role của backend sang nhóm hiển thị của admin. */
+function mapRole(user: UserResponse): AdminUserRole {
+  const names = Array.from(user.roles ?? []).map((r) => r.name?.toUpperCase() ?? "");
+  if (names.includes("ADMIN")) return "admin";
+  if (
+    names.some((n) =>
+      ["MANAGER", "MECHANIC", "SERVICE_ADVISOR"].includes(n),
+    )
+  )
+    return "garage_owner";
+  return "customer";
+}
+
+function mapUser(dto: UserResponse): AdminUser {
+  const name = dto.fullName?.trim() || dto.username;
+  return {
+    id: dto.id,
+    name,
+    email: dto.email,
+    phone: dto.phone ?? "—",
+    avatar: avatarFor(dto.id),
+    role: mapRole(dto),
+    city: "—",
+    joinedAt: "—",
+    totalOrders: 0,
+    totalSpentVND: 0,
+    status: dto.isActive === false ? "suspended" : "active",
+  };
+}
+
 export default function AdminUsers() {
+  const t = useToast();
   const [search, setSearch] = useState("");
   const [activeRole, setActiveRole] = useState<"all" | AdminUserRole>("all");
   const [actionConfirm, setActionConfirm] = useState<{
     user: AdminUser;
-    action: "suspend" | "activate";
+    action: "suspend" | "activate" | "delete";
   } | null>(null);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Nhận `?q=` từ ô tìm kiếm trên topbar admin
+  const [params] = useSearchParams();
+  const urlQuery = params.get("q") ?? "";
+  useEffect(() => {
+    if (urlQuery) setSearch(urlQuery);
+  }, [urlQuery]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await adminUserApi.listUsers({ size: 100 });
+      setUsers((page.items ?? []).map(mapUser));
+    } catch (err) {
+      setUsers([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Không tải được danh sách người dùng từ máy chủ",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const filtered = useMemo(() => {
-    return adminUsers.filter((u) => {
+    return users.filter((u) => {
       if (activeRole !== "all" && u.role !== activeRole) return false;
       if (search) {
         const s = search.toLowerCase();
@@ -59,17 +141,54 @@ export default function AdminUsers() {
       }
       return true;
     });
-  }, [activeRole, search]);
+  }, [activeRole, search, users]);
 
   // Stats
   const stats = useMemo(() => {
     return {
-      total: adminUsers.length,
-      customers: adminUsers.filter((u) => u.role === "customer").length,
-      staff: adminUsers.filter((u) => u.role === "garage_owner").length,
-      suspended: adminUsers.filter((u) => u.status === "suspended").length,
+      total: users.length,
+      customers: users.filter((u) => u.role === "customer").length,
+      staff: users.filter((u) => u.role === "garage_owner").length,
+      suspended: users.filter((u) => u.status === "suspended").length,
     };
-  }, []);
+  }, [users]);
+
+  /** Khoá / mở khoá / xoá tài khoản qua PUT / DELETE /api/users/{id}. */
+  const applyAction = useCallback(
+    async (user: AdminUser, action: "suspend" | "activate" | "delete") => {
+      setBusy(true);
+      try {
+        if (action === "delete") {
+          await adminUserApi.deleteUser(user.id);
+          setUsers((prev) => prev.filter((u) => u.id !== user.id));
+          t.success(`Đã xoá tài khoản "${user.name}".`);
+          return;
+        }
+
+        const isActive = action === "activate";
+        const saved = await adminUserApi.updateUser(user.id, { isActive });
+        const next = mapUser(saved);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === user.id ? { ...next, id: u.id } : u)),
+        );
+        t.success(
+          action === "suspend"
+            ? `Đã khoá tài khoản "${user.name}".`
+            : `Đã mở khoá tài khoản "${user.name}".`,
+        );
+      } catch (err) {
+        t.error(
+          err instanceof Error
+            ? err.message
+            : "Không cập nhật được trạng thái tài khoản.",
+        );
+      } finally {
+        setBusy(false);
+        setActionConfirm(null);
+      }
+    },
+    [t],
+  );
 
   return (
     <div className="space-y-4">
@@ -83,14 +202,29 @@ export default function AdminUsers() {
             Quản lý người dùng
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            {stats.total} tài khoản · {stats.customers} khách hàng ·{" "}
-            {stats.staff} nhân viên xưởng
+            {loading
+              ? "Đang tải danh sách tài khoản..."
+              : `${stats.total} tài khoản · ${stats.customers} khách hàng · ${stats.staff} nhân viên xưởng`}
             {stats.suspended > 0 && (
               <span className="text-red-500"> · {stats.suspended} bị khoá</span>
             )}
           </p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => void load()}>
+          <IconRefresh size={14} />
+          Tải lại
+        </Button>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={() => void load()}>
+            <IconRefresh size={14} />
+            Thử lại
+          </Button>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -154,7 +288,7 @@ export default function AdminUsers() {
       <div className="bg-white border border-ink/8 rounded-2xl overflow-hidden">
         {filtered.length === 0 ? (
           <div className="p-10 text-center text-sm text-ink-muted">
-            Không có người dùng phù hợp.
+            {loading ? "Đang tải..." : "Không có người dùng phù hợp."}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -163,9 +297,7 @@ export default function AdminUsers() {
                 <tr className="text-left text-xs text-ink-muted uppercase border-b border-ink/8 bg-bgsoft/30">
                   <th className="font-medium px-4 py-3">Người dùng</th>
                   <th className="font-medium px-4 py-3 hidden md:table-cell">Liên hệ</th>
-                  <th className="font-medium px-4 py-3 hidden md:table-cell">Khu vực</th>
                   <th className="font-medium px-4 py-3 text-center">Vai trò</th>
-                  <th className="font-medium px-4 py-3 hidden lg:table-cell text-right">Đơn / Doanh thu</th>
                   <th className="font-medium px-4 py-3 text-center">Trạng thái</th>
                   <th className="font-medium px-4 py-3 text-right">Hành động</th>
                 </tr>
@@ -188,7 +320,7 @@ export default function AdminUsers() {
                             {u.name}
                           </div>
                           <div className="text-xs text-ink-muted line-clamp-1">
-                            {u.garageName ? `Garage: ${u.garageName}` : `Tham gia: ${u.joinedAt}`}
+                            {u.email}
                           </div>
                         </div>
                       </div>
@@ -197,17 +329,8 @@ export default function AdminUsers() {
                       <div className="line-clamp-1">{u.email}</div>
                       <div className="text-ink-muted">{u.phone}</div>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-sm text-ink-muted">
-                      {u.city}
-                    </td>
                     <td className="px-4 py-3 text-center">
                       <Badge tone={ROLE_TONE[u.role]}>{getRoleLabel(u.role)}</Badge>
-                    </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-right text-sm">
-                      <div className="font-semibold">{u.totalOrders} đơn</div>
-                      <div className="text-xs text-ink-muted">
-                        {u.totalSpentVND > 0 ? compactVND(u.totalSpentVND) : "—"}
-                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {u.status === "active" ? (
@@ -220,30 +343,44 @@ export default function AdminUsers() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {u.role !== "admin" && (
-                        u.status === "active" ? (
+                      <div className="inline-flex items-center gap-1.5 justify-end">
+                        {u.role !== "admin" &&
+                          (u.status === "active" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-amber-700 border-amber-200 hover:bg-amber-50"
+                              onClick={() =>
+                                setActionConfirm({ user: u, action: "suspend" })
+                              }
+                            >
+                              Khoá
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                setActionConfirm({ user: u, action: "activate" })
+                              }
+                            >
+                              <IconCheck size={12} />
+                              Mở khoá
+                            </Button>
+                          ))}
+                        {u.role !== "admin" && (
                           <Button
                             size="sm"
                             variant="outline"
                             className="text-red-500 border-red-200 hover:bg-red-50"
+                            title="Xoá tài khoản"
                             onClick={() =>
-                              setActionConfirm({ user: u, action: "suspend" })
+                              setActionConfirm({ user: u, action: "delete" })
                             }
                           >
-                            Khoá
+                            <IconTrash size={12} />
                           </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              setActionConfirm({ user: u, action: "activate" })
-                            }
-                          >
-                            <IconCheck size={12} />
-                            Mở khoá
-                          </Button>
-                        )
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -252,30 +389,51 @@ export default function AdminUsers() {
           </div>
         )}
         <div className="px-4 py-3 border-t border-ink/8 text-xs text-ink-muted">
-          Hiển thị <strong className="text-ink">{filtered.length}</strong> / {adminUsers.length} người dùng
+          Hiển thị <strong className="text-ink">{filtered.length}</strong> / {users.length} người dùng
         </div>
       </div>
 
       {actionConfirm && (
         <ConfirmModal
-          title={actionConfirm.action === "suspend" ? "Khoá tài khoản?" : "Mở khoá tài khoản?"}
+          title={
+            actionConfirm.action === "suspend"
+              ? "Khoá tài khoản?"
+              : actionConfirm.action === "activate"
+                ? "Mở khoá tài khoản?"
+                : "Xoá tài khoản?"
+          }
           description={
             <>
               {actionConfirm.action === "suspend" ? (
                 <>
                   Tài khoản <strong>{actionConfirm.user.name}</strong> sẽ không thể đăng nhập cho đến khi được mở khoá.
                 </>
-              ) : (
+              ) : actionConfirm.action === "activate" ? (
                 <>
                   Tài khoản <strong>{actionConfirm.user.name}</strong> sẽ được khôi phục quyền truy cập.
+                </>
+              ) : (
+                <>
+                  Tài khoản <strong>{actionConfirm.user.name}</strong> sẽ bị xoá khỏi hệ thống. Hành động này không thể hoàn tác.
                 </>
               )}
             </>
           }
-          confirmLabel={actionConfirm.action === "suspend" ? "Khoá" : "Mở khoá"}
-          confirmTone={actionConfirm.action === "suspend" ? "danger" : "primary"}
+          confirmLabel={
+            actionConfirm.action === "suspend"
+              ? "Khoá"
+              : actionConfirm.action === "activate"
+                ? "Mở khoá"
+                : "Xoá"
+          }
+          confirmTone={
+            actionConfirm.action === "activate" ? "primary" : "danger"
+          }
+          loading={busy}
           onClose={() => setActionConfirm(null)}
-          onConfirm={() => setActionConfirm(null)}
+          onConfirm={() =>
+            void applyAction(actionConfirm.user, actionConfirm.action)
+          }
         />
       )}
     </div>

@@ -47,9 +47,21 @@ export default function Footer() {
         <div>
           <h4 className="font-semibold mb-3">Hỗ trợ</h4>
           <ul className="space-y-2 text-sm text-ink-light">
-            <li>Trung tâm trợ giúp</li>
-            <li>Điều khoản sử dụng</li>
-            <li>Chính sách bảo mật</li>
+            <li>
+              <Link to="/help" className="hover:text-primary">
+                Trung tâm trợ giúp
+              </Link>
+            </li>
+            <li>
+              <Link to="/terms" className="hover:text-primary">
+                Điều khoản sử dụng
+              </Link>
+            </li>
+            <li>
+              <Link to="/privacy" className="hover:text-primary">
+                Chính sách bảo mật
+              </Link>
+            </li>
           </ul>
         </div>
 

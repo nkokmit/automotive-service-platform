@@ -240,8 +240,38 @@ export function getUserAddresses(userId: string): Address[] {
   return mockUsers.find((x) => x.id === userId)?.addresses ?? [];
 }
 
+// ── Xe của tôi ────────────────────────────────────────────────────────────────
+// Backend KHÔNG có endpoint "xe của tôi" (xem comment trong VehicleController.java)
+// nên danh sách xe của khách được giữ ở localStorage. Khi khách có authority
+// (VD: ADMIN/MANAGER chạy `PUT /api/vehicles/{id}`) thì thao tác sẽ được ghi
+// thẳng lên server; nếu không, dữ liệu vẫn được giữ cục bộ để không mất.
+
+const VEHICLES_KEY = "autocare:vehicles";
+
+function readVehicleStore(userId: string): Vehicle[] | null {
+  try {
+    const raw = localStorage.getItem(`${VEHICLES_KEY}:${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Vehicle[];
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getUserVehicles(userId: string): Vehicle[] {
+  const stored = readVehicleStore(userId);
+  if (stored) return stored;
   return mockUsers.find((x) => x.id === userId)?.vehicles ?? [];
+}
+
+/** Ghi danh sách xe cục bộ của một user (fallback khi server từ chối quyền). */
+export function saveUserVehicles(userId: string, vehicles: Vehicle[]): void {
+  try {
+    localStorage.setItem(`${VEHICLES_KEY}:${userId}`, JSON.stringify(vehicles));
+  } catch {
+    /* storage bị chặn — bỏ qua */
+  }
 }
 
 // ── React hooks ───────────────────────────────────────────────────────────────

@@ -19,6 +19,37 @@ import type {
   ServiceResponse,
 } from "../types";
 
+/** Payload tạo/sửa dịch vụ — khớp `ServiceRequest.java`. */
+export interface ServiceWriteRequest {
+  categoryId: string;
+  code: string;
+  name: string;
+  duration_minutes: number;
+  required_techs: number;
+  baseLaborPrice: number;
+  isActive?: boolean;
+}
+
+/** Payload tạo/sửa phụ tùng — khớp `PartRequest.java`. */
+export interface PartWriteRequest {
+  categoryId: string;
+  sku: string;
+  oemCode?: string | null;
+  name: string;
+  brand?: string | null;
+  unit: string;
+  sellingPrice: number;
+  minStockLevel?: number;
+  isActive?: boolean;
+}
+
+/** Payload tạo/sửa nhóm — khớp `CategoryRequest.java`. */
+export interface CategoryWriteRequest {
+  code: string;
+  name: string;
+  description?: string | null;
+}
+
 export interface ListServicesParams {
   keyword?: string;
   categoryId?: string;
@@ -72,6 +103,32 @@ export const inventoryApi = {
     );
   },
 
+  /** Tạo dịch vụ mới. Cần authority `SERVICE_WRITE`. */
+  createService: async (
+    data: ServiceWriteRequest,
+  ): Promise<ServiceResponse> => {
+    return client.request<ServiceResponse>("/api/services", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  /** Cập nhật dịch vụ. Cần authority `SERVICE_WRITE`. */
+  updateService: async (
+    id: string,
+    data: ServiceWriteRequest,
+  ): Promise<ServiceResponse> => {
+    return client.request<ServiceResponse>(`/api/services/${id}`, {
+      method: "PUT",
+      body: data,
+    });
+  },
+
+  /** Vô hiệu hóa dịch vụ (soft delete → isActive = false). Cần `SERVICE_WRITE`. */
+  deleteService: async (id: string): Promise<void> => {
+    await client.request<void>(`/api/services/${id}`, { method: "DELETE" });
+  },
+
   // ── Nhóm dịch vụ ────────────────────────────────────────────────────────────
   listServiceCategories: async (
     params: { keyword?: string; page?: number; size?: number } = {},
@@ -113,6 +170,57 @@ export const inventoryApi = {
   ): Promise<PartCompatibilityResponse[]> => {
     return client.request<PartCompatibilityResponse[]>(
       `/api/parts/${partId}/compatibilities`,
+    );
+  },
+
+  /** Tạo phụ tùng mới. Cần authority `PART_WRITE`. */
+  createPart: async (data: PartWriteRequest): Promise<PartResponse> => {
+    return client.request<PartResponse>("/api/parts", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  /** Cập nhật phụ tùng. Cần authority `PART_WRITE`. */
+  updatePart: async (
+    id: string,
+    data: PartWriteRequest,
+  ): Promise<PartResponse> => {
+    return client.request<PartResponse>(`/api/parts/${id}`, {
+      method: "PUT",
+      body: data,
+    });
+  },
+
+  /** Vô hiệu hóa phụ tùng (soft delete → isActive = false). Cần `PART_WRITE`. */
+  deletePart: async (id: string): Promise<void> => {
+    await client.request<void>(`/api/parts/${id}`, { method: "DELETE" });
+  },
+
+  /** Gắn thêm một dòng xe tương thích. Cần authority `PART_WRITE`. */
+  addPartCompatibility: async (
+    partId: string,
+    data: {
+      vehicleBrand: string;
+      vehicleModel: string;
+      yearFrom?: number | null;
+      yearTo?: number | null;
+    },
+  ): Promise<PartCompatibilityResponse> => {
+    return client.request<PartCompatibilityResponse>(
+      `/api/parts/${partId}/compatibilities`,
+      { method: "POST", body: data },
+    );
+  },
+
+  /** Gỡ một dòng xe tương thích. Cần authority `PART_WRITE`. */
+  deletePartCompatibility: async (
+    partId: string,
+    compatibilityId: string,
+  ): Promise<void> => {
+    await client.request<void>(
+      `/api/parts/${partId}/compatibilities/${compatibilityId}`,
+      { method: "DELETE" },
     );
   },
 

@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
-  IconSearch,
   IconUser,
   IconMenu,
   IconClose,
@@ -13,6 +12,7 @@ import {
   IconSparkles,
 } from "./icons";
 import Button from "./Button";
+import SearchBox from "./SearchBox";
 import { useCartCount } from "../data/cartStore";
 import { useAuth } from "../data/authStore";
 import { GARAGE } from "../config/garage";
@@ -180,13 +180,10 @@ export default function Header() {
 
         {/* Search (desktop) */}
         <div className="hidden lg:flex flex-1 max-w-md ml-auto">
-          <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 w-full">
-            <IconSearch size={18} className="text-ink-muted" />
-            <input
-              placeholder="Tìm dịch vụ, phụ tùng..."
-              className="flex-1 bg-transparent outline-none text-sm placeholder:text-ink-muted"
-            />
-          </div>
+          <SearchBox
+            className="w-full"
+            placeholder="Tìm dịch vụ, phụ tùng..."
+          />
         </div>
 
         {/* Actions */}
@@ -339,11 +336,11 @@ export default function Header() {
       {open && (
         <div className="md:hidden border-t border-ink/8 bg-white">
           <div className="container-page py-3 flex flex-col gap-1">
-            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 mb-2">
-              <IconSearch size={18} className="text-ink-muted" />
-              <input
+            <div className="mb-2">
+              <SearchBox
+                className="w-full"
                 placeholder="Tìm dịch vụ, phụ tùng..."
-                className="flex-1 bg-transparent outline-none text-sm"
+                inputClassName="h-full"
               />
             </div>
             {navItems.map((it) => (

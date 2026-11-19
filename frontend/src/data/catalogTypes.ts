@@ -33,6 +33,8 @@ export interface CatalogService {
   rating: number;
   reviewsCount: number;
   bookingsCount: number;
+  /** Backend có cờ `is_active` — dịch vụ đã bị vô hiệu hóa thì không hiện nữa. */
+  isActive?: boolean;
 }
 
 /** Một phụ tùng trong catalog, đã chuẩn hoá cho UI. */
@@ -58,6 +60,8 @@ export interface CatalogPart {
   reviewsCount: number;
   isFeatured: boolean;
   isBestSeller: boolean;
+  /** Backend có cờ `is_active` — phụ tùng đã bị vô hiệu hóa. */
+  isActive?: boolean;
 }
 
 /** Sinh slug thân thiện từ tên + id (id đảm bảo slug là duy nhất). */

@@ -15,6 +15,10 @@ import type {
   BookingCreateRequest,
   BookingResponse,
   BookingRescheduleRequest,
+  BookingSource,
+  BookingStatus,
+  StaffBookingPageResponse,
+  StaffBookingResponse,
 } from "../types";
 
 export interface AvailabilityParams {
@@ -82,5 +86,78 @@ export const bookingApi = {
       method: "PATCH",
       body,
     });
+  },
+};
+
+// =========================
+// API của xưởng (staff) — dùng ở khu vực admin
+// Cần authority: BOOKING_READ / BOOKING_STATUS_UPDATE / BOOKING_CHECK_IN
+// =========================
+
+export interface StaffBookingParams {
+  status?: BookingStatus;
+  source?: BookingSource;
+  customerId?: string;
+  licensePlate?: string;
+  /** ISO date `YYYY-MM-DD`. */
+  from?: string;
+  /** ISO date `YYYY-MM-DD`. */
+  to?: string;
+  page?: number;
+  size?: number;
+  newestFirst?: boolean;
+}
+
+export const staffBookingApi = {
+  /** Tra cứu lịch hẹn toàn hệ thống. */
+  listBookings: async (
+    params: StaffBookingParams = {},
+  ): Promise<StaffBookingPageResponse> => {
+    return client.requestPage<StaffBookingPageResponse>("/api/staff/bookings", {
+      status: params.status,
+      source: params.source,
+      customerId: params.customerId,
+      licensePlate: params.licensePlate,
+      from: params.from,
+      to: params.to,
+      page: params.page ?? 0,
+      size: params.size ?? 20,
+      newestFirst: params.newestFirst ?? true,
+    });
+  },
+
+  getBooking: async (bookingId: string): Promise<StaffBookingResponse> => {
+    return client.request<StaffBookingResponse>(
+      `/api/staff/bookings/${bookingId}`,
+    );
+  },
+
+  /** Cập nhật trạng thái lịch hẹn (tiếp nhận xe, hoàn thành, huỷ…). */
+  updateStatus: async (
+    bookingId: string,
+    status: BookingStatus,
+    reason?: string,
+  ): Promise<StaffBookingResponse> => {
+    return client.request<StaffBookingResponse>(
+      `/api/staff/bookings/${bookingId}/status`,
+      {
+        method: "PATCH",
+        body: { status, reason: reason ?? null },
+      },
+    );
+  },
+
+  /** Huỷ lịch hẹn. */
+  cancelBooking: async (
+    bookingId: string,
+    reason?: string,
+  ): Promise<StaffBookingResponse> => {
+    return client.request<StaffBookingResponse>(
+      `/api/staff/bookings/${bookingId}/cancel`,
+      {
+        method: "POST",
+        body: reason ? { reason } : {},
+      },
+    );
   },
 };

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   IconShoppingBag,
   IconMapPin,
@@ -54,8 +55,18 @@ export default function AdminOrders() {
     action: "confirm" | "cancel";
   } | null>(null);
 
+  // Đơn hàng nằm trong state để duyệt/huỷ thật sự thay đổi trạng thái.
+  const [orders, setOrders] = useState<AdminOrderRow[]>(adminOrders);
+
+  // Nhận `?q=` từ ô tìm kiếm trên topbar admin
+  const [params] = useSearchParams();
+  const urlQuery = params.get("q") ?? "";
+  useEffect(() => {
+    if (urlQuery) setSearch(urlQuery);
+  }, [urlQuery]);
+
   const filtered = useMemo(() => {
-    return adminOrders.filter((o) => {
+    return orders.filter((o) => {
       if (activeFilter !== "all" && o.status !== activeFilter) return false;
       if (search) {
         const s = search.toLowerCase();
@@ -68,19 +79,19 @@ export default function AdminOrders() {
       }
       return true;
     });
-  }, [activeFilter, search]);
+  }, [activeFilter, search, orders]);
 
   // Count theo status
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    map.set("all", adminOrders.length);
-    for (const o of adminOrders) {
+    map.set("all", orders.length);
+    for (const o of orders) {
       map.set(o.status, (map.get(o.status) ?? 0) + 1);
     }
     return map;
-  }, []);
+  }, [orders]);
 
-  const totalRevenue = adminOrders
+  const totalRevenue = orders
     .filter((o) => o.status === "completed" || o.status === "shipping")
     .reduce((s, o) => s + o.totalVND, 0);
 
@@ -96,7 +107,7 @@ export default function AdminOrders() {
             Quản lý đơn hàng
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            {adminOrders.length} đơn · Doanh thu:{" "}
+            {orders.length} đơn · Doanh thu:{" "}
             <span className="font-semibold text-primary">
               {compactVND(totalRevenue)}
             </span>
@@ -241,7 +252,7 @@ export default function AdminOrders() {
           </div>
         )}
         <div className="px-4 py-3 border-t border-ink/8 text-xs text-ink-muted">
-          Hiển thị <strong className="text-ink">{filtered.length}</strong> / {adminOrders.length} đơn
+          Hiển thị <strong className="text-ink">{filtered.length}</strong> / {orders.length} đơn
         </div>
       </div>
 
@@ -268,6 +279,14 @@ export default function AdminOrders() {
           confirmTone={actionConfirm.action === "confirm" ? "primary" : "danger"}
           onClose={() => setActionConfirm(null)}
           onConfirm={() => {
+            const { order, action } = actionConfirm;
+            setOrders((prev) =>
+              prev.map((o) =>
+                o.id === order.id
+                  ? { ...o, status: action === "confirm" ? "confirmed" : "cancelled" }
+                  : o,
+              ),
+            );
             setActionConfirm(null);
             setSelected(null);
           }}

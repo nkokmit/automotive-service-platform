@@ -12,6 +12,7 @@ import {
   IconShield,
   IconRefresh,
   IconWarning,
+  IconPackage,
 } from "../../components/icons";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
@@ -23,7 +24,11 @@ import { useCatalog } from "../../data/catalog";
 import { recommendForService } from "../../data/recommend";
 import { bookingApi } from "../../api/endpoints/booking";
 import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
-import type { AvailabilitySlotResponse } from "../../api/types";
+import { inventoryApi } from "../../api/endpoints/inventory";
+import type {
+  AvailabilitySlotResponse,
+  ServiceBomResponse,
+} from "../../api/types";
 import { useAuth } from "../../data/authStore";
 
 const formatVND = (n: number) =>
@@ -106,6 +111,40 @@ export default function ServiceDetail() {
   const [slots, setSlots] = useState<AvailabilitySlotResponse[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
+
+  // BOM — định mức phụ tùng đi kèm dịch vụ (`GET /api/services/{id}/bom`).
+  const [bom, setBom] = useState<ServiceBomResponse[]>([]);
+  const [bomLoading, setBomLoading] = useState(false);
+  const [bomError, setBomError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Catalog rơi về dữ liệu mẫu → id không phải UUID thật, gọi API vô nghĩa.
+    if (!service || usingFallback) return;
+    let cancelled = false;
+    setBomLoading(true);
+    setBomError(null);
+    inventoryApi
+      .getServiceBom(service.id)
+      .then((data) => {
+        if (cancelled) return;
+        setBom(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setBom([]);
+        setBomError(
+          err instanceof Error
+            ? err.message
+            : "Không tải được định mức phụ tùng",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setBomLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service, usingFallback]);
 
   // Chọn ngày đầu tiên khi có dịch vụ
   useEffect(() => {
@@ -406,6 +445,68 @@ export default function ServiceDetail() {
                   {GARAGE.name} qua hotline {GARAGE.hotline} để được tư vấn.
                 </p>
               )}
+
+              {/* Định mức phụ tùng thật — GET /api/services/{id}/bom */}
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-semibold text-sm flex items-center gap-1.5">
+                    <IconPackage size={15} className="text-primary" />
+                    Định mức phụ tùng đi kèm
+                  </h4>
+                  <span className="text-[11px] text-ink-muted">
+                    Nguồn: GET /api/services/{service.id.slice(0, 8)}…/bom
+                  </span>
+                </div>
+
+                {bomLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-11 bg-bgsoft rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : bomError ? (
+                  <div className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg flex items-start gap-2">
+                    <IconWarning size={14} className="shrink-0 mt-0.5" />
+                    <span>
+                      Không tải được định mức phụ tùng từ máy chủ.
+                      <button
+                        onClick={() => setBomError(null)}
+                        className="ml-2 text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        <IconRefresh size={12} /> Bỏ qua
+                      </button>
+                    </span>
+                  </div>
+                ) : bom.length === 0 ? (
+                  <p className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg">
+                    Dịch vụ này không có định mức phụ tùng cố định — xưởng sẽ
+                    tư vấn linh kiện phù hợp khi tiếp nhận xe.
+                  </p>
+                ) : (
+                  <div className="border border-ink/8 rounded-xl divide-y divide-ink/5 overflow-hidden">
+                    {bom.map((b) => (
+                      <div
+                        key={b.id}
+                        className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium text-ink line-clamp-1">
+                            {b.partName}
+                          </div>
+                          <div className="text-[11px] text-ink-muted font-mono">
+                            {b.partSku}
+                            {b.note ? ` · ${b.note}` : ""}
+                          </div>
+                        </div>
+                        <div className="text-xs text-ink-muted shrink-0">
+                          {b.default_quantity} {b.partUnit}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {service.requirements.length > 0 && (
                 <div className="mt-6 p-4 bg-bgsoft rounded-xl">
                   <h4 className="font-semibold text-sm mb-2">

@@ -26,10 +26,14 @@ import ChatAssistant from "./modules/ai/ChatAssistant";
 // Content module (news/articles)
 import NewsList from "./modules/content/NewsList";
 import ArticleDetail from "./modules/content/ArticleDetail";
+import {
+  HelpPage,
+  TermsPage,
+  PrivacyPage,
+} from "./modules/content/StaticPages";
 
-// Demo pages (sẽ xoá khi lên production)
-import FoundationDemo from "./pages/FoundationDemo";
-import BoomDemo from "./pages/BoomDemo";
+// Search module
+import SearchPage from "./modules/search/SearchPage";
 
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
 import RequireAuth from "./components/RequireAuth";
@@ -48,6 +52,10 @@ import AdminParts from "./modules/admin/AdminParts";
 import AdminOrders from "./modules/admin/AdminOrders";
 import AdminUsers from "./modules/admin/AdminUsers";
 import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
+import AdminBookings from "./modules/admin/AdminBookings";
+import AdminInvoices from "./modules/admin/AdminInvoices";
+import AdminStaff from "./modules/admin/AdminStaff";
+import AdminWorkOrders from "./modules/admin/AdminWorkOrders";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
@@ -55,13 +63,15 @@ import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
 hydrateUser().finally(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
-      <ErrorBoundary
-        onError={(error, info) => {
-          // eslint-disable-next-line no-console
-          console.error("[Top-level ErrorBoundary]", error, info);
-        }}
-      >
-        <BrowserRouter>
+      {/* BrowserRouter đặt TRÊN ErrorBoundary: nếu lỗi xảy ra trong route,
+          ErrorPage vẫn dùng được <Link> mà không bị crash lần nữa. */}
+      <BrowserRouter>
+        <ErrorBoundary
+          onError={(error, info) => {
+            // eslint-disable-next-line no-console
+            console.error("[Top-level ErrorBoundary]", error, info);
+          }}
+        >
           <Routes>
             <Route path="/" element={<App />}>
               <Route index element={<Home />} />
@@ -95,9 +105,13 @@ hydrateUser().finally(() => {
               <Route path="news" element={<NewsList />} />
               <Route path="news/:slug" element={<ArticleDetail />} />
 
-              {/* Demo pages — sẽ xoá ở production */}
-              <Route path="foundation" element={<FoundationDemo />} />
-              <Route path="boom-demo" element={<BoomDemo />} />
+              {/* ============ SEARCH ============ */}
+              <Route path="search" element={<SearchPage />} />
+
+              {/* ============ Trang tĩnh ============ */}
+              <Route path="help" element={<HelpPage />} />
+              <Route path="terms" element={<TermsPage />} />
+              <Route path="privacy" element={<PrivacyPage />} />
 
               <Route path="*" element={<NotFoundPage />} />
             </Route>
@@ -116,6 +130,10 @@ hydrateUser().finally(() => {
               <Route path="services" element={<AdminServices />} />
               <Route path="parts" element={<AdminParts />} />
               <Route path="orders" element={<AdminOrders />} />
+              <Route path="bookings" element={<AdminBookings />} />
+              <Route path="invoices" element={<AdminInvoices />} />
+              <Route path="staff" element={<AdminStaff />} />
+              <Route path="work-orders" element={<AdminWorkOrders />} />
               <Route path="vehicles" element={<AdminCustomerVehicles />} />
               <Route path="users" element={<AdminUsers />} />
               <Route
@@ -139,8 +157,8 @@ hydrateUser().finally(() => {
               <Route path="*" element={<AdminNotFound />} />
             </Route>
           </Routes>
-        </BrowserRouter>
-      </ErrorBoundary>
+        </ErrorBoundary>
+      </BrowserRouter>
     </React.StrictMode>,
   );
 });

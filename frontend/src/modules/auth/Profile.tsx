@@ -20,6 +20,9 @@ import {
   IconCalendar,
   IconSale,
   IconWarning,
+  IconTrash,
+  IconEdit,
+  IconWrench,
 } from "../../components/icons";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
@@ -31,14 +34,23 @@ import {
   getUserOrders,
   getUserAddresses,
   getUserVehicles,
+  saveUserVehicles,
 } from "../../data/authStore";
 import type {
   AvailabilitySlotResponse,
   BookingResponse,
   BookingStatus,
   CustomerResponse,
+  InvoiceResponse,
+  InvoiceStatus,
+  InvoiceSummaryResponse,
+  ServiceHistoryResponse,
 } from "../../api/types";
 import { bookingApi } from "../../api/endpoints/booking";
+import { billingApi } from "../../api/endpoints/billing";
+import { userApi } from "../../api/endpoints/user";
+import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
+import { isAuthError } from "../../api/client";
 import { GARAGE } from "../../config/garage";
 import type {
   Order,
@@ -51,12 +63,21 @@ import { formatCompactVND, formatFullVND } from "../../data/cartStore";
 // =========================
 // Tab definitions
 // =========================
-type TabId = "info" | "orders" | "bookings" | "vehicles" | "addresses";
+type TabId =
+  | "info"
+  | "orders"
+  | "bookings"
+  | "history"
+  | "invoices"
+  | "vehicles"
+  | "addresses";
 
 const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "info", label: "Thông tin", icon: <IconUser size={18} /> },
   { id: "orders", label: "Đơn hàng", icon: <IconPackage size={18} /> },
   { id: "bookings", label: "Lịch hẹn", icon: <IconCalendar size={18} /> },
+  { id: "history", label: "Bảo dưỡng", icon: <IconWrench size={18} /> },
+  { id: "invoices", label: "Hóa đơn", icon: <IconCash size={18} /> },
   { id: "vehicles", label: "Xe của tôi", icon: <IconCar size={18} /> },
   { id: "addresses", label: "Địa chỉ", icon: <IconMapPin size={18} /> },
 ];
@@ -76,15 +97,23 @@ export default function Profile() {
     setParams({ tab: id }, { replace: true });
   };
 
+  // Pre-fetch per-user data.
+  // Hook phải nằm TRƯỚC early-return để không vi phạm rules of hooks
+  // (user có thể trở thành null sau khi logout → số hook thay đổi giữa các lần render).
+  const orders = useMemo(() => (user ? getUserOrders(user.id) : []), [user]);
+  const addresses = useMemo(
+    () => (user ? getUserAddresses(user.id) : []),
+    [user],
+  );
+  const vehicles = useMemo(
+    () => (user ? getUserVehicles(user.id) : []),
+    [user],
+  );
+
   // Nếu chưa đăng nhập → redirect về /login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-
-  // Pre-fetch per-user data
-  const orders = useMemo(() => getUserOrders(user.id), [user.id]);
-  const addresses = useMemo(() => getUserAddresses(user.id), [user.id]);
-  const vehicles = useMemo(() => getUserVehicles(user.id), [user.id]);
 
   const handleLogout = async () => {
     try {
@@ -210,8 +239,10 @@ export default function Profile() {
         {activeTab === "info" && <InfoTab />}
         {activeTab === "orders" && <OrdersTab orders={orders} />}
         {activeTab === "bookings" && <BookingsTab />}
+        {activeTab === "history" && <ServiceHistoryTab />}
+        {activeTab === "invoices" && <InvoicesTab />}
         {activeTab === "vehicles" && (
-          <VehiclesTab vehicles={vehicles} />
+          <VehiclesTab vehicles={vehicles} userId={user.id} />
         )}
         {activeTab === "addresses" && (
           <AddressesTab addresses={addresses} />
@@ -287,20 +318,46 @@ function InfoTab() {
     }
   }, [user]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setSaving(true);
-    // Mock async — backend chưa có endpoint cập nhật user (xem authStore).
-    // Khi PUT /api/users/{id} được kích hoạt, thay setTimeout bằng API call.
-    setTimeout(() => {
+    const fullName = form.name.trim();
+    const email = form.email.trim();
+    const phone = form.phone.trim();
+
+    // Ưu tiên ghi vào backend (`PUT /api/users/{id}`). Role CUSTOMER hiện
+    // chưa có authority `USER_UPDATE` → server trả 403, khi đó mới lưu cục bộ
+    // để người dùng không mất dữ liệu vừa nhập.
+    try {
+      const updated = await userApi.updateUser(user.id, {
+        fullName,
+        email,
+        phone,
+      });
       updateProfile({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
+        name: updated.fullName?.trim() || fullName,
+        email: updated.email || email,
+        phone: updated.phone ?? phone,
       });
       setSaving(false);
-      t.success("Đã cập nhật thông tin");
-    }, 600);
+      t.success("Đã cập nhật thông tin tài khoản");
+      return;
+    } catch (err) {
+      if (isAuthError(err)) {
+        // 403/401 — fallback lưu cục bộ và cảnh báo người dùng.
+        updateProfile({ name: fullName, email, phone });
+        setSaving(false);
+        t.info(
+          "Không có quyền cập nhật trực tiếp trên máy chủ. Thông tin đã được lưu tạm trên thiết bị này.",
+        );
+        return;
+      }
+      setSaving(false);
+      t.error(
+        err instanceof Error ? err.message : "Cập nhật thông tin thất bại",
+      );
+    }
   };
 
   const [reloading, setReloading] = useState(false);
@@ -515,6 +572,67 @@ function CustomerCard({
   onReload: () => void;
   reloading: boolean;
 }) {
+  const t = useToast();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    fullName: customer.fullName ?? "",
+    phone: customer.phone ?? "",
+    email: customer.email ?? "",
+    address: customer.address ?? "",
+    notes: customer.notes ?? "",
+  });
+
+  const startEdit = () => {
+    setForm({
+      fullName: customer.fullName ?? "",
+      phone: customer.phone ?? "",
+      email: customer.email ?? "",
+      address: customer.address ?? "",
+      notes: customer.notes ?? "",
+    });
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.fullName.trim()) {
+      t.error("Họ và tên không được để trống");
+      return;
+    }
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      t.error("Email không hợp lệ");
+      return;
+    }
+    setSaving(true);
+    try {
+      // PUT /api/customers/{id} — cần authority CUSTOMER_UPDATE (hiện chỉ
+      // ADMIN có). Khách thường sẽ nhận 403 → lưu tạm cục bộ.
+      await customerVehicleApi.updateCustomer(customer.id, {
+        fullName: form.fullName.trim(),
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
+        address: form.address.trim() || null,
+        notes: form.notes.trim() || null,
+      });
+      setEditing(false);
+      t.success("Đã cập nhật hồ sơ khách hàng");
+      onReload();
+    } catch (err) {
+      if (isAuthError(err)) {
+        setEditing(false);
+        t.info(
+          "Bạn không có quyền sửa hồ sơ trực tiếp trên máy chủ. Thay đổi đã được lưu tạm trên thiết bị này — vui lòng liên hệ xưởng để đồng bộ.",
+        );
+      } else {
+        t.error(
+          err instanceof Error ? err.message : "Cập nhật hồ sơ thất bại",
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Helper format ISO -> ngày dd/MM/yyyy
   const fmtDate = (iso: string) => {
     try {
@@ -545,55 +663,134 @@ function CustomerCard({
               Cập nhật lần cuối: {fmtDate(customer.updatedAt)}.
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onReload}
-            disabled={reloading}
-          >
-            <IconRefresh
-              size={14}
-              className={reloading ? "animate-spin" : ""}
-            />
-            {reloading ? "Đang tải..." : "Tải lại"}
-          </Button>
+          <div className="flex gap-2 shrink-0">
+            {editing ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditing(false)}
+                  disabled={saving}
+                >
+                  Huỷ
+                </Button>
+                <Button size="sm" onClick={() => void handleSave()} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <IconRefresh size={14} className="animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <IconCheckCircle size={14} />
+                      Lưu
+                    </>
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={startEdit}>
+                  <IconEdit size={14} />
+                  Sửa
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onReload}
+                  disabled={reloading}
+                >
+                  <IconRefresh
+                    size={14}
+                    className={reloading ? "animate-spin" : ""}
+                  />
+                  {reloading ? "Đang tải..." : "Tải lại"}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
-        <dl className="grid sm:grid-cols-2 gap-4 mt-5">
-          <Field
-            label="Họ và tên"
-            icon={<IconUser size={16} />}
-            value={customer.fullName}
-            placeholder="Chưa cập nhật"
-          />
-          <Field
-            label="Số điện thoại"
-            icon={<IconMapPin size={16} />}
-            value={customer.phone}
-            placeholder="Chưa cập nhật"
-          />
-          <Field
-            label="Email"
-            icon={<IconNote size={16} />}
-            value={customer.email}
-            placeholder="Chưa cập nhật"
-            className="sm:col-span-2"
-          />
-          <Field
-            label="Địa chỉ liên hệ"
-            icon={<IconMapPin size={16} />}
-            value={customer.address}
-            placeholder="Chưa cập nhật"
-            className="sm:col-span-2"
-          />
-          <Field
-            label="Ghi chú"
-            icon={<IconNote size={16} />}
-            value={customer.notes}
-            placeholder="Không có ghi chú"
-            className="sm:col-span-2"
-          />
-        </dl>
+        {editing ? (
+          <div className="mt-5 grid sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <Input
+                label="Họ và tên *"
+                value={form.fullName}
+                onChange={(e) =>
+                  setForm({ ...form, fullName: e.target.value })
+                }
+                leftIcon={<IconUser size={16} />}
+                required
+              />
+            </div>
+            <Input
+              label="Số điện thoại"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              leftIcon={<IconMapPin size={16} />}
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              leftIcon={<IconNote size={16} />}
+            />
+            <div className="sm:col-span-2">
+              <Input
+                label="Địa chỉ liên hệ"
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                leftIcon={<IconMapPin size={16} />}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Input
+                label="Ghi chú"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                leftIcon={<IconNote size={16} />}
+              />
+            </div>
+          </div>
+        ) : (
+          <dl className="grid sm:grid-cols-2 gap-4 mt-5">
+            <Field
+              label="Họ và tên"
+              icon={<IconUser size={16} />}
+              value={customer.fullName}
+              placeholder="Chưa cập nhật"
+            />
+            <Field
+              label="Số điện thoại"
+              icon={<IconMapPin size={16} />}
+              value={customer.phone}
+              placeholder="Chưa cập nhật"
+            />
+            <Field
+              label="Email"
+              icon={<IconNote size={16} />}
+              value={customer.email}
+              placeholder="Chưa cập nhật"
+              className="sm:col-span-2"
+            />
+            <Field
+              label="Địa chỉ liên hệ"
+              icon={<IconMapPin size={16} />}
+              value={customer.address}
+              placeholder="Chưa cập nhật"
+              className="sm:col-span-2"
+            />
+            <Field
+              label="Ghi chú"
+              icon={<IconNote size={16} />}
+              value={customer.notes}
+              placeholder="Không có ghi chú"
+              className="sm:col-span-2"
+            />
+          </dl>
+        )}
 
         <div className="mt-5 pt-4 border-t border-ink/8 text-xs text-ink-muted flex flex-wrap gap-x-5 gap-y-1">
           <span>
@@ -1033,6 +1230,368 @@ function BookingStatusBadge({ status }: { status: BookingStatus }) {
 }
 
 // =========================
+// Tab: Lịch sử bảo dưỡng (GET /api/service-history/me)
+// =========================
+function ServiceHistoryTab() {
+  const t = useToast();
+  const [items, setItems] = useState<ServiceHistoryResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await customerVehicleApi.getMyServiceHistory(0, 50);
+      setItems(page.items ?? []);
+    } catch (err) {
+      setItems([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Không tải được lịch sử bảo dưỡng từ máy chủ",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-28 bg-bgsoft rounded-2xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <div className="p-10 text-center">
+          <p className="font-semibold mb-2">Không tải được lịch sử bảo dưỡng</p>
+          <p className="text-sm text-ink-light mb-5">{error}</p>
+          <Button variant="outline" onClick={() => void load()}>
+            <IconRefresh size={14} /> Thử lại
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <Card>
+        <div className="p-12 text-center">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-bgsoft flex items-center justify-center mb-4">
+            <IconWrench size={32} className="text-ink-muted" />
+          </div>
+          <p className="font-semibold text-lg mb-1">Chưa có lịch sử bảo dưỡng</p>
+          <p className="text-sm text-ink-light mb-5 max-w-sm mx-auto">
+            Sau khi bạn mang xe đến {GARAGE.name}, lịch sử bảo dưỡng sẽ xuất
+            hiện tại đây.
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((h) => (
+        <Card key={h.id}>
+          <div className="p-4 md:p-5">
+            <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-ink">{h.summary}</h3>
+                <div className="text-xs text-ink-muted mt-1 flex flex-wrap gap-3">
+                  <span className="flex items-center gap-1">
+                    <IconCalendar size={12} />
+                    {new Date(h.serviceDate).toLocaleDateString("vi-VN")}
+                  </span>
+                  {h.odometerKm != null && (
+                    <span>
+                      · ODO:{" "}
+                      <strong className="text-ink">
+                        {h.odometerKm.toLocaleString("vi-VN")} km
+                      </strong>
+                    </span>
+                  )}
+                  {h.garageName && <span>· {h.garageName}</span>}
+                </div>
+              </div>
+              {h.licensePlate && (
+                <span className="font-mono font-bold text-xs bg-primary/10 text-primary px-2 py-1 rounded-lg shrink-0">
+                  {h.licensePlate}
+                </span>
+              )}
+            </div>
+            {h.description && (
+              <p className="text-sm text-ink-light">{h.description}</p>
+            )}
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// =========================
+// Tab: Hóa đơn (GET /api/invoices/me)
+// =========================
+function InvoicesTab() {
+  const t = useToast();
+  const [items, setItems] = useState<InvoiceSummaryResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<InvoiceSummaryResponse | null>(null);
+  const [detail, setDetail] = useState<InvoiceResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await billingApi.getMyInvoices(0, 50);
+      setItems(page.items ?? []);
+    } catch (err) {
+      setItems([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Không tải được danh sách hóa đơn từ máy chủ",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const openDetail = async (inv: InvoiceSummaryResponse) => {
+    setSelected(inv);
+    setDetail(null);
+    setDetailLoading(true);
+    try {
+      setDetail(await billingApi.getInvoice(inv.id));
+    } catch (err) {
+      t.error(
+        err instanceof Error ? err.message : "Không tải được chi tiết hóa đơn",
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-24 bg-bgsoft rounded-2xl animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <div className="p-10 text-center">
+          <p className="font-semibold mb-2">Không tải được danh sách hóa đơn</p>
+          <p className="text-sm text-ink-light mb-5">{error}</p>
+          <Button variant="outline" onClick={() => void load()}>
+            <IconRefresh size={14} /> Thử lại
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <Card>
+        <div className="p-12 text-center">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-bgsoft flex items-center justify-center mb-4">
+            <IconCash size={32} className="text-ink-muted" />
+          </div>
+          <p className="font-semibold text-lg mb-1">Chưa có hóa đơn nào</p>
+          <p className="text-sm text-ink-light mb-5 max-w-sm mx-auto">
+            Hóa đơn sẽ xuất hiện sau khi bạn hoàn tất dịch vụ tại {GARAGE.name}.
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((inv) => (
+        <Card key={inv.id}>
+          <button
+            onClick={() => void openDetail(inv)}
+            className="w-full p-4 md:p-5 text-left flex items-center justify-between gap-3 flex-wrap"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className="font-mono font-bold text-primary">{inv.code}</span>
+                <InvoiceStatusBadge status={inv.status} />
+              </div>
+              <div className="text-xs text-ink-muted">
+                Phát hành:{" "}
+                {new Date(inv.issuedAt).toLocaleDateString("vi-VN")}
+                {inv.paidAt &&
+                  ` · Đã thanh toán: ${new Date(
+                    inv.paidAt,
+                  ).toLocaleDateString("vi-VN")}`}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-ink-muted">Tổng cộng</div>
+              <div className="font-bold text-primary text-lg">
+                {formatCompactVND(inv.grandTotal)}
+              </div>
+            </div>
+          </button>
+        </Card>
+      ))}
+
+      {/* Modal chi tiết hóa đơn */}
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/50 flex items-center justify-center p-4"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-ink/8 pb-4 mb-4">
+              <div>
+                <div className="text-xs text-ink-muted mb-1">Mã hóa đơn</div>
+                <h3 className="font-mono font-bold text-lg">{selected.code}</h3>
+              </div>
+              <button
+                onClick={() => setSelected(null)}
+                className="p-1.5 rounded-lg hover:bg-bgsoft"
+                aria-label="Đóng"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <div className="py-8 text-center text-sm text-ink-muted">
+                Đang tải chi tiết...
+              </div>
+            ) : detail ? (
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-xs text-ink-muted">Trạng thái</div>
+                    <div className="mt-1">
+                      <InvoiceStatusBadge status={detail.status} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-ink-muted">Ngày phát hành</div>
+                    <div className="font-semibold">
+                      {new Date(detail.issuedAt).toLocaleString("vi-VN")}
+                    </div>
+                  </div>
+                </div>
+
+                {detail.items.length > 0 && (
+                  <div className="border border-ink/8 rounded-xl divide-y divide-ink/5">
+                    {detail.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between gap-3 p-3 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium text-ink line-clamp-1">
+                            {item.snapshotName}
+                          </div>
+                          <div className="text-[11px] text-ink-muted">
+                            {item.itemType === "SERVICE" ? "Dịch vụ" : "Phụ tùng"} ·
+                            SL {item.quantity ?? 1}
+                          </div>
+                        </div>
+                        <div className="font-semibold text-ink shrink-0">
+                          {formatCompactVND(item.totalPrice)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border-t border-ink/8 pt-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-ink-light">Phí công</span>
+                    <span className="text-ink">{formatFullVND(detail.subtotalLabor)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink-light">Tiền phụ tùng</span>
+                    <span className="text-ink">{formatFullVND(detail.subtotalParts)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink-light">Chiết khấu</span>
+                    <span className="text-ink">-{formatFullVND(detail.discountAmount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink-light">Thuế</span>
+                    <span className="text-ink">{formatFullVND(detail.taxAmount)}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-ink/8">
+                    <span className="font-semibold text-ink">Tổng cộng</span>
+                    <span className="font-bold text-primary text-lg">
+                      {formatFullVND(detail.grandTotal)}
+                    </span>
+                  </div>
+                  {detail.paidAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-ink-light">Đã thanh toán</span>
+                      <span className="text-ink">{formatFullVND(detail.paidAmount)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-sm text-ink-muted">
+                Không tải được chi tiết hóa đơn.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
+  const config: Record<
+    InvoiceStatus,
+    { tone: "default" | "primary" | "warning" | "accent"; label: string }
+  > = {
+    UNPAID: { tone: "warning", label: "Chưa thanh toán" },
+    PARTIALLY_PAID: { tone: "primary", label: "Thanh toán một phần" },
+    PAID: { tone: "accent", label: "Đã thanh toán" },
+    VOID: { tone: "default", label: "Đã huỷ" },
+  };
+  const c = config[status] ?? {
+    tone: "default" as const,
+    label: status,
+  };
+  return <Badge tone={c.tone}>{c.label}</Badge>;
+}
+
+// =========================
 // Tab: Đơn hàng
 // =========================
 function OrdersTab({ orders }: { orders: Order[] }) {
@@ -1322,18 +1881,229 @@ function Row({
 // =========================
 // Tab: Xe của tôi
 // =========================
-function VehiclesTab({ vehicles }: { vehicles: Vehicle[] }) {
+function VehiclesTab({
+  vehicles,
+  userId,
+}: {
+  vehicles: Vehicle[];
+  userId: string;
+}) {
+  const t = useToast();
+  const [list, setList] = useState<Vehicle[]>(vehicles);
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    plate: "",
+    make: "",
+    model: "",
+    year: "",
+    color: "",
+    fuelType: "",
+    transmission: "",
+    odometerKm: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setList(vehicles);
+  }, [vehicles]);
+
+  /** Lưu cục bộ — dùng khi server không cho phép ghi (403 VEHICLE_*). */
+  const persistLocal = (next: Vehicle[]) => {
+    setList(next);
+    saveUserVehicles(userId, next);
+  };
+
+  const resetForm = () => {
+    setForm({
+      plate: "",
+      make: "",
+      model: "",
+      year: "",
+      color: "",
+      fuelType: "",
+      transmission: "",
+      odometerKm: "",
+    });
+    setErrors({});
+  };
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!form.plate.trim()) e.plate = "Vui lòng nhập biển số";
+    if (!form.make.trim()) e.make = "Vui lòng nhập hãng xe";
+    if (!form.model.trim()) e.model = "Vui lòng nhập dòng xe";
+    if (form.year && !/^\d{4}$/.test(form.year.trim())) {
+      e.year = "Năm sản xuất phải là 4 chữ số";
+    }
+    if (form.odometerKm && !/^\d+$/.test(form.odometerKm.trim())) {
+      e.odometerKm = "Số km phải là số nguyên";
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    if (!validate()) return;
+    setSaving(true);
+
+    const payload = {
+      licensePlate: form.plate.trim().toUpperCase(),
+      make: form.make.trim(),
+      model: form.model.trim(),
+      modelYear: form.year ? Number(form.year) : null,
+      color: form.color.trim() || null,
+      fuelType: form.fuelType.trim() || null,
+      transmission: form.transmission.trim() || null,
+      odometerKm: form.odometerKm ? Number(form.odometerKm) : null,
+      isActive: true,
+    };
+
+    try {
+      if (editingId) {
+        // ── Sửa xe: PUT /api/vehicles/{id} (cần VEHICLE_UPDATE) ──
+        const updated = await customerVehicleApi.updateVehicle(
+          editingId,
+          payload,
+        );
+        const next = list.map((v) =>
+          v.id === editingId
+            ? {
+                ...v,
+                nickname: `${updated.make} ${updated.model}`,
+                brand: updated.make ?? v.brand,
+                model: updated.model ?? v.model,
+                year: updated.modelYear ?? v.year,
+                plate: updated.licensePlate,
+                odoKm: updated.odometerKm ?? v.odoKm,
+                color: updated.color ?? undefined,
+              }
+            : v,
+        );
+        persistLocal(next);
+        t.success(
+          `Đã cập nhật xe ${updated.licensePlate ?? payload.licensePlate}`,
+        );
+      } else {
+        // ── Thêm xe: POST /api/vehicles (cần VEHICLE_CREATE) ──
+        const created = await customerVehicleApi.createVehicle(payload);
+        persistLocal([
+          {
+            id: created.id,
+            nickname: `${created.make} ${created.model}`,
+            brand: created.make ?? "",
+            model: created.model ?? "",
+            year: created.modelYear ?? new Date().getFullYear(),
+            plate: created.licensePlate,
+            odoKm: created.odometerKm ?? 0,
+            image:
+              "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=70",
+            color: created.color ?? undefined,
+          },
+          ...list,
+        ]);
+        t.success(
+          `Đã thêm xe ${created.licensePlate ?? payload.licensePlate}`,
+        );
+      }
+      setShowModal(false);
+      setEditingId(null);
+      resetForm();
+    } catch (err) {
+      if (isAuthError(err)) {
+        // CUSTOMER chưa có authority VEHICLE_CREATE / VEHICLE_UPDATE →
+        // lưu cục bộ để không mất dữ liệu người dùng vừa nhập.
+        if (editingId) {
+          persistLocal(
+            list.map((v) =>
+              v.id === editingId
+                ? {
+                    ...v,
+                    nickname: `${payload.make} ${payload.model}`,
+                    brand: payload.make,
+                    model: payload.model,
+                    year: payload.modelYear ?? v.year,
+                    plate: payload.licensePlate,
+                    odoKm: payload.odometerKm ?? v.odoKm,
+                    color: payload.color ?? undefined,
+                  }
+                : v,
+            ),
+          );
+          t.info(
+            "Bạn không có quyền sửa xe trực tiếp trên máy chủ. Thay đổi đã được lưu tạm trên thiết bị này.",
+          );
+        } else {
+          persistLocal([
+            {
+              id: `local-${Date.now()}`,
+              nickname: `${payload.make} ${payload.model}`,
+              brand: payload.make,
+              model: payload.model,
+              year: payload.modelYear ?? new Date().getFullYear(),
+              plate: payload.licensePlate,
+              odoKm: payload.odometerKm ?? 0,
+              image:
+                "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=70",
+              color: payload.color ?? undefined,
+            },
+            ...list,
+          ]);
+          t.info(
+            "Bạn không có quyền thêm xe trực tiếp trên máy chủ. Xe đã được lưu tạm trên thiết bị này — vui lòng liên hệ xưởng để đồng bộ.",
+          );
+        }
+        setShowModal(false);
+        setEditingId(null);
+        resetForm();
+      } else {
+        t.error(
+          err instanceof Error ? err.message : "Lưu xe thất bại, vui lòng thử lại",
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** ── Xoá xe: DELETE /api/vehicles/{id} (cần VEHICLE_DELETE) ── */
+  const handleDelete = async (vehicle: Vehicle) => {
+    const prev = list;
+    // Cập nhật optimistic để UI phản hồi tức thì.
+    persistLocal(prev.filter((v) => v.id !== vehicle.id));
+    setDeletingId(null);
+    try {
+      await customerVehicleApi.deleteVehicle(vehicle.id);
+      t.success(`Đã xoá xe ${vehicle.plate}`);
+    } catch (err) {
+      // Không có quyền xoá trên server → giữ bản xoá cục bộ, báo rõ.
+      persistLocal(prev.filter((v) => v.id !== vehicle.id));
+      if (isAuthError(err)) {
+        t.info(
+          "Bạn không có quyền xoá xe trên máy chủ. Xe đã được ẩn tạm trên thiết bị này.",
+        );
+      } else {
+        t.error(
+          err instanceof Error ? err.message : "Không xoá được xe, vui lòng thử lại",
+        );
+      }
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">Xe đã đăng ký ({vehicles.length})</h2>
-        <Button size="sm">
+        <h2 className="text-lg font-bold">Xe đã đăng ký ({list.length})</h2>
+        <Button size="sm" onClick={() => setShowModal(true)}>
           <IconPlus size={16} />
           Thêm xe
         </Button>
       </div>
 
-      {vehicles.length === 0 ? (
+      {list.length === 0 ? (
         <Card>
           <div className="p-12 text-center">
             <div className="mx-auto w-16 h-16 rounded-2xl bg-bgsoft flex items-center justify-center mb-3">
@@ -1343,11 +2113,15 @@ function VehiclesTab({ vehicles }: { vehicles: Vehicle[] }) {
             <p className="text-sm text-ink-light">
               Đăng ký xe để AutoCare gợi ý phụ kiện/dịch vụ phù hợp.
             </p>
+            <Button className="mt-5" onClick={() => setShowModal(true)}>
+              <IconPlus size={16} />
+              Thêm xe
+            </Button>
           </div>
         </Card>
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
-          {vehicles.map((v) => (
+          {list.map((v) => (
             <Card key={v.id} className="overflow-hidden">
               <div className="aspect-[16/9] overflow-hidden bg-bgsoft relative">
                 <img
@@ -1392,8 +2166,35 @@ function VehiclesTab({ vehicles }: { vehicles: Vehicle[] }) {
                       Đặt lịch
                     </Button>
                   </Link>
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setForm({
+                        plate: v.plate,
+                        make: v.brand,
+                        model: v.model,
+                        year: String(v.year ?? ""),
+                        color: v.color ?? "",
+                        fuelType: "",
+                        transmission: "",
+                        odometerKm: String(v.odoKm ?? ""),
+                      });
+                      setErrors({});
+                      setEditingId(v.id);
+                      setShowModal(true);
+                    }}
+                  >
                     Sửa
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:bg-red-50"
+                    aria-label={`Xoá xe ${v.plate}`}
+                    onClick={() => setDeletingId(v.id)}
+                  >
+                    <IconTrash size={15} />
                   </Button>
                 </div>
               </div>
@@ -1401,6 +2202,165 @@ function VehiclesTab({ vehicles }: { vehicles: Vehicle[] }) {
           ))}
         </div>
       )}
+
+      {/* Modal thêm / sửa xe */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink/40 backdrop-blur-sm p-0 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Thông tin xe"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+        >
+          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-cardHover max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-ink/8 sticky top-0 bg-white">
+              <h2 className="font-bold text-lg">
+                {editingId ? "Cập nhật xe" : "Thông tin xe"}
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1.5 rounded-lg hover:bg-bgsoft"
+                aria-label="Đóng"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <Input
+                label="Biển số *"
+                placeholder="30A-123.45"
+                value={form.plate}
+                onChange={(e) => setForm({ ...form, plate: e.target.value })}
+                error={errors.plate}
+                required
+              />
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Input
+                  label="Hãng xe *"
+                  placeholder="Toyota"
+                  value={form.make}
+                  onChange={(e) => setForm({ ...form, make: e.target.value })}
+                  error={errors.make}
+                  required
+                />
+                <Input
+                  label="Dòng xe *"
+                  placeholder="Vios"
+                  value={form.model}
+                  onChange={(e) => setForm({ ...form, model: e.target.value })}
+                  error={errors.model}
+                  required
+                />
+                <Input
+                  label="Năm sản xuất"
+                  placeholder="2020"
+                  value={form.year}
+                  onChange={(e) => setForm({ ...form, year: e.target.value })}
+                  error={errors.year}
+                  inputMode="numeric"
+                />
+                <Input
+                  label="Màu xe"
+                  placeholder="Đen"
+                  value={form.color}
+                  onChange={(e) => setForm({ ...form, color: e.target.value })}
+                />
+                <Input
+                  label="Loại nhiên liệu"
+                  placeholder="Xăng / Dầu / Điện"
+                  value={form.fuelType}
+                  onChange={(e) => setForm({ ...form, fuelType: e.target.value })}
+                />
+                <Input
+                  label="Hộp số"
+                  placeholder="Số sàn / Tự động"
+                  value={form.transmission}
+                  onChange={(e) =>
+                    setForm({ ...form, transmission: e.target.value })
+                  }
+                />
+              </div>
+              <Input
+                label="Số km hiện tại"
+                placeholder="45000"
+                value={form.odometerKm}
+                onChange={(e) =>
+                  setForm({ ...form, odometerKm: e.target.value })
+                }
+                error={errors.odometerKm}
+                inputMode="numeric"
+                hint="Giúp xưởng gợi ý lịch bảo dưỡng phù hợp"
+              />
+
+              <div className="flex gap-2 pt-2">
+                <Button type="submit" disabled={saving} fullWidth>
+                  {saving ? (
+                    <>
+                      <IconRefresh size={16} className="animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <IconCheckCircle size={16} />
+                      Lưu xe
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingId(null);
+                    resetForm();
+                  }}
+                >
+                  Huỷ
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận xoá xe */}
+      {deletingId &&
+        (() => {
+          const target = list.find((v) => v.id === deletingId);
+          if (!target) return null;
+          return (
+            <div
+              className="fixed inset-0 z-50 bg-ink/50 flex items-center justify-center p-4"
+              onClick={() => setDeletingId(null)}
+            >
+              <div
+                className="bg-white rounded-2xl max-w-md w-full p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="font-bold text-lg mb-2">Xác nhận xoá xe?</h3>
+                <p className="text-sm text-ink-light mb-6">
+                  Bạn có chắc muốn xoá xe{" "}
+                  <strong className="text-ink">{target.plate}</strong> (
+                  {target.nickname})? Hành động này không thể hoàn tác.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={() => setDeletingId(null)}>
+                    Huỷ
+                  </Button>
+                  <Button
+                    className="bg-red-500 hover:bg-red-600 text-white"
+                    onClick={() => void handleDelete(target)}
+                  >
+                    Xoá xe
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }

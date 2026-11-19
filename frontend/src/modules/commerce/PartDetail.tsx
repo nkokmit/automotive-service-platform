@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   IconShoppingBag,
   IconStar,
@@ -25,6 +25,8 @@ import RecommendationWidget from "../../components/RecommendationWidget";
 import { GARAGE } from "../../config/garage";
 import { useCatalog, type CatalogPart } from "../../data/catalog";
 import { recommendForPart } from "../../data/recommend";
+import { inventoryApi } from "../../api/endpoints/inventory";
+import type { PartCompatibilityResponse } from "../../api/types";
 import {
   addToCart,
   setCartQty,
@@ -195,6 +197,7 @@ function PartCardSmall({ part }: { part: CatalogPart }) {
 export default function PartDetail() {
   const { slug } = useParams();
   const t = useToast();
+  const navigate = useNavigate();
   const { parts, loading: catalogLoading, usingFallback } = useCatalog();
 
   // Tìm part theo slug trong catalog đang hiển thị (API thật hoặc fallback)
@@ -214,6 +217,49 @@ export default function PartDetail() {
     title: string;
     message: string;
   } | null>(null);
+
+  // Similar: dùng RecommendationWidget (smart engine) trên pool catalog hiện tại.
+  // Hook phải nằm TRƯỚC mọi early-return để không vi phạm rules of hooks.
+  const similarRecommendations = useMemo(
+    () => (part ? recommendForPart(part.id, 4, parts) : []),
+    [part, parts],
+  );
+
+  // Dòng xe tương thích — `GET /api/parts/{id}/compatibilities`.
+  const [compatibilities, setCompatibilities] = useState<
+    PartCompatibilityResponse[]
+  >([]);
+  const [compatLoading, setCompatLoading] = useState(false);
+  const [compatError, setCompatError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Catalog rơi về dữ liệu mẫu → id không phải UUID thật, gọi API vô nghĩa.
+    if (!part || usingFallback) return;
+    let cancelled = false;
+    setCompatLoading(true);
+    setCompatError(null);
+    inventoryApi
+      .getPartCompatibilities(part.id)
+      .then((data) => {
+        if (cancelled) return;
+        setCompatibilities(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setCompatibilities([]);
+        setCompatError(
+          err instanceof Error
+            ? err.message
+            : "Không tải được danh sách xe tương thích",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setCompatLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [part, usingFallback]);
 
   // =========================
   // RENDER BRANCHES
@@ -274,12 +320,6 @@ export default function PartDetail() {
   const discount = getPartDiscountPercent(part);
   const inStock = part.stockQty > 0;
 
-  // Similar: dùng RecommendationWidget (smart engine) trên pool catalog hiện tại
-  const similarRecommendations = useMemo(
-    () => recommendForPart(part.id, 4, parts),
-    [part.id, parts],
-  );
-
   const handleAddToCart = (showModal: boolean = false) => {
     addToCart(part.id, qty);
     if (showModal) {
@@ -293,8 +333,10 @@ export default function PartDetail() {
   };
 
   const handleBuyNow = () => {
+    // Đảm bảo giỏ có đúng số lượng người dùng chọn rồi chuyển sang checkout
     setCartQty(part.id, qty);
-    t.info("Đã chuyển sang trang thanh toán (mock)");
+    t.success(`Đã chuyển ${qty} × "${part.name}" sang trang thanh toán`);
+    navigate("/checkout");
   };
 
   return (
@@ -474,35 +516,72 @@ export default function PartDetail() {
             </div>
           </div>
 
-          {/* Compatible cars */}
-          {part.compatibleCars && part.compatibleCars.length > 0 && (
-            <Card hover={false} className="mt-6">
-              <div className="p-5">
-                <h2 className="font-semibold mb-3 flex items-center gap-2">
+          {/* Compatible cars — GET /api/parts/{id}/compatibilities */}
+          <Card hover={false} className="mt-6">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold flex items-center gap-2">
                   <IconCar size={18} className="text-primary" />
                   Xe tương thích
                 </h2>
-                <p className="text-xs text-ink-muted mb-3">
-                  Sản phẩm phù hợp với các dòng xe sau (có thể cần thêm phụ
-                  kiện lắp đặt):
-                </p>
+                {compatibilities.length > 0 && (
+                  <span className="text-[11px] text-ink-muted">
+                    {compatibilities.length} dòng xe
+                  </span>
+                )}
+              </div>
+
+              {compatLoading ? (
                 <div className="flex flex-wrap gap-2">
-                  {part.compatibleCars.map((c) => (
-                    <Link
-                      key={c}
-                      to={`/cars?brand=${encodeURIComponent(
-                        c.split(" ")[0],
-                      )}`}
-                      className="inline-flex items-center gap-1 px-3 h-9 rounded-full bg-bgsoft text-sm text-ink hover:bg-primary hover:text-white transition-colors"
-                    >
-                      <IconCar size={14} />
-                      {c}
-                    </Link>
+                  {[1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="h-9 w-28 bg-bgsoft rounded-full animate-pulse"
+                    />
                   ))}
                 </div>
-              </div>
-            </Card>
-          )}
+              ) : compatError ? (
+                <p className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg flex items-start gap-2">
+                  <IconRefresh size={14} className="shrink-0 mt-0.5" />
+                  <span>Không tải được danh sách xe tương thích từ máy chủ.</span>
+                </p>
+              ) : compatibilities.length === 0 ? (
+                <p className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg">
+                  Chưa có dữ liệu dòng xe tương thích cho sản phẩm này. Vui
+                  lòng liên hệ {GARAGE.name} để được tư vấn chính xác.
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-ink-muted mb-3">
+                    Sản phẩm phù hợp với các dòng xe sau (có thể cần thêm phụ
+                    kiện lắp đặt):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {compatibilities.map((c) => {
+                      const label = `${c.vehicleBrand} ${c.vehicleModel}`;
+                      const years =
+                        c.yearFrom != null || c.yearTo != null
+                          ? ` (${c.yearFrom ?? "..."}–${c.yearTo ?? "..."})`
+                          : "";
+                      return (
+                        <Link
+                          key={c.id}
+                          to={`/cars?brand=${encodeURIComponent(c.vehicleBrand)}`}
+                          className="inline-flex items-center gap-1 px-3 h-9 rounded-full bg-bgsoft text-sm text-ink hover:bg-primary hover:text-white transition-colors"
+                        >
+                          <IconCar size={14} />
+                          {label}
+                          {years && (
+                            <span className="text-xs opacity-70">{years}</span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </Card>
 
           {/* Trust / shipping */}
           <Card hover={false} className="mt-6 bg-bgsoft/40">

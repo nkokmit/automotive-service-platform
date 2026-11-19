@@ -73,6 +73,17 @@ export interface UserResponse {
   roles: Set<RoleResponse>;
 }
 
+/** Khớp UserUpdateRequest.java — mọi field đều optional (null = không đổi). */
+export interface UserUpdateRequest {
+  username?: string;
+  password?: string;
+  email?: string;
+  phone?: string;
+  fullName?: string;
+  isActive?: boolean;
+  roleIds?: string[];
+}
+
 /** Khớp AuthenticationResponse.java — KHÔNG có field expiresIn. */
 export interface AuthenticationResponse {
   accessToken: string;
@@ -291,6 +302,9 @@ export type BookingStatus =
   | "CHECKED_IN"
   | "FULFILLED";
 
+/** Khớp BookingSource.java. */
+export type BookingSource = "ONLINE" | "PHONE" | "WALK_IN";
+
 /** Khớp BookingServiceResponse.java — dịch vụ đã chốt trong 1 lịch hẹn. */
 export interface BookingServiceResponse {
   serviceId: string;
@@ -338,6 +352,249 @@ export interface BookingRescheduleRequest {
 /** Khớp BookingCancelRequest.java. */
 export interface BookingCancelRequest {
   reason?: string;
+}
+
+// ── Staff service (staff-service) ─────────────────────────────────────────────
+/** Khớp StaffResponse.java */
+export interface StaffResponse {
+  id: string;
+  userId: string | null;
+  employeeCode: string | null;
+  fullName: string | null;
+  phone: string | null;
+  email: string | null;
+  /** Chức vụ: MECHANIC, SERVICE_ADVISOR, CASHIER, MANAGER… */
+  position: string | null;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Work Order service (work-order-service) ───────────────────────────────────
+/** Khớp WorkOrderStatus.java */
+export type WorkOrderStatus =
+  | "CREATED"
+  | "DIAGNOSING"
+  | "PENDING_APPROVAL"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "PENDING_PAYMENT"
+  | "CLOSED"
+  | "CANCELED";
+
+/** Khớp WorkOrderListItemResponse.java — dòng trong bảng tra cứu. */
+export interface WorkOrderListItemResponse {
+  id: string;
+  code: string;
+  bookingId: string | null;
+  customerId: string | null;
+  vehicleId: string | null;
+  advisorId: string | null;
+  status: WorkOrderStatus;
+  odometerIn: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp WorkOrderPageResponse.java — không có hasNext/hasPrevious. */
+export interface WorkOrderPageResponse {
+  items: WorkOrderListItemResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/** Khớp CustomerSummaryResponse.java */
+export interface WorkOrderCustomerSummary {
+  id: string;
+  fullName: string | null;
+  phone: string | null;
+}
+
+/** Khớp VehicleSummaryResponse.java */
+export interface WorkOrderVehicleSummary {
+  id: string;
+  licensePlate: string | null;
+  vin: string | null;
+  make: string | null;
+  model: string | null;
+  modelYear: number | null;
+  trim: string | null;
+  color: string | null;
+  fuelType: string | null;
+  transmission: string | null;
+  odometerKm: number | null;
+  notes: string | null;
+  isActive: boolean | null;
+}
+
+/** Khớp EstimateSummaryResponse.java */
+export interface EstimateSummaryResponse {
+  id: string;
+  code: string;
+  /** INITIAL | SUPPLEMENTARY */
+  type: string;
+  /** DRAFT | PENDING_APPROVAL | APPROVED | REJECTED… */
+  status: string;
+  totalAmount: number;
+}
+
+/** Khớp WorkOrderStatusHistoryResponse.java */
+export interface WorkOrderStatusHistoryResponse {
+  id: string;
+  statusFrom: string | null;
+  statusTo: string;
+  changedBy: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** Khớp WorkOrderResponse.java */
+export interface WorkOrderResponse {
+  id: string;
+  code: string;
+  bookingId: string | null;
+  customerId: string | null;
+  vehicleId: string | null;
+  customer: WorkOrderCustomerSummary | null;
+  vehicle: WorkOrderVehicleSummary | null;
+  advisorId: string | null;
+  status: WorkOrderStatus;
+  odometerIn: number | null;
+  odometerOut: number | null;
+  vehicleCondition: string | null;
+  customerNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  estimates: EstimateSummaryResponse[];
+  statusHistory: WorkOrderStatusHistoryResponse[];
+}
+
+// ── Billing service (billing-service) ─────────────────────────────────────────
+/** Khớp InvoiceStatus.java */
+export type InvoiceStatus = "UNPAID" | "PARTIALLY_PAID" | "PAID" | "VOID";
+
+/** Khớp InvoiceItemType.java */
+export type InvoiceItemType = "SERVICE" | "PART";
+
+/** Khớp PaymentMethod.java */
+export type PaymentMethod = "CASH" | "BANK_TRANSFER" | "CARD";
+
+/** Khớp PaymentStatus.java */
+export type PaymentStatus = "SUCCEEDED" | "REFUNDED";
+
+/** Khớp InvoiceItemResponse.java */
+export interface InvoiceItemResponse {
+  id: string;
+  itemType: InvoiceItemType;
+  referenceItemId: string | null;
+  catalogId: string | null;
+  snapshotCode: string | null;
+  snapshotName: string | null;
+  quantity: number | null;
+  unitPrice: number;
+  discountAmount: number;
+  taxRate: number;
+  totalPrice: number;
+}
+
+/** Khớp PaymentResponse.java */
+export interface PaymentResponse {
+  id: string;
+  code: string;
+  invoiceId: string;
+  idempotencyKey: string | null;
+  paymentMethod: PaymentMethod;
+  amount: number;
+  status: PaymentStatus;
+  transactionRef: string | null;
+  processedBy: string | null;
+  note: string | null;
+  paidAt: string | null;
+  refundedAt: string | null;
+  refundReason: string | null;
+}
+
+/** Khớp InvoiceSummaryResponse.java — dòng trong bảng tra cứu hóa đơn. */
+export interface InvoiceSummaryResponse {
+  id: string;
+  code: string;
+  workOrderId: string | null;
+  customerId: string | null;
+  vehicleId: string | null;
+  subtotalLabor: number;
+  subtotalParts: number;
+  discountAmount: number;
+  taxAmount: number;
+  grandTotal: number;
+  paidAmount: number;
+  status: InvoiceStatus;
+  issuedAt: string;
+  paidAt: string | null;
+}
+
+/** Khớp InvoicePageResponse.java — không có hasNext/hasPrevious. */
+export interface InvoicePageResponse {
+  items: InvoiceSummaryResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/** Khớp InvoiceResponse.java */
+export interface InvoiceResponse {
+  id: string;
+  code: string;
+  workOrderId: string | null;
+  customerId: string | null;
+  vehicleId: string | null;
+  subtotalLabor: number;
+  subtotalParts: number;
+  discountAmount: number;
+  taxAmount: number;
+  grandTotal: number;
+  paidAmount: number;
+  status: InvoiceStatus;
+  note: string | null;
+  issuedBy: string | null;
+  issuedAt: string;
+  paidAt: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  items: InvoiceItemResponse[];
+  payments: PaymentResponse[];
+}
+
+// ── Staff booking (booking-service — màn hình lịch hẹn của xưởng) ─────────────
+/** Khớp StaffBookingResponse.java */
+export interface StaffBookingResponse {
+  id: string;
+  customerId: string | null;
+  vehicleId: string | null;
+  workOrderId: string | null;
+  licensePlateSnapshot: string;
+  startAt: string;
+  endAt: string;
+  status: BookingStatus;
+  source: BookingSource;
+  createdBy: string | null;
+  customerNote: string | null;
+  services: BookingServiceResponse[];
+  createdAt: string;
+  updatedAt: string;
+  cancelledAt: string | null;
+  checkedInAt: string | null;
+}
+
+/** Khớp StaffBookingPageResponse.java — không có hasNext/hasPrevious. */
+export interface StaffBookingPageResponse {
+  items: StaffBookingResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

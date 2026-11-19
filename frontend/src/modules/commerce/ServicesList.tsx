@@ -36,7 +36,7 @@ type SortId = (typeof sortOptions)[number]["id"];
 
 export default function ServicesList() {
   const [params] = useSearchParams();
-  const { services, loading, usingFallback } = useCatalog();
+  const { services, loading, usingFallback, error } = useCatalog();
   const categories = useServiceCategoryOptions();
 
   const [filters, setFilters] = useState({
@@ -110,8 +110,9 @@ export default function ServicesList() {
       {/* Cảnh báo fallback — API chưa sẵn sàng */}
       {usingFallback && (
         <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Đang hiển thị danh mục dịch vụ mẫu. Hệ thống sẽ tự đồng bộ dữ liệu
-          thật khi máy chủ sẵn sàng.
+          {error?.includes("chưa có dữ liệu")
+            ? "Máy chủ đã kết nối được nhưng chưa có dữ liệu dịch vụ. Đang hiển thị danh mục mẫu."
+            : "Đang hiển thị danh mục dịch vụ mẫu. Hệ thống sẽ tự đồng bộ dữ liệu thật khi máy chủ sẵn sàng."}
         </div>
       )}
 

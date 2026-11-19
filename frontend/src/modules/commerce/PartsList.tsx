@@ -53,7 +53,7 @@ const statusOptions: { id: StatusFilter; label: string }[] = [
 export default function PartsList() {
   const [params, setParams] = useSearchParams();
   const t = useToast();
-  const { parts, loading, usingFallback } = useCatalog();
+  const { parts, loading, usingFallback, error } = useCatalog();
 
   const [filters, setFilters] = useState({
     category: "Tất cả" as string,
@@ -224,8 +224,9 @@ export default function PartsList() {
 
       {usingFallback && (
         <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Đang hiển thị danh mục phụ tùng mẫu. Hệ thống sẽ tự đồng bộ dữ liệu
-          thật khi máy chủ sẵn sàng.
+          {error?.includes("chưa có dữ liệu")
+            ? "Máy chủ đã kết nối được nhưng chưa có dữ liệu phụ tùng. Đang hiển thị danh mục mẫu."
+            : "Đang hiển thị danh mục phụ tùng mẫu. Hệ thống sẽ tự đồng bộ dữ liệu thật khi máy chủ sẵn sàng."}
         </div>
       )}
 

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   IconDashboard,
   IconBuilding,
@@ -16,8 +16,16 @@ import {
   IconArrowLeft,
   IconCar,
   IconLogout,
+  IconCheck,
+  IconWarning,
+  IconActivity,
+  IconCalendar,
+  IconCash,
 } from "./icons";
 import { useAuth } from "../data/authStore";
+import { useToast } from "./Toast";
+import SearchBox from "./SearchBox";
+import { recentActivities } from "../data/adminMock";
 
 // =========================
 // AdminLayout — shell chung cho /admin/*
@@ -46,6 +54,10 @@ const navGroups: NavGroup[] = [
     label: "Quản lý",
     items: [
       { to: "/admin/orders", label: "Đơn hàng", icon: IconShoppingBag, badge: "24" },
+      { to: "/admin/bookings", label: "Lịch hẹn xưởng", icon: IconCalendar },
+      { to: "/admin/invoices", label: "Hóa đơn", icon: IconCash },
+      { to: "/admin/work-orders", label: "Phiếu sửa chữa", icon: IconWrench },
+      { to: "/admin/staff", label: "Kỹ thuật viên", icon: IconUsers },
       { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
       { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
       { to: "/admin/services", label: "Dịch vụ", icon: IconWrench },
@@ -65,6 +77,96 @@ const navGroups: NavGroup[] = [
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const t = useToast();
+
+  // Panel thông báo
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        notifRef.current &&
+        !notifRef.current.contains(e.target as Node)
+      ) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showNotifications]);
+
+  const unreadCount = recentActivities.filter(
+    (a) => !readIds.includes(a.id),
+  ).length;
+
+  // Ô tìm kiếm admin: điều hướng tới trang phù hợp dựa trên từ khoá.
+  //
+  // Lưu ý: từ khoá chỉ mang tính "định tuyến" (ví dụ "phụ tùng" → trang phụ tùng).
+  // Ta bỏ chính từ khoá định tuyến ra khỏi chuỗi lọc để bảng không bị lọc rỗng
+  // (tìm "phụ tùng" trong danh sách phụ tùng sẽ không ra dòng nào).
+  const ADMIN_ROUTES: {
+    match: RegExp;
+    to: string;
+    /** Các từ khoá chỉ dùng để định tuyến — không đưa vào bộ lọc của bảng. */
+    routeWords: string[];
+  }[] = [
+    {
+      match: /đơn|order|ord-/,
+      to: "/admin/orders",
+      routeWords: ["đơn", "đơn hàng", "order", "orders"],
+    },
+    {
+      match: /xe|vehicle|khách|customer/,
+      to: "/admin/vehicles",
+      routeWords: ["xe", "xe của khách", "vehicle", "khách", "khách hàng", "customer"],
+    },
+    {
+      match: /phụ tùng|phụ kiện|part|kho|stock/,
+      to: "/admin/parts",
+      routeWords: ["phụ tùng", "phụ kiện", "part", "parts", "kho"],
+    },
+    {
+      match: /dịch vụ|service/,
+      to: "/admin/services",
+      routeWords: ["dịch vụ", "service", "services"],
+    },
+    {
+      match: /người dùng|user|tài khoản/,
+      to: "/admin/users",
+      routeWords: ["người dùng", "user", "users", "tài khoản"],
+    },
+  ];
+
+  const handleAdminSearch = (query: string) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+
+    const route = ADMIN_ROUTES.find((r) => r.match.test(q));
+    if (!route) {
+      navigate(`/admin/orders?q=${encodeURIComponent(query)}`);
+      t.info(
+        `Không xác định "${query}" thuộc mục nào — đang tìm trong danh sách đơn hàng.`,
+      );
+      return;
+    }
+
+    // Cắt bỏ các từ khoá chỉ dùng để định tuyến, phần còn lại mới lọc bảng.
+    let filter = q;
+    for (const w of route.routeWords) {
+      filter = filter.split(w).join(" ");
+    }
+    filter = filter.replace(/\s+/g, " ").trim();
+
+    navigate(
+      filter
+        ? `${route.to}?q=${encodeURIComponent(filter)}`
+        : route.to,
+    );
+  };
 
   return (
     <div className="min-h-screen bg-bgsoft/50 flex">
@@ -103,16 +205,12 @@ export default function AdminLayout() {
 
           {/* Search */}
           <div className="hidden md:flex flex-1 max-w-md">
-            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 w-full focus-within:bg-white focus-within:border-primary transition-colors">
-              <IconSearch size={16} className="text-ink-muted" />
-              <input
-                placeholder="Tìm đơn hàng, khách hàng, dịch vụ..."
-                className="flex-1 bg-transparent outline-none text-sm placeholder:text-ink-muted"
-              />
-              <kbd className="hidden lg:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border border-ink/15 bg-white text-ink-muted">
-                ⌘K
-              </kbd>
-            </div>
+            <SearchBox
+              className="w-full"
+              placeholder="Tìm đơn hàng, khách hàng, dịch vụ..."
+              shortcut
+              onNavigate={handleAdminSearch}
+            />
           </div>
 
           <div className="flex-1 md:flex-none" />
@@ -128,13 +226,103 @@ export default function AdminLayout() {
               <span className="hidden md:inline">Trang khách hàng</span>
             </Link>
 
-            <button
-              className="relative p-2 rounded-lg hover:bg-bgsoft text-ink-muted hover:text-ink"
-              aria-label="Thông báo"
-            >
-              <IconBell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
-            </button>
+            {/* Notifications */}
+            <div ref={notifRef} className="relative">
+              <button
+                onClick={() => setShowNotifications((v) => !v)}
+                className="relative p-2 rounded-lg hover:bg-bgsoft text-ink-muted hover:text-ink"
+                aria-label="Thông báo"
+                aria-expanded={showNotifications}
+                aria-haspopup="menu"
+              >
+                <IconBell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-cardHover border border-ink/10 z-40 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-ink/8">
+                    <span className="font-semibold text-sm">Thông báo</span>
+                    <button
+                      onClick={() => setReadIds(recentActivities.map((a) => a.id))}
+                      className="text-xs text-primary hover:underline font-medium"
+                    >
+                      Đánh dấu đã đọc
+                    </button>
+                  </div>
+
+                  <ul className="max-h-80 overflow-y-auto divide-y divide-ink/5">
+                    {recentActivities.map((a) => {
+                      const unread = !readIds.includes(a.id);
+                      return (
+                        <li key={a.id}>
+                          <button
+                            onClick={() =>
+                              setReadIds((prev) =>
+                                prev.includes(a.id) ? prev : [...prev, a.id],
+                              )
+                            }
+                            className={[
+                              "w-full text-left px-4 py-3 hover:bg-bgsoft transition-colors",
+                              unread ? "bg-primary/5" : "",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <span
+                                className={[
+                                  "mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
+                                  a.tone === "warning"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : a.tone === "success"
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : "bg-primary/10 text-primary",
+                                ].join(" ")}
+                              >
+                                {a.kind === "low_stock" ? (
+                                  <IconWarning size={13} />
+                                ) : a.kind === "new_user" ? (
+                                  <IconUsers size={13} />
+                                ) : (
+                                  <IconActivity size={13} />
+                                )}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-ink line-clamp-1">
+                                  {a.title}
+                                </div>
+                                <div className="text-xs text-ink-muted line-clamp-1">
+                                  {a.description}
+                                </div>
+                              </div>
+                              {unread && (
+                                <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />
+                              )}
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  <div className="px-4 py-2 border-t border-ink/8">
+                    <Link
+                      to="/admin/orders"
+                      onClick={() => setShowNotifications(false)}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Xem tất cả hoạt động
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* User avatar */}
             <div className="flex items-center gap-2 pl-2 border-l border-ink/10">

@@ -95,6 +95,7 @@ export function mapService(dto: ServiceResponse): CatalogService {
     rating: 0,
     reviewsCount: 0,
     bookingsCount: 0,
+    isActive: dto.isActive,
   };
 }
 
@@ -124,6 +125,7 @@ export function mapPart(dto: PartResponse): CatalogPart {
     reviewsCount: 0,
     isFeatured: false,
     isBestSeller: false,
+    isActive: dto.isActive,
   };
 }
 
@@ -170,12 +172,24 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         const mappedServices = svcRes.items.map(mapService);
         const mappedParts = partRes.items.map(mapPart);
 
+        // Phân biệt 2 trường hợp rất khác nhau:
+        //  1. API lỗi / không kết nối được  → dùng mock, usingFallback = true.
+        //  2. API OK nhưng catalog rỗng       → dùng mock, usingFallback = true,
+        //     và báo rõ "máy chủ chưa có dữ liệu" thay vì im lặng.
+        // Trường hợp 2 trước đây set usingFallback = false nên UI hiển thị mock
+        // mà không có cảnh báo nào — người dùng tưởng đang xem dữ liệu thật.
+        const isEmpty = mappedServices.length === 0 && mappedParts.length === 0;
+
         setServices(mappedServices.length > 0 ? mappedServices : mockServices);
         setParts(mappedParts.length > 0 ? mappedParts : mockParts);
         setServiceCategories(svcCatRes.items ?? []);
         setPartCategories(partCatRes.items ?? []);
-        setError(null);
-        setUsingFallback(false);
+        setError(
+          isEmpty
+            ? "Máy chủ chưa có dữ liệu catalog (dịch vụ / phụ tùng)."
+            : null,
+        );
+        setUsingFallback(isEmpty);
       } catch (err) {
         if (cancelled) return;
         // Rơi về dữ liệu mẫu — web vẫn hiển thị được, chỉ mất dữ liệu thật.
