@@ -72,6 +72,7 @@ class WorkOrderCompletionTransactionTest {
                 eventPublisher);
         workOrder = WorkOrder.builder()
                 .id(workOrderId)
+                .code("WO-" + workOrderId)
                 .customerId(customerId)
                 .vehicleId(vehicleId)
                 .status(WorkOrderStatus.IN_PROGRESS)
@@ -130,6 +131,7 @@ class WorkOrderCompletionTransactionTest {
         verify(eventPublisher).publish(eventCaptor.capture());
         WorkOrderCompletedEvent event = eventCaptor.getValue();
         assertEquals(workOrderId, event.workOrderId());
+        assertEquals(workOrder.getCode(), event.workOrderCode());
         assertEquals(customerId, event.customerId());
         assertEquals(vehicleId, event.vehicleId());
         assertEquals(1, event.services().size());

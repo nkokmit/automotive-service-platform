@@ -95,6 +95,7 @@ public class WorkOrderCompletionTransaction {
         eventPublisher.publish(new WorkOrderCompletedEvent(
                 UUID.randomUUID(),
                 workOrder.getId(),
+                workOrder.getCode(),
                 workOrder.getCustomerId(),
                 workOrder.getVehicleId(),
                 completedServices,

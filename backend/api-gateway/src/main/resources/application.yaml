@@ -81,6 +81,16 @@ spring:
               predicates:
                 - Path=/api/payments,/api/payments/**
 
+            - id: notification-service-notifications
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/notifications,/api/notifications/**
+
+            - id: notification-service-templates
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/notification-templates,/api/notification-templates/**
+
             - id: staff-service-staff
               uri: lb://staff-service
               predicates:

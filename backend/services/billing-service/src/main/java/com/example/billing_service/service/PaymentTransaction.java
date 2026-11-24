@@ -76,7 +76,14 @@ public class PaymentTransaction {
                     "billing.payment-completed",
                     "PaymentCompletedEvent",
                     eventId -> new PaymentCompletedEvent(
-                            eventId, invoice.getId(), invoice.getWorkOrderId(), newPaidAmount, paidAt)
+                            eventId,
+                            invoice.getId(),
+                            invoice.getCode(),
+                            invoice.getWorkOrderId(),
+                            invoice.getCustomerId(),
+                            invoice.getVehicleId(),
+                            newPaidAmount,
+                            paidAt)
             );
         } else {
             invoice.setStatus(InvoiceStatus.PARTIALLY_PAID);

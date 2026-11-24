@@ -185,8 +185,11 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 
 Giá trị mặc định trong `application.yaml` đã là `localhost:9092`, nên khi chạy
 từ IDE thường không cần khai báo. Chỉ cần override nếu bạn đổi `KAFKA_PORT`.
-Lưu ý chỉ có **hạ tầng Kafka** (broker + producer/consumer config); chưa có
-service nào phát hoặc nhận event, nên topic sẽ không tự xuất hiện.
+Kafka đang được một số service sử dụng cho các luồng nghiệp vụ; không phải mọi
+topic đã cấu hình consumer đều có producer. Ví dụ, notification hiện có consumer
+cho `booking.confirmed` nhưng booking chưa có transition xác nhận riêng, và
+`inventory.low-stock-alert` chưa có producer. Việc topic tự được tạo phụ thuộc
+cấu hình broker.
 
 Ngoài ra:
 

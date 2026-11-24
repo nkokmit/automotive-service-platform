@@ -26,9 +26,12 @@ import com.example.work_order_service.integration.contract.InternalPartCatalogCo
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
 import com.example.work_order_service.mapper.EstimateMapper;
+import com.example.work_order_service.messaging.event.EstimateApprovedEvent;
+import com.example.work_order_service.messaging.event.EstimatePendingApprovalEvent;
 import com.example.work_order_service.messaging.event.PartReservationItem;
 import com.example.work_order_service.messaging.event.PartsReservationRequestedEvent;
 import com.example.work_order_service.messaging.event.WorkOrderCanceledEvent;
+import com.example.work_order_service.messaging.producer.EstimateEventPublisher;
 import com.example.work_order_service.messaging.producer.PartsReservationRequestPublisher;
 import com.example.work_order_service.messaging.producer.WorkOrderCanceledEventPublisher;
 import com.example.work_order_service.repository.EstimateRepository;
@@ -41,6 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -60,6 +64,7 @@ public class EstimateTransaction {
     private final EstimateMapper mapper;
     private final PartsReservationRequestPublisher reservationRequestPublisher;
     private final WorkOrderCanceledEventPublisher canceledEventPublisher;
+    private final EstimateEventPublisher estimateEventPublisher;
 
     @Transactional
     public EstimateResponse create(UUID workOrderId, CreateEstimateRequest request, UUID createdBy) {
@@ -224,6 +229,15 @@ public class EstimateTransaction {
 
         estimate.setStatus(EstimateStatus.PENDING_APPROVAL);
         estimateRepository.save(estimate);
+        estimateEventPublisher.publishPendingApproval(new EstimatePendingApprovalEvent(
+                UUID.randomUUID(),
+                estimate.getId(),
+                estimate.getCode(),
+                workOrder.getId(),
+                workOrder.getCode(),
+                workOrder.getCustomerId(),
+                workOrder.getVehicleId(),
+                Instant.now()));
         return toResponse(estimate);
     }
 
@@ -303,6 +317,16 @@ public class EstimateTransaction {
                                         line.getId(), line.getPartId(), line.getRequestedQuantity()))
                                 .toList()));
             }
+            WorkOrder workOrder = estimate.getWorkOrder();
+            estimateEventPublisher.publishApproved(new EstimateApprovedEvent(
+                    UUID.randomUUID(),
+                    estimate.getId(),
+                    estimate.getCode(),
+                    workOrder.getId(),
+                    workOrder.getCode(),
+                    workOrder.getAdvisorId(),
+                    estimate.getStatus(),
+                    Instant.now()));
         }
         return toResponse(estimate);
     }

@@ -8,14 +8,17 @@ import com.example.booking_service.entity.BookingService;
 import com.example.booking_service.enums.BookingStatus;
 import com.example.booking_service.exception.ApiException;
 import com.example.booking_service.exception.ErrorCode;
+import com.example.booking_service.messaging.BookingCanceledDomainEvent;
 import com.example.booking_service.repository.BookingRepository;
 import com.example.booking_service.repository.BookingServiceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -49,6 +52,8 @@ class BookingTransactionServiceImplManageTest {
     private CapacityCheckService capacityCheckService;
     @Mock
     private BookingStatusHistoryService bookingStatusHistoryService;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private BookingTransactionServiceImpl service;
     private Booking booking;
@@ -57,7 +62,8 @@ class BookingTransactionServiceImplManageTest {
     @BeforeEach
     void setUp() {
         service = new BookingTransactionServiceImpl(bookingRepository, bookingServiceRepository,
-                capacityCheckService, bookingStatusHistoryService, ZoneId.of("Asia/Ho_Chi_Minh"));
+                capacityCheckService, bookingStatusHistoryService, applicationEventPublisher,
+                ZoneId.of("Asia/Ho_Chi_Minh"));
         Instant start = Instant.now().plusSeconds(86_400);
         booking = Booking.builder()
                 .id(BOOKING_ID)
@@ -106,6 +112,12 @@ class BookingTransactionServiceImplManageTest {
         order.verify(bookingStatusHistoryService).recordTransition(
                 booking, BookingStatus.CONFIRMED, BookingStatus.CANCELLED, USER_ID, "Customer request");
         order.verify(bookingRepository).saveAndFlush(booking);
+        ArgumentCaptor<Object> event = ArgumentCaptor.forClass(Object.class);
+        verify(applicationEventPublisher).publishEvent(event.capture());
+        BookingCanceledDomainEvent canceledEvent = (BookingCanceledDomainEvent) event.getValue();
+        assertEquals(BOOKING_ID, canceledEvent.bookingId());
+        assertEquals(CUSTOMER_ID, canceledEvent.customerId());
+        assertEquals("Customer request", canceledEvent.reason());
     }
 
     @Test
@@ -122,6 +134,7 @@ class BookingTransactionServiceImplManageTest {
         verify(bookingRepository, never()).insertCapacityDayLockIfAbsent(any());
         verify(bookingStatusHistoryService, never()).recordTransition(any(), any(), any(), any(), any());
         verify(bookingRepository, never()).saveAndFlush(any());
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     @Test

@@ -13,9 +13,12 @@ import com.example.booking_service.enums.BookingStatus;
 import com.example.booking_service.exception.ApiException;
 import com.example.booking_service.exception.ErrorCode;
 import com.example.booking_service.mapper.BookingMapper;
+import com.example.booking_service.messaging.BookingCanceledDomainEvent;
+import com.example.booking_service.messaging.BookingCreatedDomainEvent;
 import com.example.booking_service.repository.BookingRepository;
 import com.example.booking_service.repository.BookingServiceRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +40,7 @@ public class BookingTransactionServiceImpl implements BookingTransactionService 
     private final BookingServiceRepository bookingServiceRepository;
     private final CapacityCheckService capacityCheckService;
     private final BookingStatusHistoryService bookingStatusHistoryService;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final ZoneId scheduleZoneId;
 
     @Override
@@ -103,6 +107,12 @@ public class BookingTransactionServiceImpl implements BookingTransactionService 
         }
         bookingServiceRepository.saveAll(serviceEntities);
         bookingStatusHistoryService.recordInitialStatus(saved, changedBy, initialReason);
+        applicationEventPublisher.publishEvent(new BookingCreatedDomainEvent(
+                UUID.randomUUID(),
+                saved.getId(),
+                saved.getCustomerId(),
+                saved.getStartAt(),
+                Instant.now()));
 
         return BookingMapper.toResponse(saved, serviceEntities);
     }
@@ -207,6 +217,13 @@ public class BookingTransactionServiceImpl implements BookingTransactionService 
         bookingStatusHistoryService.recordTransition(
                 booking, previousStatus, BookingStatus.CANCELLED, changedBy, reason);
         bookingRepository.saveAndFlush(booking);
+        applicationEventPublisher.publishEvent(new BookingCanceledDomainEvent(
+                UUID.randomUUID(),
+                booking.getId(),
+                booking.getCustomerId(),
+                booking.getStartAt(),
+                reason,
+                Instant.now()));
         return responseFor(booking);
     }
 

@@ -20,6 +20,8 @@ app:
       parts-reservation-failed: ${PARTS_RESERVATION_FAILED_TOPIC:parts-reservation-failed}
       work-order-completed: ${WORK_ORDER_COMPLETED_TOPIC:work-order-completed}
       work-order-canceled: ${WORK_ORDER_CANCELED_TOPIC:work-order-canceled}
+      estimate-pending-approval: ${ESTIMATE_PENDING_APPROVAL_TOPIC:work-order.estimate-pending-approval}
+      estimate-approved: ${ESTIMATE_APPROVED_TOPIC:work-order.estimate-approved}
 
 spring:
   application:

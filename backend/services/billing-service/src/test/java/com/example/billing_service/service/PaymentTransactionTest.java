@@ -6,6 +6,7 @@ import com.example.billing_service.enums.InvoiceStatus;
 import com.example.billing_service.enums.PaymentMethod;
 import com.example.billing_service.exception.ApiException;
 import com.example.billing_service.mapper.InvoiceMapper;
+import com.example.billing_service.messaging.event.PaymentCompletedEvent;
 import com.example.billing_service.repository.InvoiceRepository;
 import com.example.billing_service.repository.PaymentRepository;
 import org.junit.jupiter.api.Test;
@@ -18,11 +19,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -48,6 +51,18 @@ class PaymentTransactionTest {
         when(invoiceRepository.findByIdForUpdate(invoice.getId())).thenReturn(Optional.of(invoice));
         when(paymentRepository.findByIdempotencyKey(any())).thenReturn(Optional.empty());
         when(paymentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+            Function<UUID, ?> eventFactory = invocation.getArgument(4);
+            PaymentCompletedEvent event = (PaymentCompletedEvent) eventFactory.apply(UUID.randomUUID());
+            assertEquals(invoice.getId(), event.invoiceId());
+            assertEquals(invoice.getCode(), event.invoiceCode());
+            assertEquals(invoice.getCustomerId(), event.customerId());
+            assertEquals(invoice.getVehicleId(), event.vehicleId());
+            return null;
+        }).when(outboxEventService).add(
+                eq("WORK_ORDER"), eq(invoice.getWorkOrderId()), eq("billing.payment-completed"),
+                eq("PaymentCompletedEvent"), any()
+        );
 
         transaction.record(
                 new PaymentCreateRequest(invoice.getId(), UUID.randomUUID(), PaymentMethod.CASH,
@@ -81,6 +96,7 @@ class PaymentTransactionTest {
     private Invoice invoice(BigDecimal grandTotal, BigDecimal paidAmount) {
         return Invoice.builder()
                 .id(UUID.randomUUID())
+                .code("INV-" + UUID.randomUUID())
                 .workOrderId(UUID.randomUUID())
                 .customerId(UUID.randomUUID())
                 .vehicleId(UUID.randomUUID())
