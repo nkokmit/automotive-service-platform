@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -35,6 +36,8 @@ class StaffBookingTransactionServiceImplTest {
     private static final UUID BOOKING_ID = UUID.randomUUID();
     private static final UUID STAFF_ID = UUID.randomUUID();
     private static final UUID VEHICLE_ID = UUID.randomUUID();
+    private static final Instant NOW = Instant.parse("2026-11-24T16:30:00Z");
+    private static final Clock CLOCK = Clock.fixed(NOW, ZoneId.of("UTC"));
 
     @Mock
     private BookingRepository bookingRepository;
@@ -50,7 +53,7 @@ class StaffBookingTransactionServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new StaffBookingTransactionServiceImpl(bookingRepository, bookingServiceRepository,
-                historyService, ZoneId.of("Asia/Ho_Chi_Minh"), eventPublisher);
+                historyService, ZoneId.of("Asia/Ho_Chi_Minh"), CLOCK, eventPublisher);
         lenient().when(bookingServiceRepository.findAllByBookingIds(any())).thenReturn(List.of());
     }
 
@@ -64,7 +67,7 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void checkInRequiresLinkedVehicle() {
-        booking(BookingStatus.CONFIRMED, Instant.now(), null);
+        booking(BookingStatus.CONFIRMED, NOW, null);
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.checkIn(BOOKING_ID, null, null, 1200, null, null, STAFF_ID));
@@ -75,7 +78,7 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void checkInMovesConfirmedBookingToCheckedIn() {
-        Booking booking = booking(BookingStatus.CONFIRMED, Instant.now(), VEHICLE_ID);
+        Booking booking = booking(BookingStatus.CONFIRMED, NOW, VEHICLE_ID);
 
         service.checkIn(BOOKING_ID, null, null, 1200, null, null, STAFF_ID);
 
@@ -94,7 +97,7 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void checkInIsIdempotent() {
-        booking(BookingStatus.CHECKED_IN, Instant.now(), VEHICLE_ID);
+        booking(BookingStatus.CHECKED_IN, NOW, VEHICLE_ID);
 
         service.checkIn(BOOKING_ID, null, null, 1200, null, null, STAFF_ID);
 
@@ -104,7 +107,7 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void noShowOnlyAfterStartTime() {
-        booking(BookingStatus.CONFIRMED, Instant.now().plusSeconds(3600), null);
+        booking(BookingStatus.CONFIRMED, NOW.plusSeconds(3600), null);
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.updateStatus(BOOKING_ID, BookingStatus.NO_SHOW, null, STAFF_ID));
@@ -114,7 +117,7 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void noShowAfterStartTimeIsRecorded() {
-        Booking booking = booking(BookingStatus.CONFIRMED, Instant.now().minusSeconds(3600), null);
+        Booking booking = booking(BookingStatus.CONFIRMED, NOW.minusSeconds(3600), null);
 
         service.updateStatus(BOOKING_ID, BookingStatus.NO_SHOW, null, STAFF_ID);
 
@@ -124,7 +127,7 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void genericStatusEndpointRejectsCancelAndCheckedIn() {
-        booking(BookingStatus.CONFIRMED, Instant.now().plusSeconds(3600), null);
+        booking(BookingStatus.CONFIRMED, NOW.plusSeconds(3600), null);
 
         assertThrows(ApiException.class,
                 () -> service.updateStatus(BOOKING_ID, BookingStatus.CANCELLED, null, STAFF_ID));
@@ -134,7 +137,7 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void checkInRejectsVehiclePlateMismatch() {
-        booking(BookingStatus.CONFIRMED, Instant.now(), null);
+        booking(BookingStatus.CONFIRMED, NOW, null);
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "30H-99999", 1200, null, null, STAFF_ID));
@@ -144,7 +147,7 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void checkInLinksVehicleWhenPlateFormattingMatches() {
-        Booking booking = booking(BookingStatus.CONFIRMED, Instant.now(), null);
+        Booking booking = booking(BookingStatus.CONFIRMED, NOW, null);
 
         service.checkIn(BOOKING_ID, VEHICLE_ID, "51a 12345", 1200, "Minor damage", "Call first", STAFF_ID);
         assertEquals(VEHICLE_ID, booking.getVehicleId());
@@ -153,11 +156,23 @@ class StaffBookingTransactionServiceImplTest {
 
     @Test
     void checkInRejectsDifferentVehicleWhenAlreadyLinked() {
-        booking(BookingStatus.CONFIRMED, Instant.now().plusSeconds(3600), UUID.randomUUID());
+        booking(BookingStatus.CONFIRMED, NOW.plusSeconds(600), UUID.randomUUID());
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "51A-12345", 1200, null, null, STAFF_ID));
 
         assertEquals(ErrorCode.VEHICLE_ALREADY_LINKED, ex.getErrorCode());
+    }
+
+    @Test
+    void checkInRejectsBookingOnNextLocalDayBeforeCheckingVehicle() {
+        booking(BookingStatus.CONFIRMED, NOW.plusSeconds(3600), UUID.randomUUID());
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.checkIn(BOOKING_ID, VEHICLE_ID, "51A-12345", 1200, null, null, STAFF_ID));
+
+        assertEquals(ErrorCode.CHECK_IN_REQUIREMENTS_NOT_MET, ex.getErrorCode());
+        verify(historyService, never()).recordTransition(any(), any(), any(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 }

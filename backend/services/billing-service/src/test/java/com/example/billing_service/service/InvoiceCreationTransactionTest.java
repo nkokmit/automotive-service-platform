@@ -108,6 +108,7 @@ class InvoiceCreationTransactionTest {
         var response = transaction.createFromCompletedEvent(new WorkOrderCompletedEvent(
                 UUID.randomUUID(),
                 workOrderId,
+                "WO-" + workOrderId,
                 customerId,
                 vehicleId,
                 List.of(new WorkOrderCompletedEvent.WorkOrderCompletedServiceItem(

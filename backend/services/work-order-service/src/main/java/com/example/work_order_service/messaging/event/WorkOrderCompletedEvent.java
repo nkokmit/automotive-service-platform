@@ -8,6 +8,7 @@ import java.util.UUID;
 public record WorkOrderCompletedEvent(
         UUID eventId,
         UUID workOrderId,
+        String workOrderCode,
         UUID customerId,
         UUID vehicleId,
         List<WorkOrderCompletedServiceItem> services,

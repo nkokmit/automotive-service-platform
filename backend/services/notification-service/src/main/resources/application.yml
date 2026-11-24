@@ -1,0 +1,112 @@
+server:
+  port: ${SERVER_PORT:8088}
+
+spring:
+  application:
+    name: notification-service
+
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/notification_service}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      fail-fast: false
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:notification-service-group}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.use.type.headers: false
+        spring.json.trusted.packages: com.example.notification_service.messaging.event
+    listener:
+      missing-topics-fatal: false
+      ack-mode: record
+      retry:
+        enabled: false
+      dlt:
+        suffix: .DLT
+
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: ${FEIGN_CONNECT_TIMEOUT_MS:2000}
+            read-timeout: ${FEIGN_READ_TIMEOUT_MS:5000}
+
+app:
+  kafka:
+    topics:
+      work-order-completed: ${WORK_ORDER_COMPLETED_TOPIC:work-order-completed}
+      payment-completed: ${PAYMENT_COMPLETED_TOPIC:billing.payment-completed}
+      parts-reservation-failed: ${PARTS_RESERVATION_FAILED_TOPIC:parts-reservation-failed}
+      booking-created: ${BOOKING_CREATED_TOPIC:booking.created}
+      booking-confirmed: ${BOOKING_CONFIRMED_TOPIC:booking.confirmed}
+      booking-canceled: ${BOOKING_CANCELED_TOPIC:booking.canceled}
+      estimate-pending-approval: ${ESTIMATE_PENDING_APPROVAL_TOPIC:work-order.estimate-pending-approval}
+      estimate-approved: ${ESTIMATE_APPROVED_TOPIC:work-order.estimate-approved}
+      low-stock-alert: ${LOW_STOCK_ALERT_TOPIC:inventory.low-stock-alert}
+  email:
+    brevo:
+      api-url: ${BREVO_API_URL:https://api.brevo.com/v3/smtp/email}
+      api-key: ${BREVO_API_KEY:}
+      sender-email: ${BREVO_SENDER_EMAIL:}
+      sender-name: ${BREVO_SENDER_NAME:Automotive Service}
+  notification:
+    email-poll-interval-ms: ${EMAIL_POLL_INTERVAL_MS:2000}
+  integration:
+    customer-vehicle-service-url: ${CUSTOMER_VEHICLE_SERVICE_URL:http://customer-vehicle-service:8082}
+    user-service-url: ${USER_SERVICE_URL:http://user-service:8081}
+    staff-service-url: ${STAFF_SERVICE_URL:http://staff-service:8083}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    registry-fetch-interval-seconds: ${EUREKA_REGISTRY_FETCH_INTERVAL:10}
+    register-with-eureka: ${EUREKA_REGISTER:true}
+    fetch-registry: ${EUREKA_FETCH:true}
+  instance:
+    prefer-ip-address: true
+
+jwt:
+  secret: ${JWT_SECRET}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.example.notification_service: ${APP_LOG_LEVEL:INFO}

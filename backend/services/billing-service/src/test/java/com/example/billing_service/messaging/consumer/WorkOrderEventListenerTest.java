@@ -43,7 +43,7 @@ class WorkOrderEventListenerTest {
                 .thenReturn(0);
 
         listener.onWorkOrderCompleted(new WorkOrderCompletedEvent(
-                eventId, workOrderId, UUID.randomUUID(), UUID.randomUUID(), List.of(), List.of(),
+                eventId, workOrderId, "WO-" + workOrderId, UUID.randomUUID(), UUID.randomUUID(), List.of(), List.of(),
                 BigDecimal.ZERO, Instant.now()));
 
         verify(invoiceCreationTransaction, never()).createFromCompletedEvent(

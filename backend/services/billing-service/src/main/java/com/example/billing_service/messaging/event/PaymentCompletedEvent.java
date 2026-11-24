@@ -7,7 +7,10 @@ import java.util.UUID;
 public record PaymentCompletedEvent(
         UUID eventId,
         UUID invoiceId,
+        String invoiceCode,
         UUID workOrderId,
+        UUID customerId,
+        UUID vehicleId,
         BigDecimal paidAmount,
         Instant paidAt
 ) {

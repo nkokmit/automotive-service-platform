@@ -23,6 +23,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
     private final BookingServiceRepository bookingServiceRepository;
     private final BookingStatusHistoryService bookingStatusHistoryService;
     private final ZoneId scheduleZoneId;
+    private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -139,7 +141,7 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
                     "Chỉ tiếp nhận lịch hẹn CONFIRMED");
         }
         if (!booking.getStartAt().atZone(scheduleZoneId).toLocalDate()
-                .equals(Instant.now().atZone(scheduleZoneId).toLocalDate())) {
+                .equals(Instant.now(clock).atZone(scheduleZoneId).toLocalDate())) {
             throw new ApiException(ErrorCode.CHECK_IN_REQUIREMENTS_NOT_MET,
                     "Chỉ tiếp nhận trong ngày hẹn");
         }
@@ -150,7 +152,7 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
             throw new ApiException(ErrorCode.CHECK_IN_REQUIREMENTS_NOT_MET,
                     "Cần xác minh và liên kết xe chính thức trước khi tiếp nhận");
         }
-        booking.setCheckedInAt(Instant.now());
+        booking.setCheckedInAt(Instant.now(clock));
         bookingStatusHistoryService.recordTransition(
                 booking, BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN, staffUserId, "STAFF_CHECK_IN");
         bookingRepository.saveAndFlush(booking);
@@ -174,7 +176,7 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
                 odometerIn,
                 vehicleCondition,
                 customerNote,
-                Instant.now()));
+                Instant.now(clock)));
     }
 
     /** Chỉ cho phép NO_SHOW (CONFIRMED, đã quá giờ hẹn) và FULFILLED (CHECKED_IN). */
@@ -192,7 +194,7 @@ public class StaffBookingTransactionServiceImpl implements StaffBookingTransacti
                         || booking.getWorkOrderId() != null) {
                     throw invalid(current, target);
                 }
-                if (booking.getStartAt().isAfter(Instant.now())) {
+                if (booking.getStartAt().isAfter(Instant.now(clock))) {
                     throw new ApiException(ErrorCode.INVALID_BOOKING_STATUS_TRANSITION,
                             "Chỉ ghi nhận no-show sau thời điểm hẹn");
                 }

@@ -23,7 +23,10 @@ import com.example.work_order_service.integration.contract.InternalServiceBomCon
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
 import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
 import com.example.work_order_service.mapper.EstimateMapper;
+import com.example.work_order_service.messaging.event.EstimateApprovedEvent;
+import com.example.work_order_service.messaging.event.EstimatePendingApprovalEvent;
 import com.example.work_order_service.messaging.event.PartsReservationRequestedEvent;
+import com.example.work_order_service.messaging.producer.EstimateEventPublisher;
 import com.example.work_order_service.messaging.producer.PartsReservationRequestPublisher;
 import com.example.work_order_service.messaging.producer.WorkOrderCanceledEventPublisher;
 import com.example.work_order_service.repository.EstimateRepository;
@@ -49,6 +52,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -72,6 +76,8 @@ class EstimateTransactionTest {
     @Mock
     private WorkOrderCanceledEventPublisher canceledEventPublisher;
     @Mock
+    private EstimateEventPublisher estimateEventPublisher;
+    @Mock
     private WorkOrderPartTransaction workOrderPartTransaction;
 
     private EstimateTransaction transaction;
@@ -90,11 +96,19 @@ class EstimateTransactionTest {
                 partLineRepository,
                 new EstimateMapper(),
                 reservationRequestPublisher,
-                canceledEventPublisher);
+                canceledEventPublisher,
+                estimateEventPublisher);
+        UUID workOrderId = UUID.randomUUID();
         estimate = Estimate.builder()
                 .id(ESTIMATE_ID)
                 .code("EST-" + ESTIMATE_ID)
-                .workOrder(WorkOrder.builder().id(UUID.randomUUID()).build())
+                .workOrder(WorkOrder.builder()
+                        .id(workOrderId)
+                        .code("WO-" + workOrderId)
+                        .customerId(UUID.randomUUID())
+                        .vehicleId(UUID.randomUUID())
+                        .advisorId(UUID.randomUUID())
+                        .build())
                 .type(EstimateType.INITIAL)
                 .status(EstimateStatus.DRAFT)
                 .totalLaborAmount(BigDecimal.ZERO)
@@ -332,6 +346,15 @@ class EstimateTransactionTest {
         assertEquals(WorkOrderStatus.PENDING_APPROVAL, workOrder.getStatus());
         verify(workOrderRepository).saveAndFlush(workOrder);
         verify(statusHistoryRepository).save(any());
+        org.mockito.ArgumentCaptor<EstimatePendingApprovalEvent> eventCaptor =
+                org.mockito.ArgumentCaptor.forClass(EstimatePendingApprovalEvent.class);
+        verify(estimateEventPublisher).publishPendingApproval(eventCaptor.capture());
+        assertEquals(ESTIMATE_ID, eventCaptor.getValue().estimateId());
+        assertEquals(estimate.getCode(), eventCaptor.getValue().estimateCode());
+        assertEquals(workOrder.getId(), eventCaptor.getValue().workOrderId());
+        assertEquals(workOrder.getCode(), eventCaptor.getValue().workOrderCode());
+        assertEquals(workOrder.getCustomerId(), eventCaptor.getValue().customerId());
+        assertEquals(workOrder.getVehicleId(), eventCaptor.getValue().vehicleId());
     }
 
     @Test
@@ -347,6 +370,7 @@ class EstimateTransactionTest {
         assertEquals(WorkOrderStatus.IN_PROGRESS, workOrder.getStatus());
         verify(workOrderRepository, never()).saveAndFlush(any());
         verify(statusHistoryRepository, never()).save(any());
+        verify(estimateEventPublisher).publishPendingApproval(any(EstimatePendingApprovalEvent.class));
     }
 
     @Test
@@ -394,6 +418,11 @@ class EstimateTransactionTest {
         assertEquals(EstimateStatus.PARTIALLY_APPROVED, result.status());
         assertEquals(WorkOrderStatus.IN_PROGRESS, estimate.getWorkOrder().getStatus());
         verify(reservationRequestPublisher, never()).publish(any(PartsReservationRequestedEvent.class));
+        org.mockito.ArgumentCaptor<EstimateApprovedEvent> eventCaptor =
+                org.mockito.ArgumentCaptor.forClass(EstimateApprovedEvent.class);
+        verify(estimateEventPublisher).publishApproved(eventCaptor.capture());
+        assertEquals(EstimateStatus.PARTIALLY_APPROVED, eventCaptor.getValue().status());
+        assertEquals(estimate.getWorkOrder().getAdvisorId(), eventCaptor.getValue().advisorId());
     }
 
     @Test
@@ -477,6 +506,7 @@ class EstimateTransactionTest {
 
         assertEquals(EstimateStatus.PENDING_APPROVAL, pendingResult.status());
         assertEquals(WorkOrderServiceStatus.PENDING, secondLine.getStatus());
+        verify(estimateEventPublisher, never()).publishApproved(any(EstimateApprovedEvent.class));
 
         var finalResult = transaction.decide(ESTIMATE_ID, new EstimateDecisionRequest(List.of(
                 new EstimateItemDecisionRequest(
@@ -484,6 +514,7 @@ class EstimateTransactionTest {
                 UUID.randomUUID());
 
         assertEquals(EstimateStatus.APPROVED, finalResult.status());
+        verify(estimateEventPublisher, times(1)).publishApproved(any(EstimateApprovedEvent.class));
     }
 
     @Test

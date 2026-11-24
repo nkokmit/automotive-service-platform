@@ -10,6 +10,7 @@ import com.example.booking_service.entity.BookingService;
 import com.example.booking_service.enums.BookingStatus;
 import com.example.booking_service.exception.ApiException;
 import com.example.booking_service.exception.ErrorCode;
+import com.example.booking_service.messaging.BookingCreatedDomainEvent;
 import com.example.booking_service.repository.BookingRepository;
 import com.example.booking_service.repository.BookingServiceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -51,6 +53,8 @@ class BookingTransactionServiceImplCreateTest {
     private CapacityCheckService capacityCheckService;
     @Mock
     private BookingStatusHistoryService bookingStatusHistoryService;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private BookingTransactionServiceImpl service;
     private BookingCreateRequest request;
@@ -60,9 +64,9 @@ class BookingTransactionServiceImplCreateTest {
     @BeforeEach
     void setUp() {
         service = new BookingTransactionServiceImpl(
-                bookingRepository, bookingServiceRepository, capacityCheckService,                 bookingStatusHistoryService,
-                                java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
-                        request = new BookingCreateRequest(START, List.of(SERVICE_ID), "  51A-12345 ", "  note  ");
+                bookingRepository, bookingServiceRepository, capacityCheckService, bookingStatusHistoryService,
+                applicationEventPublisher, java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        request = new BookingCreateRequest(START, List.of(SERVICE_ID), "  51A-12345 ", "  note  ");
         serviceSlots = List.of(new ServiceSlot(SERVICE_ID, "Oil change", 30, 1));
         supply = List.of(new SupplyInterval(UUID.randomUUID(), START, END));
         when(bookingRepository.lockCapacityDay(LOCK_DATE)).thenReturn(java.sql.Date.valueOf(LOCK_DATE));
@@ -91,7 +95,7 @@ class BookingTransactionServiceImplCreateTest {
 
         ArgumentCaptor<Iterable<BookingService>> services = ArgumentCaptor.forClass(Iterable.class);
         InOrder order = inOrder(bookingRepository, capacityCheckService, bookingServiceRepository,
-                bookingStatusHistoryService);
+                bookingStatusHistoryService, applicationEventPublisher);
         order.verify(bookingRepository).insertCapacityDayLockIfAbsent(LOCK_DATE);
         order.verify(bookingRepository).lockCapacityDay(LOCK_DATE);
         order.verify(capacityCheckService).check(START, serviceSlots, supply);
@@ -100,6 +104,12 @@ class BookingTransactionServiceImplCreateTest {
         order.verify(bookingStatusHistoryService).recordInitialStatus(
                 any(Booking.class), org.mockito.ArgumentMatchers.eq(USER_ID), org.mockito.ArgumentMatchers.eq(
                         "CUSTOMER_BOOKING_CREATED"));
+        ArgumentCaptor<Object> event = ArgumentCaptor.forClass(Object.class);
+        order.verify(applicationEventPublisher).publishEvent(event.capture());
+        BookingCreatedDomainEvent createdEvent = (BookingCreatedDomainEvent) event.getValue();
+        assertEquals(response.id(), createdEvent.bookingId());
+        assertEquals(CUSTOMER_ID, createdEvent.customerId());
+        assertEquals(START, createdEvent.appointmentTime());
 
         BookingService savedLine = services.getValue().iterator().next();
         assertEquals(SERVICE_ID, savedLine.getServiceId());
@@ -122,5 +132,6 @@ class BookingTransactionServiceImplCreateTest {
         verify(bookingRepository, never()).save(any());
         verify(bookingServiceRepository, never()).saveAll(any());
         verify(bookingStatusHistoryService, never()).recordInitialStatus(any(), any(), any());
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 }
