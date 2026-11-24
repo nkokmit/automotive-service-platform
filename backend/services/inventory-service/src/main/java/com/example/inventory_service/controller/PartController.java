@@ -6,6 +6,7 @@ import com.example.inventory_service.common.PageableFactory;
 import com.example.inventory_service.dto.request.PartCompatibilityRequest;
 import com.example.inventory_service.dto.request.PartPricingRequest;
 import com.example.inventory_service.dto.request.PartRequest;
+import com.example.inventory_service.dto.request.StockAdjustmentRequest;
 import com.example.inventory_service.dto.request.StockAvailabilityRequest;
 import com.example.inventory_service.dto.request.StockOperationRequest;
 import com.example.inventory_service.dto.response.InventoryTransactionResponse;
@@ -128,6 +129,22 @@ public class PartController {
             description = "Phụ tùng đã bị vô hiệu hóa.")
     public void deletePart(@PathVariable UUID partId) {
         partService.deletePart(partId);
+    }
+
+    @PostMapping("/{partId}/stock")
+    @PreAuthorize("hasAuthority('STOCK_WRITE')")
+    @Operation(summary = "Nhập / hiệu chỉnh tồn kho",
+            description = "Điều chỉnh tồn kho thủ công cho một phụ tùng. "
+                    + "Mode ADD cộng thêm số lượng vào tồn thực (ghi sổ kho IMPORT); "
+                    + "mode SET đặt tồn thực bằng đúng số lượng (ghi sổ kho ADJUSTMENT). "
+                    + "Tồn thực không được thấp hơn tồn đã giữ chỗ.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về phụ tùng sau khi điều chỉnh tồn kho.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Phụ tùng không tồn tại hoặc số lượng không hợp lệ.")
+    public ApiResponse<PartResponse> adjustStock(@PathVariable UUID partId,
+                                                 @Valid @RequestBody StockAdjustmentRequest request) {
+        return ApiResponse.success("Cập nhật tồn kho thành công", stockService.adjustStock(partId, request));
     }
 
     @GetMapping("/{partId}/compatibilities")

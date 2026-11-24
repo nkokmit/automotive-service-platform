@@ -174,7 +174,10 @@ export function AdminTable<T extends { id: string }>({
   const handleDeleteClick = (row: T) => {
     if (onDelete) {
       // Page cha xử lý việc gọi API — hiện modal xác nhận, chờ promise xong.
-      setExternalDelete(onDelete);
+      // Phải bọc trong arrow function: nếu truyền thẳng `onDelete` vào
+      // `setState`, React coi nó là updater function và gọi ngay với state
+      // cũ (`null`), khiến handler bị chạy sai và lỗi "handler is not a function".
+      setExternalDelete(() => onDelete);
       setDeleteConfirm(row);
       return;
     }
@@ -630,6 +633,28 @@ export interface AdminFormField {
   options?: { value: string; label: string }[];
   required?: boolean;
   rows?: number;
+  /**
+   * Chỉ hiển thị ở những chế độ này. Bỏ trống = hiển thị ở cả thêm và sửa.
+   *
+   * <p>Ví dụ: tồn kho ban đầu chỉ có ở chế độ "add", còn điều chỉnh tồn
+   * kho chỉ có ở chế độ "edit".
+   */
+  modes?: ("add" | "edit")[];
+  /**
+   * Trường chỉ đọc — dùng cho giá trị hệ thống tự sinh (VD: SKU, mã đơn).
+   * Giá trị hiển thị lấy từ {@link derive} nếu có, không tính vào dữ liệu gửi.
+   */
+  readonly?: boolean;
+  /**
+   * Tính giá trị hiển thị từ các trường khác trong form (VD: xem trước SKU
+   * sẽ được backend tự sinh từ tên sản phẩm).
+   */
+  derive?: (
+    values: Record<string, string | number>,
+    mode: "add" | "edit",
+  ) => string;
+  /** Gợi ý nhỏ hiển thị dưới ô nhập. */
+  hint?: string;
 }
 
 export interface AdminFormProps<T> {
@@ -668,9 +693,14 @@ function FormModal({
   onSubmit: (values: Record<string, string | number>) => void | Promise<void>;
   submitting?: boolean;
 }) {
+  // Chỉ hiển thị trường thuộc chế độ hiện tại (thêm / sửa).
+  const visibleFields = fields.filter(
+    (f) => !f.modes || f.modes.includes(mode),
+  );
+
   const [values, setValues] = useState<Record<string, string | number>>(() => {
     const init: Record<string, string | number> = {};
-    for (const f of fields) {
+    for (const f of visibleFields) {
       const v = initial?.[f.key];
       init[f.key] = v === undefined || v === null ? "" : String(v);
     }
@@ -707,45 +737,66 @@ function FormModal({
           </button>
         </div>
         <div className="p-5 space-y-3">
-          {fields.map((f) => (
-            <div key={f.key}>
-              <label className="text-sm font-medium text-ink mb-1.5 block">
-                {f.label}
-                {f.required && <span className="text-red-500"> *</span>}
-              </label>
-              {f.type === "textarea" ? (
-                <textarea
-                  value={String(values[f.key] ?? "")}
-                  onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
-                  placeholder={f.placeholder}
-                  rows={f.rows ?? 3}
-                  className="w-full px-3 py-2 rounded-xl border border-ink/15 bg-white text-sm focus:border-primary focus:outline-none"
-                />
-              ) : f.type === "select" ? (
-                <select
-                  value={String(values[f.key] ?? "")}
-                  onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
-                  className="w-full h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm focus:border-primary focus:outline-none"
-                >
-                  <option value="">-- Chọn --</option>
-                  {f.options?.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  type={f.type}
-                  placeholder={f.placeholder}
-                  value={String(values[f.key] ?? "")}
-                  onChange={(e) =>
-                    setValues({ ...values, [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value })
-                  }
-                />
-              )}
-            </div>
-          ))}
+          {visibleFields.map((f) => {
+            const derived = f.derive ? f.derive(values, mode) : undefined;
+            const displayValue =
+              f.readonly && derived !== undefined ? derived : String(values[f.key] ?? "");
+            return (
+              <div key={f.key}>
+                <label className="text-sm font-medium text-ink mb-1.5 block">
+                  {f.label}
+                  {f.required && <span className="text-red-500"> *</span>}
+                </label>
+                {f.type === "textarea" ? (
+                  <textarea
+                    value={displayValue}
+                    disabled={f.readonly}
+                    onChange={(e) =>
+                      setValues({ ...values, [f.key]: e.target.value })
+                    }
+                    placeholder={f.placeholder}
+                    rows={f.rows ?? 3}
+                    className="w-full px-3 py-2 rounded-xl border border-ink/15 bg-white text-sm focus:border-primary focus:outline-none disabled:bg-bgsoft disabled:text-ink-muted"
+                  />
+                ) : f.type === "select" ? (
+                  <select
+                    value={displayValue}
+                    disabled={f.readonly}
+                    onChange={(e) =>
+                      setValues({ ...values, [f.key]: e.target.value })
+                    }
+                    className="w-full h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm focus:border-primary focus:outline-none disabled:bg-bgsoft disabled:text-ink-muted"
+                  >
+                    <option value="">-- Chọn --</option>
+                    {f.options?.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    type={f.type}
+                    placeholder={f.placeholder}
+                    value={displayValue}
+                    disabled={f.readonly}
+                    onChange={(e) =>
+                      setValues({
+                        ...values,
+                        [f.key]:
+                          f.type === "number"
+                            ? Number(e.target.value)
+                            : e.target.value,
+                      })
+                    }
+                  />
+                )}
+                {f.hint && (
+                  <span className="text-xs text-ink-muted">{f.hint}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="p-5 border-t border-ink/8 flex gap-2 justify-end sticky bottom-0 bg-white">
           <Button variant="outline" type="button" onClick={onClose} disabled={submitting}>

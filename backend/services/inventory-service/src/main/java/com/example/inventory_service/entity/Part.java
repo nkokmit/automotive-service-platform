@@ -39,6 +39,12 @@ public class Part {
     @Column(name = "brand", length = 100)
     private String brand;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "unit", length = 20, nullable = false)
     private String unit;
 

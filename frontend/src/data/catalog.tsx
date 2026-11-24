@@ -104,6 +104,14 @@ export function mapPart(dto: PartResponse): CatalogPart {
   const cost = Number(dto.costPrice ?? 0);
   // Giá vốn chỉ dùng làm "giá gốc" khi cao hơn giá bán (tức đang giảm giá).
   const hasDiscount = cost > selling && selling > 0;
+  // Ảnh do admin nhập; nếu không có thì rơi về ảnh dự phòng theo nhóm.
+  const image = dto.imageUrl?.trim() || partImageFor(dto.categoryName);
+  // Mô tả do admin nhập; không có thì dựng từ thông tin cơ bản.
+  const description =
+    dto.description?.trim() ||
+    (dto.oemCode
+      ? `Phụ tùng chính hãng. Mã OEM ${dto.oemCode}. Đơn vị: ${dto.unit}.`
+      : `Phụ tùng chính hãng. Đơn vị: ${dto.unit}.`);
   return {
     id: dto.id,
     slug: makeSlug(dto.name, dto.id),
@@ -116,10 +124,11 @@ export function mapPart(dto: PartResponse): CatalogPart {
     priceVND: selling,
     originalPriceVND: hasDiscount ? cost : undefined,
     stockQty: dto.availableStock ?? dto.onHandStock ?? 0,
-    image: partImageFor(dto.categoryName),
-    shortDescription: dto.oemCode
-      ? `Mã OEM ${dto.oemCode}. Đơn vị: ${dto.unit}.`
-      : `Phụ tùng chính hãng. Đơn vị: ${dto.unit}.`,
+    minStockLevel: dto.minStockLevel ?? 0,
+    image,
+    imageUrl: dto.imageUrl ?? null,
+    description: dto.description ?? null,
+    shortDescription: description,
     compatibleCars: [],
     rating: 0,
     reviewsCount: 0,
@@ -135,6 +144,21 @@ export function mapPart(dto: PartResponse): CatalogPart {
 
 const CatalogContext = createContext<CatalogState | null>(null);
 
+/**
+ * Sự kiện toàn cục báo "catalog phía server đã đổi".
+ *
+ * <p>Trang quản trị bắn sự kiện này sau khi thêm/sửa/xoá phụ tùng hoặc dịch
+ * vụ; `CatalogProvider` nghe và tải lại catalog để giao diện khách hàng không
+ * còn hiển thị sản phẩm đã bị ẩn.
+ */
+export const CATALOG_CHANGED_EVENT = "catalog:changed";
+
+/** Báo cho provider biết catalog trên server vừa thay đổi. */
+export function notifyCatalogChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(CATALOG_CHANGED_EVENT));
+}
+
 export function CatalogProvider({ children }: { children: ReactNode }) {
   const [services, setServices] = useState<CatalogService[]>(mockServices);
   const [parts, setParts] = useState<CatalogPart[]>(mockParts);
@@ -148,6 +172,12 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const [nonce, setNonce] = useState(0);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  // Admin vừa thêm/sửa/xoá → tải lại catalog cho giao diện khách hàng.
+  useEffect(() => {
+    window.addEventListener(CATALOG_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(CATALOG_CHANGED_EVENT, reload);
+  }, [reload]);
 
   // Đăng ký phụ tùng đang hiển thị cho cartStore để giỏ hàng tra cứu được
   // tên/giá khi catalog là dữ liệu thật từ inventory-service.

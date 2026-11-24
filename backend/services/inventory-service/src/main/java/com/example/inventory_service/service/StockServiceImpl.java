@@ -1,8 +1,10 @@
 package com.example.inventory_service.service;
 
+import com.example.inventory_service.dto.request.StockAdjustmentRequest;
 import com.example.inventory_service.dto.request.StockItemRequest;
 import com.example.inventory_service.dto.request.StockOperationRequest;
 import com.example.inventory_service.dto.response.InventoryTransactionResponse;
+import com.example.inventory_service.dto.response.PartResponse;
 import com.example.inventory_service.entity.InventoryTransaction;
 import com.example.inventory_service.entity.Part;
 import com.example.inventory_service.enums.ReferenceType;
@@ -13,6 +15,7 @@ import com.example.inventory_service.exception.InsufficientStockException;
 import com.example.inventory_service.exception.PartNotFoundException;
 import com.example.inventory_service.exception.ReservationNotFoundException;
 import com.example.inventory_service.mapper.InventoryTransactionMapper;
+import com.example.inventory_service.mapper.PartMapper;
 import com.example.inventory_service.repository.InventoryTransactionRepository;
 import com.example.inventory_service.repository.PartRepository;
 import com.example.inventory_service.security.CurrentActorIdProvider;
@@ -48,6 +51,7 @@ public class StockServiceImpl implements StockService {
     private final PartRepository partRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final InventoryTransactionMapper inventoryTransactionMapper;
+    private final PartMapper partMapper;
     private final CurrentActorIdProvider currentActorIdProvider;
 
     @Override
@@ -163,6 +167,67 @@ public class StockServiceImpl implements StockService {
         }
         return save(parts, ledger, operation == TransactionType.EXPORT ? "xuất kho" : "giải phóng giữ chỗ",
                 request.referenceId());
+    }
+
+    /**
+     * Nhập / hiệu chỉnh tồn kho thủ công.
+     *
+     * <p>Khác với luồng đơn nhập hàng (PO 3 bước), endpoint này cho phép admin
+     * nhập tồn đầu tiên hoặc sửa chênh lệch kiểm kê ngay tại màn hình quản trị.
+     * Mọi thay đổi vẫn được ghi vào sổ kho {@code inventory_transactions} để giữ
+     * nguyên tắc "mọi biến động tồn kho đều có bản ghi".
+     */
+    @Override
+    public PartResponse adjustStock(UUID partId, StockAdjustmentRequest request) {
+        Part part = partRepository.findByIdForUpdate(partId)
+                .orElseThrow(() -> new PartNotFoundException("Không tìm thấy phụ tùng với id: " + partId));
+
+        int before = part.getOnHandStock();
+        int reserved = part.getReservedStock();
+        int target;
+        TransactionType type;
+        int quantity;
+
+        if (request.mode() == StockAdjustmentRequest.StockAdjustmentMode.ADD) {
+            target = before + request.quantity();
+            type = TransactionType.IMPORT;
+            quantity = request.quantity();
+        } else {
+            target = request.quantity();
+            type = TransactionType.ADJUSTMENT;
+            quantity = Math.abs(target - before);
+        }
+
+        if (target < 0) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST, "Tồn kho không được âm");
+        }
+        if (target < reserved) {
+            throw new InsufficientStockException(
+                    "Tồn thực không thể thấp hơn tồn đã giữ chỗ (" + reserved + ") cho phụ tùng " + part.getSku());
+        }
+        if (quantity == 0) {
+            // Không có biến động -> không ghi sổ kho, chỉ trả về trạng thái hiện tại.
+            return partMapper.toResponse(part);
+        }
+
+        part.setOnHandStock(target);
+        partRepository.save(part);
+
+        InventoryTransaction transaction = InventoryTransaction.builder()
+                .part(part)
+                .type(type)
+                .quantity(quantity)
+                .stockBefore(before)
+                .stockAfter(target)
+                .referenceType(ReferenceType.MANUAL)
+                .referenceId(partId)
+                .createdBy(currentActorIdProvider.requireCurrentUserId())
+                .note(request.note() == null || request.note().isBlank() ? null : request.note().trim())
+                .build();
+        inventoryTransactionRepository.save(transaction);
+
+        log.info("Đã điều chỉnh tồn kho thủ công: partId={}, {} -> {} (type={})", partId, before, target, type);
+        return partMapper.toResponse(part);
     }
 
     /**

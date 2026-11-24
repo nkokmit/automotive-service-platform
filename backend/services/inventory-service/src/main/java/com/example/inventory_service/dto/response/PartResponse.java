@@ -15,6 +15,8 @@ public record PartResponse(
         String oemCode,
         String name,
         String brand,
+        String imageUrl,
+        String description,
         String unit,
         BigDecimal costPrice,
         BigDecimal sellingPrice,

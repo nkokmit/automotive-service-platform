@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconPackage,
-  IconStar,
   IconWarning,
   IconRefresh,
 } from "../../components/icons";
@@ -16,7 +15,7 @@ import {
 } from "../../components/AdminTable";
 import { inventoryApi } from "../../api/endpoints/inventory";
 import type { CategoryResponse } from "../../api/types";
-import { mapPart } from "../../data/catalog";
+import { mapPart, notifyCatalogChanged } from "../../data/catalog";
 import type { CatalogPart } from "../../data/catalog";
 import {
   formatCompactVND as compactVND,
@@ -26,7 +25,7 @@ import {
 // =========================
 // AdminParts — quản lý phụ tùng (kho)
 // Nguồn dữ liệu: GET/POST/PUT/DELETE /api/parts (inventory-service)
-// Cần authority: PART_READ (xem) / PART_WRITE (ghi)
+// Cần authority: PART_READ (xem) / PART_WRITE (ghi) / STOCK_WRITE (điều chỉnh tồn)
 // =========================
 
 const columns: AdminTableColumn<CatalogPart>[] = [
@@ -127,8 +126,13 @@ const filters: AdminTableFilter<CatalogPart>[] = [
   { id: "inactive", label: "Đã ẩn", predicate: (p) => p.isActive === false },
 ];
 
-/** Sinh SKU từ tên (VD: "Lốp Michelin 205/55R16" → "SP-LOP-MICHELIN-205-55R16"). */
-function generateSku(name: string): string {
+/**
+ * Xem trước mã SKU mà backend sẽ tự sinh từ tên sản phẩm.
+ *
+ * <p>Backend sinh mã dạng `PT-<SLUG-TÊN>-<4 KÝ TỰ NGẪU NHIÊN>`; phần hậu tố
+ * ngẫu nhiên không hiển thị trước được nên ta chỉ preview phần slug.
+ */
+function previewSku(name: string): string {
   const slug = name
     .toLowerCase()
     .normalize("NFD")
@@ -136,8 +140,10 @@ function generateSku(name: string): string {
     .replace(/đ/g, "d")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .toUpperCase();
-  return `SP-${slug.slice(0, 40)}`;
+    .toUpperCase()
+    .slice(0, 24)
+    .replace(/-+$/, "");
+  return slug ? `PT-${slug}-••••` : "PT-PHU-TUNG-••••";
 }
 
 export default function AdminParts() {
@@ -190,20 +196,20 @@ export default function AdminParts() {
           key: "sku",
           label: "Mã SKU",
           type: "text",
-          required: true,
-          placeholder: "SP-LOP-MICHELIN-205-55R16",
+          readonly: true,
+          derive: (values) => {
+            const existing = String(values.sku ?? "").trim();
+            if (existing) return existing;
+            const name = String(values.name ?? "").trim();
+            return name ? previewSku(name) : "Nhập tên sản phẩm để tự sinh mã";
+          },
+          hint: "Hệ thống tự sinh mã từ tên sản phẩm, bạn không cần nhập.",
         },
         {
           key: "brand",
           label: "Thương hiệu",
           type: "text",
           placeholder: "Michelin",
-        },
-        {
-          key: "oemCode",
-          label: "Mã OEM",
-          type: "text",
-          placeholder: "56211",
         },
         {
           key: "category",
@@ -227,10 +233,70 @@ export default function AdminParts() {
           placeholder: "500000",
         },
         {
-          key: "minStock",
+          key: "imageUrl",
+          label: "Đường dẫn ảnh",
+          type: "text",
+          placeholder: "https://cdn.example.com/lop-michelin.jpg",
+          hint: "Dán link ảnh (URL). Để trống sẽ dùng ảnh mặc định theo danh mục.",
+        },
+        {
+          key: "description",
+          label: "Mô tả sản phẩm",
+          type: "textarea",
+          rows: 3,
+          placeholder: "Mô tả ngắn gọn về phụ tùng, hiển thị ở trang chi tiết.",
+        },
+        {
+          key: "minStockLevel",
           label: "Tồn kho tối thiểu",
           type: "number",
           placeholder: "10",
+          hint: "Cảnh báo sắp hết khi tồn thực <= mức này.",
+        },
+        {
+          key: "initialStock",
+          label: "Tồn kho ban đầu",
+          type: "number",
+          modes: ["add"],
+          placeholder: "0",
+          hint: "Số lượng nhập kho lần đầu. Để 0 nếu chưa có hàng.",
+        },
+        {
+          key: "stockQty",
+          label: "Tồn kho hiện tại",
+          type: "text",
+          readonly: true,
+          modes: ["edit"],
+          derive: (values) => {
+            const current = String(values.stockQty ?? "").trim();
+            return current ? `${current}` : "—";
+          },
+          hint: "Tồn khả dụng hiện tại trong kho.",
+        },
+        {
+          key: "stockMode",
+          label: "Cách điều chỉnh tồn",
+          type: "select",
+          modes: ["edit"],
+          options: [
+            { value: "ADD", label: "Cộng thêm vào tồn hiện tại" },
+            { value: "SET", label: "Đặt tồn thực bằng số lượng này" },
+          ],
+          hint: "Để trống nếu không muốn thay đổi tồn kho.",
+        },
+        {
+          key: "stockQuantity",
+          label: "Số lượng tồn",
+          type: "number",
+          modes: ["edit"],
+          placeholder: "0",
+        },
+        {
+          key: "stockNote",
+          label: "Ghi chú tồn kho",
+          type: "text",
+          modes: ["edit"],
+          placeholder: "VD: Nhập bổ sung từ nhà cung cấp",
         },
       ],
       onSubmit: async (values, initial) => {
@@ -247,29 +313,51 @@ export default function AdminParts() {
           );
         }
 
-        const sku = String(values.sku ?? "").trim() || generateSku(name);
         const unit = String(values.unit ?? "").trim() || "cái";
-        const oemCode = String(values.oemCode ?? "").trim();
+        const imageUrl = String(values.imageUrl ?? "").trim();
+        const description = String(values.description ?? "").trim();
 
         const payload = {
           categoryId,
-          sku,
-          oemCode: oemCode || null,
+          // SKU để trống → backend tự sinh từ tên sản phẩm.
+          sku: null,
           name,
           brand: String(values.brand ?? "").trim() || null,
+          imageUrl: imageUrl || null,
+          description: description || null,
           unit,
           sellingPrice: Number(values.priceVND) || 0,
           minStockLevel:
-            values.minStock === undefined || values.minStock === ""
+            values.minStockLevel === undefined || values.minStockLevel === ""
               ? undefined
-              : Number(values.minStock),
+              : Number(values.minStockLevel),
           isActive: initial?.isActive ?? true,
         };
 
         const saved = initial
           ? await inventoryApi.updatePart(initial.id, payload)
-          : await inventoryApi.createPart(payload);
+          : await inventoryApi.createPart({
+              ...payload,
+              initialStock:
+                values.initialStock === undefined || values.initialStock === ""
+                  ? 0
+                  : Number(values.initialStock),
+            });
 
+        // Điều chỉnh tồn kho khi sửa (nếu có yêu cầu) — gọi API kho riêng.
+        const stockMode = String(values.stockMode ?? "");
+        const stockQuantity = Number(values.stockQuantity ?? 0);
+        if (initial && stockMode && stockQuantity > 0) {
+          const adjusted = await inventoryApi.adjustPartStock(initial.id, {
+            mode: stockMode as "ADD" | "SET",
+            quantity: stockQuantity,
+            note: String(values.stockNote ?? "").trim() || null,
+          });
+          notifyCatalogChanged();
+          return mapPart(adjusted);
+        }
+
+        notifyCatalogChanged();
         return mapPart(saved);
       },
     }),
@@ -279,25 +367,24 @@ export default function AdminParts() {
   const handleDelete = useCallback(async (row: CatalogPart) => {
     // Xoá mềm (isActive = false) → giữ lại lịch sử kho.
     await inventoryApi.deletePart(row.id);
+    notifyCatalogChanged();
     return { ...row, isActive: false };
   }, []);
 
   const handleDuplicate = useCallback(async (row: CatalogPart) => {
     const name = `${row.name} (bản sao)`;
-    const sku = generateSku(name);
-    if (sku === row.sku) {
-      throw new Error("SKU trùng với bản ghi gốc.");
-    }
     const saved = await inventoryApi.createPart({
       categoryId: row.categoryId,
-      sku,
       name,
       brand: row.brand || null,
+      imageUrl: row.imageUrl || null,
+      description: row.description || null,
       unit: row.unit || "cái",
       sellingPrice: row.priceVND,
       minStockLevel: 0,
       isActive: true,
     });
+    notifyCatalogChanged();
     return mapPart(saved);
   }, []);
 
