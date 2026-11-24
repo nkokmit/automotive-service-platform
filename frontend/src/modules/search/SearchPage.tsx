@@ -1,9 +1,8 @@
 /**
  * Trang kết quả tìm kiếm — `/search?q=...`
  *
- * Tổng hợp kết quả từ 4 nhóm: dịch vụ, phụ tùng, xe, tin tức.
- * Dịch vụ + phụ tùng đến từ catalog thật (inventory-service), xe + tin tức
- * đến từ dữ liệu mẫu (chưa có REST API cho 2 nhóm này).
+ * Kết quả đến từ catalog thật của inventory-service (`GET /api/services`).
+ * Phụ tùng không còn storefront riêng nên chỉ hiện trong BOM của từng dịch vụ.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -12,9 +11,6 @@ import {
   IconClose,
   IconArrowRight,
   IconWrench,
-  IconPackage,
-  IconCar,
-  IconNote,
 } from "../../components/icons";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
@@ -27,21 +23,18 @@ import {
   SEARCH_KIND_LABEL,
   type SearchKind,
 } from "../../data/search";
-import { formatCompactVND as compactVND } from "../../data/cartStore";
+import { formatCompactVND as compactVND } from "../../utils/format";
 
 type TabId = SearchKind | "all";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "all", label: "Tất cả", icon: <IconSearch size={16} /> },
   { id: "service", label: "Dịch vụ", icon: <IconWrench size={16} /> },
-  { id: "part", label: "Phụ tùng", icon: <IconPackage size={16} /> },
-  { id: "car", label: "Xe", icon: <IconCar size={16} /> },
-  { id: "article", label: "Tin tức", icon: <IconNote size={16} /> },
 ];
 
 export default function SearchPage() {
   const [params, setParams] = useSearchParams();
-  const { services, parts, loading } = useCatalog();
+  const { services, loading } = useCatalog();
 
   const query = params.get("q") ?? "";
   const [input, setInput] = useState(query);
@@ -53,8 +46,8 @@ export default function SearchPage() {
   }, [query]);
 
   const groups = useMemo(
-    () => searchAll(query, { services, parts }),
-    [query, services, parts],
+    () => searchAll(query, { services }),
+    [query, services],
   );
 
   const total = countHits(groups);
@@ -62,9 +55,6 @@ export default function SearchPage() {
   const counts: Record<TabId, number> = {
     all: total,
     service: groups.services.length,
-    part: groups.parts.length,
-    car: groups.cars.length,
-    article: groups.articles.length,
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -96,14 +86,14 @@ export default function SearchPage() {
             <span className="font-semibold text-ink">"{query}"</span>
           </>
         ) : (
-          "Nhập từ khoá để tìm dịch vụ, phụ tùng, xe và tin tức."
+          "Nhập từ khoá để tìm dịch vụ sửa chữa."
         )}
       </p>
 
       {/* Ô tìm kiếm */}
       <form onSubmit={handleSubmit} className="mb-6">
         <Input
-          placeholder="Tìm dịch vụ, phụ tùng, xe, tin tức..."
+          placeholder="Tìm dịch vụ sửa chữa..."
           leftIcon={<IconSearch size={18} />}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -157,8 +147,8 @@ export default function SearchPage() {
               <Link to="/services">
                 <Button variant="outline">Xem dịch vụ</Button>
               </Link>
-              <Link to="/parts">
-                <Button variant="outline">Xem phụ tùng</Button>
+              <Link to="/ai/damage">
+                <Button variant="outline">Phân tích hư hỏng</Button>
               </Link>
             </div>
           </div>
@@ -187,72 +177,16 @@ export default function SearchPage() {
               ))}
             </Group>
           )}
-
-          {(tab === "all" || tab === "part") && groups.parts.length > 0 && (
-            <Group
-              title="Phụ tùng"
-              count={groups.parts.length}
-              viewAllHref="/parts"
-            >
-              {groups.parts.map((p) => (
-                <ResultRow
-                  key={p.id}
-                  to={`/parts/${p.slug}`}
-                  image={p.image}
-                  title={p.name}
-                  subtitle={`${p.brand} · ${p.category}`}
-                  priceVND={p.priceVND}
-                  badge={SEARCH_KIND_LABEL.part}
-                />
-              ))}
-            </Group>
-          )}
-
-          {(tab === "all" || tab === "car") && groups.cars.length > 0 && (
-            <Group title="Xe" count={groups.cars.length} viewAllHref="/cars">
-              {groups.cars.map((c) => (
-                <ResultRow
-                  key={c.id}
-                  to={`/cars/${c.slug}`}
-                  image={c.image}
-                  title={c.title}
-                  subtitle={`${c.year} · ${c.bodyType} · ${c.city}`}
-                  priceVND={c.priceVND}
-                  badge={SEARCH_KIND_LABEL.car}
-                />
-              ))}
-            </Group>
-          )}
-
-          {(tab === "all" || tab === "article") && groups.articles.length > 0 && (
-            <Group
-              title="Tin tức"
-              count={groups.articles.length}
-              viewAllHref="/news"
-            >
-              {groups.articles.map((a) => (
-                <ResultRow
-                  key={a.id}
-                  to={`/news/${a.slug}`}
-                  image={a.image}
-                  title={a.title}
-                  subtitle={`${a.category} · ${a.readMinutes} phút đọc`}
-                  badge={SEARCH_KIND_LABEL.article}
-                />
-              ))}
-            </Group>
-          )}
         </div>
       )}
 
       {/* Chưa có query */}
       {!query && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
             { to: "/services", label: "Dịch vụ sửa chữa", icon: "🔧" },
-            { to: "/parts", label: "Phụ tùng", icon: "📦" },
-            { to: "/cars", label: "Mua xe", icon: "🚗" },
-            { to: "/news", label: "Tin tức", icon: "📰" },
+            { to: "/ai/damage", label: "Phân tích hư hỏng", icon: "📸" },
+            { to: "/ai/assistant", label: "Trợ lý AI", icon: "💬" },
           ].map((c) => (
             <Link key={c.to} to={c.to}>
               <Card className="h-full">

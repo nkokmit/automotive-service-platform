@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   IconPackage,
   IconWarning,
@@ -20,7 +19,7 @@ import type { CatalogPart } from "../../data/catalog";
 import {
   formatCompactVND as compactVND,
   getPartDiscountPercent,
-} from "../../data/cartStore";
+} from "../../utils/format";
 
 // =========================
 // AdminParts — quản lý phụ tùng (kho)
@@ -40,12 +39,9 @@ const columns: AdminTableColumn<CatalogPart>[] = [
           className="w-10 h-10 rounded-lg object-cover shrink-0"
         />
         <div className="min-w-0">
-          <Link
-            to={`/parts/${p.slug}`}
-            className="font-semibold text-sm hover:text-primary line-clamp-1"
-          >
+          <span className="font-semibold text-sm line-clamp-1 block">
             {p.name}
-          </Link>
+          </span>
           <div className="text-xs text-ink-muted line-clamp-1">
             {p.sku} · {p.brand} · {p.category}
           </div>

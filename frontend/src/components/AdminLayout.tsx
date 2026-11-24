@@ -5,7 +5,6 @@ import {
   IconBuilding,
   IconWrench,
   IconPackage,
-  IconShoppingBag,
   IconUsers,
   IconChart,
   IconSettings,
@@ -53,7 +52,6 @@ const navGroups: NavGroup[] = [
   {
     label: "Quản lý",
     items: [
-      { to: "/admin/orders", label: "Đơn hàng", icon: IconShoppingBag, badge: "24" },
       { to: "/admin/bookings", label: "Lịch hẹn xưởng", icon: IconCalendar },
       { to: "/admin/invoices", label: "Hóa đơn", icon: IconCash },
       { to: "/admin/work-orders", label: "Phiếu sửa chữa", icon: IconWrench },
@@ -115,9 +113,19 @@ export default function AdminLayout() {
     routeWords: string[];
   }[] = [
     {
-      match: /đơn|order|ord-/,
-      to: "/admin/orders",
-      routeWords: ["đơn", "đơn hàng", "order", "orders"],
+      match: /lịch hẹn|booking|hẹn/,
+      to: "/admin/bookings",
+      routeWords: ["lịch hẹn", "lịch", "booking", "bookings", "hẹn"],
+    },
+    {
+      match: /hóa đơn|invoice|bill/,
+      to: "/admin/invoices",
+      routeWords: ["hóa đơn", "invoice", "invoices"],
+    },
+    {
+      match: /phiếu|work.?order/,
+      to: "/admin/work-orders",
+      routeWords: ["phiếu", "work order", "work-orders"],
     },
     {
       match: /xe|vehicle|khách|customer/,
@@ -147,9 +155,9 @@ export default function AdminLayout() {
 
     const route = ADMIN_ROUTES.find((r) => r.match.test(q));
     if (!route) {
-      navigate(`/admin/orders?q=${encodeURIComponent(query)}`);
+      navigate(`/admin/bookings?q=${encodeURIComponent(query)}`);
       t.info(
-        `Không xác định "${query}" thuộc mục nào — đang tìm trong danh sách đơn hàng.`,
+        `Không xác định "${query}" thuộc mục nào — đang tìm trong danh sách lịch hẹn.`,
       );
       return;
     }
@@ -207,7 +215,7 @@ export default function AdminLayout() {
           <div className="hidden md:flex flex-1 max-w-md">
             <SearchBox
               className="w-full"
-              placeholder="Tìm đơn hàng, khách hàng, dịch vụ..."
+              placeholder="Tìm lịch hẹn, khách hàng, dịch vụ..."
               shortcut
               onNavigate={handleAdminSearch}
             />
@@ -313,7 +321,7 @@ export default function AdminLayout() {
 
                   <div className="px-4 py-2 border-t border-ink/8">
                     <Link
-                      to="/admin/orders"
+                      to="/admin"
                       onClick={() => setShowNotifications(false)}
                       className="text-xs font-medium text-primary hover:underline"
                     >

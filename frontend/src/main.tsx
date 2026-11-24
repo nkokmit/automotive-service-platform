@@ -9,13 +9,7 @@ import { hydrateUser } from "./data/authStore";
 import Login from "./modules/auth/Login";
 import Profile from "./modules/auth/Profile";
 
-// Commerce module (cars / parts / cart / services)
-import CarsList from "./modules/commerce/CarsList";
-import CarDetail from "./modules/commerce/CarDetail";
-import PartsList from "./modules/commerce/PartsList";
-import PartDetail from "./modules/commerce/PartDetail";
-import Cart from "./modules/commerce/Cart";
-import Checkout from "./modules/commerce/Checkout";
+// Commerce module (services)
 import ServicesList from "./modules/commerce/ServicesList";
 import ServiceDetail from "./modules/commerce/ServiceDetail";
 
@@ -23,9 +17,7 @@ import ServiceDetail from "./modules/commerce/ServiceDetail";
 import DamageUpload from "./modules/ai/DamageUpload";
 import ChatAssistant from "./modules/ai/ChatAssistant";
 
-// Content module (news/articles)
-import NewsList from "./modules/content/NewsList";
-import ArticleDetail from "./modules/content/ArticleDetail";
+// Content module (static pages)
 import {
   HelpPage,
   TermsPage,
@@ -49,7 +41,6 @@ import AdminDashboard from "./modules/admin/AdminDashboard";
 import AdminGarageProfile from "./modules/admin/AdminGarageProfile";
 import AdminServices from "./modules/admin/AdminServices";
 import AdminParts from "./modules/admin/AdminParts";
-import AdminOrders from "./modules/admin/AdminOrders";
 import AdminUsers from "./modules/admin/AdminUsers";
 import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
 import AdminBookings from "./modules/admin/AdminBookings";
@@ -88,22 +79,12 @@ hydrateUser().finally(() => {
               />
 
               {/* ============ COMMERCE module ============ */}
-              <Route path="cars" element={<CarsList />} />
-              <Route path="cars/:slug" element={<CarDetail />} />
-              <Route path="parts" element={<PartsList />} />
-              <Route path="parts/:slug" element={<PartDetail />} />
-              <Route path="cart" element={<Cart />} />
-              <Route path="checkout" element={<Checkout />} />
               <Route path="services" element={<ServicesList />} />
               <Route path="services/:slug" element={<ServiceDetail />} />
 
               {/* ============ AI module ============ */}
               <Route path="ai/damage" element={<DamageUpload />} />
               <Route path="ai/assistant" element={<ChatAssistant />} />
-
-              {/* ============ CONTENT module ============ */}
-              <Route path="news" element={<NewsList />} />
-              <Route path="news/:slug" element={<ArticleDetail />} />
 
               {/* ============ SEARCH ============ */}
               <Route path="search" element={<SearchPage />} />
@@ -129,7 +110,6 @@ hydrateUser().finally(() => {
               <Route path="garage" element={<AdminGarageProfile />} />
               <Route path="services" element={<AdminServices />} />
               <Route path="parts" element={<AdminParts />} />
-              <Route path="orders" element={<AdminOrders />} />
               <Route path="bookings" element={<AdminBookings />} />
               <Route path="invoices" element={<AdminInvoices />} />
               <Route path="staff" element={<AdminStaff />} />

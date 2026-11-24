@@ -16,7 +16,7 @@ import { isAuthError } from "../api/client";
 import { TOKEN_EVENT, getAccessToken } from "../api/session";
 import { primaryRole } from "../api/types";
 import type { CustomerResponse, UserResponse } from "../api/types";
-import { mockUsers, type Order, type Address, type Vehicle } from "./mock";
+import { mockUsers, type Vehicle } from "./mock";
 
 export const AUTH_KEY = "autocare:auth";
 export const AUTH_EVENT = "autocare:auth:changed";
@@ -227,22 +227,6 @@ export function updateProfile(patch: Partial<AuthUser>): Session | null {
   const next: Session = { ...current, user: { ...current.user, ...patch } };
   writeSession(next);
   return next;
-}
-
-// ── Per-user data ─────────────────────────────────────────────────────────────
-// Ba hàm dưới đây vẫn dùng mock vì backend **chưa có** endpoint tương ứng:
-//   - orders/addresses → thuộc commerce-service, chưa tồn tại.
-//   - vehicles → VehicleController cố ý không có route "xe của tôi" (xem
-//     comment trong VehicleController.java); lịch sử bảo dưỡng nằm ở
-//     `GET /api/service-history/me`.
-// Khi các service tương ứng được implement, thay phần thân của hàm bằng call API.
-
-export function getUserOrders(userId: string): Order[] {
-  return mockUsers.find((x) => x.id === userId)?.orders ?? [];
-}
-
-export function getUserAddresses(userId: string): Address[] {
-  return mockUsers.find((x) => x.id === userId)?.addresses ?? [];
 }
 
 // ── Xe của tôi ────────────────────────────────────────────────────────────────

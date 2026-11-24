@@ -18,10 +18,8 @@ import Card from "../../components/Card";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { useToast } from "../../components/Toast";
-import RecommendationWidget from "../../components/RecommendationWidget";
 import { GARAGE } from "../../config/garage";
 import { useCatalog } from "../../data/catalog";
-import { recommendForService } from "../../data/recommend";
 import { bookingApi } from "../../api/endpoints/booking";
 import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
 import { inventoryApi } from "../../api/endpoints/inventory";
@@ -585,12 +583,6 @@ export default function ServiceDetail() {
               ))}
             </div>
           )}
-
-          {/* Related parts — gợi ý phụ tùng phù hợp với dịch vụ */}
-          <ServiceRelatedParts
-            serviceCategory={service.category}
-            serviceName={service.name}
-          />
         </div>
 
         {/* RIGHT: booking widget sticky */}
@@ -814,34 +806,5 @@ export default function ServiceDetail() {
         </div>
       )}
     </div>
-  );
-}
-
-// =========================
-// Related parts cho ServiceDetail
-// =========================
-
-function ServiceRelatedParts({
-  serviceCategory,
-  serviceName,
-}: {
-  serviceCategory: string;
-  serviceName: string;
-}) {
-  const recommendations = useMemo(
-    () => recommendForService(serviceCategory, 4),
-    [serviceCategory],
-  );
-
-  if (recommendations.length === 0) return null;
-
-  return (
-    <RecommendationWidget
-      items={recommendations}
-      title="Phụ tùng liên quan"
-      subtitle={`Phụ tùng phù hợp với dịch vụ "${serviceName}"`}
-      viewAllHref="/parts"
-      viewAllLabel="Xem thêm phụ tùng"
-    />
   );
 }

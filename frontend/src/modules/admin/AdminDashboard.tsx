@@ -24,7 +24,7 @@ import {
   useAdminDashboard,
   type DashboardKpi,
 } from "./useAdminDashboard";
-import { formatCompactVND as compactVND } from "../../data/cartStore";
+import { formatCompactVND as compactVND } from "../../utils/format";
 
 // =========================
 // Dashboard — trang tổng quan cho admin
@@ -96,10 +96,10 @@ export default function AdminDashboard() {
             <IconRefresh size={14} />
             {loading ? "Đang tải..." : "Làm mới"}
           </Button>
-          <Link to="/admin/orders">
+          <Link to="/admin/work-orders">
             <Button size="md">
               <IconPlus size={14} />
-              Tạo đơn
+              Tạo phiếu sửa chữa
             </Button>
           </Link>
         </div>
@@ -342,7 +342,7 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-2 mb-1.5">
               <IconCar size={16} />
               <span className="text-xs font-medium opacity-80 uppercase tracking-wider">
-                Mua xe
+                Lịch hẹn
               </span>
             </div>
             <div className="text-2xl font-bold mb-1">{totals.bookings}</div>

@@ -27,11 +27,6 @@ export default function Footer() {
               </Link>
             </li>
             <li>
-              <Link to="/parts" className="hover:text-primary">
-                Phụ kiện &amp; phụ tùng
-              </Link>
-            </li>
-            <li>
               <Link to="/ai/damage" className="hover:text-primary">
                 Phân tích hư hỏng
               </Link>
@@ -48,18 +43,13 @@ export default function Footer() {
           <h4 className="font-semibold mb-3">Hỗ trợ</h4>
           <ul className="space-y-2 text-sm text-ink-light">
             <li>
-              <Link to="/help" className="hover:text-primary">
-                Trung tâm trợ giúp
+              <Link to="/services" className="hover:text-primary">
+                Đặt lịch sửa chữa
               </Link>
             </li>
             <li>
-              <Link to="/terms" className="hover:text-primary">
-                Điều khoản sử dụng
-              </Link>
-            </li>
-            <li>
-              <Link to="/privacy" className="hover:text-primary">
-                Chính sách bảo mật
+              <Link to="/profile" className="hover:text-primary">
+                Tài khoản của tôi
               </Link>
             </li>
           </ul>

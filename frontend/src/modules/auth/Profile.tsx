@@ -31,8 +31,6 @@ import Input from "../../components/Input";
 import { useToast } from "../../components/Toast";
 import { useAuth } from "../../data/authStore";
 import {
-  getUserOrders,
-  getUserAddresses,
   getUserVehicles,
   saveUserVehicles,
 } from "../../data/authStore";
@@ -52,34 +50,25 @@ import { userApi } from "../../api/endpoints/user";
 import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
 import { isAuthError } from "../../api/client";
 import { GARAGE } from "../../config/garage";
-import type {
-  Order,
-  OrderStatus,
-  Address,
-  Vehicle,
-} from "../../data/mock";
-import { formatCompactVND, formatFullVND } from "../../data/cartStore";
+import type { Vehicle } from "../../data/mock";
+import { formatCompactVND, formatFullVND } from "../../utils/format";
 
 // =========================
 // Tab definitions
 // =========================
 type TabId =
   | "info"
-  | "orders"
   | "bookings"
   | "history"
   | "invoices"
-  | "vehicles"
-  | "addresses";
+  | "vehicles";
 
 const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "info", label: "Thông tin", icon: <IconUser size={18} /> },
-  { id: "orders", label: "Đơn hàng", icon: <IconPackage size={18} /> },
   { id: "bookings", label: "Lịch hẹn", icon: <IconCalendar size={18} /> },
   { id: "history", label: "Bảo dưỡng", icon: <IconWrench size={18} /> },
   { id: "invoices", label: "Hóa đơn", icon: <IconCash size={18} /> },
   { id: "vehicles", label: "Xe của tôi", icon: <IconCar size={18} /> },
-  { id: "addresses", label: "Địa chỉ", icon: <IconMapPin size={18} /> },
 ];
 
 // =========================
@@ -100,15 +89,43 @@ export default function Profile() {
   // Pre-fetch per-user data.
   // Hook phải nằm TRƯỚC early-return để không vi phạm rules of hooks
   // (user có thể trở thành null sau khi logout → số hook thay đổi giữa các lần render).
-  const orders = useMemo(() => (user ? getUserOrders(user.id) : []), [user]);
-  const addresses = useMemo(
-    () => (user ? getUserAddresses(user.id) : []),
-    [user],
-  );
   const vehicles = useMemo(
     () => (user ? getUserVehicles(user.id) : []),
     [user],
   );
+
+  // Số liệu tổng quan: lịch hẹn + tổng chi tiêu (từ hoá đơn).
+  const [bookingsCount, setBookingsCount] = useState(0);
+  const [invoiceTotal, setInvoiceTotal] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const list = await bookingApi.getMyBookings();
+        if (!cancelled) setBookingsCount(Array.isArray(list) ? list.length : 0);
+      } catch {
+        // Không tải được lịch hẹn → để 0, tab tương ứng tự hiển thị lỗi.
+      }
+      try {
+        const page = await billingApi.getMyInvoices(0, 100);
+        if (cancelled) return;
+        const total = (page.items ?? []).reduce(
+          (sum, inv) => sum + Number(inv.grandTotal ?? 0),
+          0,
+        );
+        setInvoiceTotal(total);
+      } catch {
+        // Tương tự — không chặn render.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Nếu chưa đăng nhập → redirect về /login
   if (!user) {
@@ -167,13 +184,13 @@ export default function Profile() {
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
-              <Link to="/cart">
+              <Link to="/services">
                 <Button
                   variant="outline"
                   size="sm"
                   className="border-white/40 text-white hover:bg-white/15"
                 >
-                  <IconPackage size={16} /> Giỏ hàng
+                  <IconWrench size={16} /> Đặt lịch sửa chữa
                 </Button>
               </Link>
               <Button
@@ -191,9 +208,9 @@ export default function Profile() {
         {/* Quick stats */}
         <div className="grid grid-cols-3 divide-x divide-ink/10 bg-white">
           <Stat
-            icon={<IconPackage size={20} />}
-            label="Đơn hàng"
-            value={orders.length.toString()}
+            icon={<IconCalendar size={20} />}
+            label="Lịch hẹn"
+            value={bookingsCount.toString()}
           />
           <Stat
             icon={<IconCar size={20} />}
@@ -203,9 +220,7 @@ export default function Profile() {
           <Stat
             icon={<IconSale size={20} />}
             label="Tổng chi tiêu"
-            value={formatCompactVND(
-              orders.reduce((s, o) => s + o.totalVND, 0),
-            )}
+            value={formatCompactVND(invoiceTotal)}
           />
         </div>
       </Card>
@@ -225,11 +240,6 @@ export default function Profile() {
           >
             {tab.icon}
             <span>{tab.label}</span>
-            {tab.id === "orders" && orders.length > 0 && (
-              <span className="px-1.5 h-5 rounded-full bg-primary/10 text-primary text-[11px] font-bold inline-flex items-center">
-                {orders.length}
-              </span>
-            )}
           </button>
         ))}
       </div>
@@ -237,15 +247,11 @@ export default function Profile() {
       {/* Tab content */}
       <div>
         {activeTab === "info" && <InfoTab />}
-        {activeTab === "orders" && <OrdersTab orders={orders} />}
         {activeTab === "bookings" && <BookingsTab />}
         {activeTab === "history" && <ServiceHistoryTab />}
         {activeTab === "invoices" && <InvoicesTab />}
         {activeTab === "vehicles" && (
           <VehiclesTab vehicles={vehicles} userId={user.id} />
-        )}
-        {activeTab === "addresses" && (
-          <AddressesTab addresses={addresses} />
         )}
       </div>
     </div>
@@ -527,8 +533,8 @@ function InfoTab() {
               Ưu đãi thành viên
             </h3>
             <p className="text-sm text-ink-light mb-3">
-              Tích luỹ điểm thưởng qua mỗi đơn hàng. Đổi điểm lấy voucher,
-              phụ kiện miễn phí, hoặc giảm giá dịch vụ.
+              Tích luỹ điểm thưởng qua mỗi lần đặt lịch sửa chữa. Đổi điểm
+              lấy voucher, giảm giá dịch vụ hoặc ưu đãi bảo dưỡng định kỳ.
             </p>
             <Link to="/services">
               <Button variant="outline" size="sm" fullWidth>
@@ -1592,293 +1598,6 @@ function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
 }
 
 // =========================
-// Tab: Đơn hàng
-// =========================
-function OrdersTab({ orders }: { orders: Order[] }) {
-  const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
-
-  const filtered = useMemo(() => {
-    if (statusFilter === "all") return orders;
-    return orders.filter((o) => o.status === statusFilter);
-  }, [orders, statusFilter]);
-
-  const statusCounts = useMemo(() => {
-    const counts: Record<OrderStatus | "all", number> = {
-      all: orders.length,
-      pending: 0,
-      confirmed: 0,
-      shipping: 0,
-      completed: 0,
-      cancelled: 0,
-    };
-    for (const o of orders) counts[o.status]++;
-    return counts;
-  }, [orders]);
-
-  return (
-    <div>
-      {/* Status quick filter */}
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-4 -mx-4 px-4 md:mx-0 md:px-0">
-        {[
-          { id: "all" as const, label: "Tất cả" },
-          { id: "pending" as const, label: "Chờ xác nhận" },
-          { id: "shipping" as const, label: "Đang giao" },
-          { id: "completed" as const, label: "Hoàn thành" },
-          { id: "cancelled" as const, label: "Đã huỷ" },
-        ].map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setStatusFilter(s.id)}
-            disabled={statusCounts[s.id] === 0 && s.id !== "all"}
-            className={[
-              "shrink-0 px-3 h-9 rounded-full text-sm font-medium border transition-colors disabled:cursor-not-allowed",
-              statusFilter === s.id
-                ? "bg-primary text-white border-primary"
-                : "bg-white text-ink border-ink/15 hover:bg-bgsoft disabled:opacity-40",
-            ].join(" ")}
-          >
-            {s.label}
-            <span
-              className={[
-                "ml-1.5 px-1.5 h-5 rounded-full text-[11px] inline-flex items-center justify-center",
-                statusFilter === s.id
-                  ? "bg-white/20 text-white"
-                  : "bg-bgsoft text-ink-muted",
-              ].join(" ")}
-            >
-              {statusCounts[s.id]}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {filtered.length === 0 ? (
-        <EmptyOrders />
-      ) : (
-        <div className="space-y-4">
-          {filtered.map((order) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OrderCard({ order }: { order: Order }) {
-  const t = useToast();
-  const [expanded, setExpanded] = useState(false);
-
-  const handleReorder = () => {
-    t.info("Đã thêm các sản phẩm trong đơn vào giỏ hàng (mock)");
-  };
-
-  return (
-    <Card>
-      {/* Header */}
-      <div className="p-4 md:p-5 flex items-start gap-4 flex-wrap border-b border-ink/8">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h3 className="font-semibold text-ink">{order.id}</h3>
-            <OrderStatusBadge status={order.status} />
-          </div>
-          <div className="text-xs text-ink-muted flex items-center gap-3 flex-wrap">
-            <span className="flex items-center gap-1">
-              <IconCalendar size={12} />
-              {order.date}
-            </span>
-            <span>·</span>
-            <span className="flex items-center gap-1">
-              <IconCash size={12} />
-              {order.paymentMethod}
-            </span>
-            <span>·</span>
-            <span>{order.items.length} sản phẩm</span>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-xs text-ink-muted">Tổng</div>
-          <div className="text-primary font-bold text-lg">
-            {formatCompactVND(order.totalVND)}
-          </div>
-        </div>
-      </div>
-
-      {/* Items (collapsed by default) */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full px-4 md:px-5 py-3 flex items-center justify-between text-sm text-ink-light hover:bg-bgsoft/40 transition-colors"
-      >
-        <span>
-          {expanded ? "Thu gọn" : "Xem chi tiết"} đơn hàng
-        </span>
-        <IconArrowRight
-          size={14}
-          className={[
-            "transition-transform",
-            expanded ? "rotate-90" : "",
-          ].join(" ")}
-        />
-      </button>
-
-      {expanded && (
-        <div className="px-4 md:px-5 pb-5 space-y-4">
-          {/* Items */}
-          <div className="space-y-3">
-            {order.items.map((item) => (
-              <div key={item.itemId} className="flex gap-3">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="w-16 h-16 rounded-lg object-cover bg-bgsoft shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-ink text-sm line-clamp-1">
-                    {item.name}
-                  </div>
-                  <div className="text-xs text-ink-muted mt-0.5">
-                    {formatCompactVND(item.priceVND)} × {item.qty}
-                  </div>
-                </div>
-                <div className="text-sm font-semibold text-ink shrink-0">
-                  {formatCompactVND(item.priceVND * item.qty)}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Summary */}
-          <div className="border-t border-ink/8 pt-3 text-sm space-y-1.5">
-            <Row label="Tạm tính" value={formatFullVND(order.totalVND - order.shippingVND)} />
-            <Row label="Phí vận chuyển" value={order.shippingVND === 0 ? "Miễn phí" : formatFullVND(order.shippingVND)} />
-            <Row label="Tổng cộng" value={formatFullVND(order.totalVND)} bold />
-          </div>
-
-          {/* Address */}
-          <div className="bg-bgsoft/50 rounded-xl p-3 text-sm">
-            <div className="text-xs uppercase tracking-wide text-ink-muted font-semibold mb-1">
-              Địa chỉ giao hàng
-            </div>
-            <div className="text-ink">{order.address}</div>
-          </div>
-
-          {/* Tracking */}
-          {order.trackingNote && (
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm flex items-start gap-2">
-              <IconTruck size={16} className="text-primary shrink-0 mt-0.5" />
-              <div>
-                <div className="font-medium text-ink">Vận chuyển</div>
-                <div className="text-ink-light">{order.trackingNote}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex flex-wrap gap-2 pt-2 border-t border-ink/8">
-            {order.status === "shipping" && (
-              <Button variant="outline" size="sm">
-                <IconMapPin size={14} />
-                Theo dõi đơn
-              </Button>
-            )}
-            {order.status === "completed" && (
-              <Button variant="outline" size="sm" onClick={handleReorder}>
-                <IconRefresh size={14} />
-                Mua lại
-              </Button>
-            )}
-            <Button variant="ghost" size="sm">
-              Liên hệ CSKH
-            </Button>
-          </div>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  const config: Record<OrderStatus, { tone: "default" | "primary" | "warning" | "accent"; label: string; icon: React.ReactNode }> = {
-    pending: {
-      tone: "warning",
-      label: "Chờ xác nhận",
-      icon: <IconClock size={11} />,
-    },
-    confirmed: {
-      tone: "primary",
-      label: "Đã xác nhận",
-      icon: <IconCheckCircle size={11} />,
-    },
-    shipping: {
-      tone: "primary",
-      label: "Đang giao",
-      icon: <IconTruck size={11} />,
-    },
-    completed: {
-      tone: "accent",
-      label: "Hoàn thành",
-      icon: <IconCheckCircle size={11} />,
-    },
-    cancelled: {
-      tone: "default",
-      label: "Đã huỷ",
-      icon: <IconClose size={11} />,
-    },
-  };
-  const c = config[status];
-  return (
-    <Badge tone={c.tone}>
-      {c.icon} {c.label}
-    </Badge>
-  );
-}
-
-function EmptyOrders() {
-  return (
-    <Card>
-      <div className="p-12 text-center">
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-bgsoft flex items-center justify-center mb-4">
-          <IconPackage size={32} className="text-ink-muted" />
-        </div>
-        <p className="font-semibold text-lg mb-1">Chưa có đơn hàng nào</p>
-        <p className="text-sm text-ink-light mb-5 max-w-sm mx-auto">
-          Khám phá phụ kiện chính hãng hoặc đặt lịch dịch vụ để bắt đầu.
-        </p>
-        <div className="flex flex-wrap gap-2 justify-center">
-          <Link to="/parts">
-            <Button>Mua phụ kiện</Button>
-          </Link>
-          <Link to="/services">
-            <Button variant="outline">Đặt dịch vụ</Button>
-          </Link>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function Row({
-  label,
-  value,
-  bold,
-}: {
-  label: string;
-  value: string;
-  bold?: boolean;
-}) {
-  return (
-    <div className="flex justify-between">
-      <span className={bold ? "font-semibold text-ink" : "text-ink-light"}>
-        {label}
-      </span>
-      <span className={bold ? "font-bold text-primary" : "text-ink"}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-// =========================
 // Tab: Xe của tôi
 // =========================
 function VehiclesTab({
@@ -2111,7 +1830,7 @@ function VehiclesTab({
             </div>
             <p className="font-semibold mb-1">Chưa có xe nào</p>
             <p className="text-sm text-ink-light">
-              Đăng ký xe để AutoCare gợi ý phụ kiện/dịch vụ phù hợp.
+              Đăng ký xe để AutoCare gợi ý dịch vụ bảo dưỡng phù hợp.
             </p>
             <Button className="mt-5" onClick={() => setShowModal(true)}>
               <IconPlus size={16} />
@@ -2380,66 +2099,6 @@ function Info({
         {label}
       </div>
       <div className="text-ink font-medium">{value}</div>
-    </div>
-  );
-}
-
-// =========================
-// Tab: Địa chỉ
-// =========================
-function AddressesTab({ addresses }: { addresses: Address[] }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">Sổ địa chỉ ({addresses.length})</h2>
-        <Button size="sm">
-          <IconPlus size={16} />
-          Thêm địa chỉ
-        </Button>
-      </div>
-
-      {addresses.length === 0 ? (
-        <Card>
-          <div className="p-12 text-center">
-            <div className="mx-auto w-16 h-16 rounded-2xl bg-bgsoft flex items-center justify-center mb-3">
-              <IconMapPin size={32} className="text-ink-muted" />
-            </div>
-            <p className="font-semibold mb-1">Chưa có địa chỉ nào</p>
-            <p className="text-sm text-ink-light">
-              Thêm địa chỉ để đặt hàng nhanh hơn.
-            </p>
-          </div>
-        </Card>
-      ) : (
-        <div className="grid md:grid-cols-2 gap-4">
-          {addresses.map((a) => (
-            <Card key={a.id} className="overflow-hidden">
-              <div className="p-5">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-ink">{a.label}</h3>
-                    {a.isDefault && (
-                      <Badge tone="primary">
-                        <IconCheckCircle size={11} /> Mặc định
-                      </Badge>
-                    )}
-                  </div>
-                  <button className="text-xs text-primary hover:underline font-medium">
-                    Sửa
-                  </button>
-                </div>
-                <div className="text-sm font-medium text-ink mb-1">
-                  {a.recipient}
-                </div>
-                <div className="text-sm text-ink-light mb-2">{a.phone}</div>
-                <p className="text-sm text-ink-light leading-relaxed">
-                  {a.fullAddress}
-                </p>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -7,22 +7,17 @@ import {
   IconCar,
   IconCamera,
   IconChat,
-  IconCart,
   IconArrowRight,
   IconSparkles,
 } from "./icons";
 import Button from "./Button";
 import SearchBox from "./SearchBox";
-import { useCartCount } from "../data/cartStore";
 import { useToast } from "./Toast";
 import { useAuth } from "../data/authStore";
 import { GARAGE } from "../config/garage";
 
 const navItems = [
-  { to: "/cars", label: "Mua xe" },
-  { to: "/parts", label: "Phụ kiện" },
   { to: "/services", label: "Đặt lịch sửa chữa" },
-  { to: "/news", label: "Tin tức" },
 ];
 
 /** Nhóm "AI" — gộp 2 trang vào dropdown cho gọn nav. */
@@ -46,7 +41,6 @@ export default function Header() {
   const [userMenu, setUserMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
-  const cartCount = useCartCount();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const t = useToast();
@@ -202,25 +196,12 @@ export default function Header() {
         <div className="hidden lg:flex flex-1 max-w-md ml-auto">
           <SearchBox
             className="w-full"
-            placeholder="Tìm dịch vụ, phụ tùng..."
+            placeholder="Tìm dịch vụ sửa chữa..."
           />
         </div>
 
         {/* Actions */}
         <div className="hidden md:flex items-center gap-2 ml-auto lg:ml-2">
-          <Link
-            to="/cart"
-            className="relative p-2 rounded-lg hover:bg-bgsoft"
-            aria-label={`Giỏ hàng (${cartCount})`}
-          >
-            <IconCart size={22} />
-            {cartCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                {cartCount > 99 ? "99+" : cartCount}
-              </span>
-            )}
-          </Link>
-
           {/* Auth: đã login → avatar + dropdown, chưa → login/register buttons */}
           {user ? (
             <div className="relative">
@@ -289,7 +270,7 @@ export default function Header() {
                       </span>
                     </Link>
                     <Link
-                      to="/profile?tab=orders"
+                      to="/profile?tab=bookings"
                       onClick={() => setUserMenu(false)}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-ink hover:bg-bgsoft"
                     >
@@ -303,11 +284,12 @@ export default function Header() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                        <line x1="3" y1="6" x2="21" y2="6" />
-                        <path d="M16 10a4 4 0 0 1-8 0" />
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
                       </svg>
-                      Đơn hàng của tôi
+                      Lịch hẹn của tôi
                     </Link>
                     <button
                       onClick={handleLogout}
@@ -336,11 +318,6 @@ export default function Header() {
           aria-label="Mở menu"
         >
           {open ? <IconClose /> : <IconMenu />}
-          {cartCount > 0 && (
-            <span className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center">
-              {cartCount > 99 ? "99+" : cartCount}
-            </span>
-          )}
         </button>
       </div>
 
@@ -351,7 +328,7 @@ export default function Header() {
             <div className="mb-2">
               <SearchBox
                 className="w-full"
-                placeholder="Tìm dịch vụ, phụ tùng..."
+                placeholder="Tìm dịch vụ sửa chữa..."
                 inputClassName="h-full"
               />
             </div>
@@ -414,20 +391,6 @@ export default function Header() {
                 </NavLink>
               ))}
             </div>
-
-            <Link
-              to="/cart"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink hover:bg-bgsoft"
-            >
-              <IconCart size={18} />
-              <span>Giỏ hàng</span>
-              {cartCount > 0 && (
-                <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-white text-[11px] font-bold flex items-center justify-center">
-                  {cartCount > 99 ? "99+" : cartCount}
-                </span>
-              )}
-            </Link>
 
             {/* Auth trong mobile menu */}
             {user ? (

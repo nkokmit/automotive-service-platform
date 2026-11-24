@@ -21,7 +21,7 @@ import type { CatalogService } from "../../data/catalog";
 import { GARAGE } from "../../config/garage";
 import {
   formatCompactVND as compactVND,
-} from "../../data/cartStore";
+} from "../../utils/format";
 
 // =========================
 // AdminServices — quản lý dịch vụ

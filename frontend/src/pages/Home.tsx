@@ -9,7 +9,6 @@ import {
   IconStar,
   IconCar,
   IconBolt,
-  IconShoppingBag,
   IconShield,
   IconCheck,
   IconPhone,
@@ -18,7 +17,6 @@ import {
 import Button from "../components/Button";
 import Card from "../components/Card";
 import Badge from "../components/Badge";
-import { cars, articles } from "../data/mock";
 import { useCatalog } from "../data/catalog";
 import { GARAGE } from "../config/garage";
 /** Icon gợi ý cho từng nhóm dịch vụ của xưởng. */
@@ -41,7 +39,7 @@ const compactVND = (n: number) => {
 };
 
 export default function Home() {
-  const { services, parts } = useCatalog();
+  const { services } = useCatalog();
 
   // Chip danh mục dịch vụ — suy ra từ catalog đang hiển thị (API thật hoặc mẫu).
   const categoryChips = useMemo(() => {
@@ -60,14 +58,6 @@ export default function Home() {
     .sort((a, b) => b.bookingsCount - a.bookingsCount)
     .slice(0, 4);
 
-  // Top 4 xe nổi bật
-  const featuredCars = cars.filter((c) => c.isFeatured).slice(0, 4);
-
-  // Top 8 phụ kiện bán chạy
-  const topParts = parts
-    .filter((p) => p.isBestSeller || p.isFeatured)
-    .slice(0, 8);
-
   return (
     <>
       {/* ============== HERO ============== */}
@@ -81,13 +71,13 @@ export default function Home() {
               {GARAGE.name}
               <br />
               <span className="text-primary">
-                Bảo dưỡng — Sửa chữa — Phụ tùng
+                Bảo dưỡng — Sửa chữa — Chẩn đoán AI
               </span>
             </h1>
             <p className="mt-4 text-ink-light text-base md:text-lg max-w-lg">
               Xưởng sửa chữa ô tô chuyên nghiệp tại {GARAGE.city}. Đặt lịch
-              trực tuyến, mua phụ tùng chính hãng, tư vấn AI 24/7 — tất cả tại
-              một nơi.
+              trực tuyến, phân tích hư hỏng bằng AI, tư vấn kỹ thuật 24/7 — tất
+              cả tại một nơi.
             </p>
 
             {/* Quick search bar */}
@@ -95,7 +85,7 @@ export default function Home() {
               <div className="flex items-center gap-2 flex-1 px-3">
                 <IconSearch size={18} className="text-ink-muted" />
                 <input
-                  placeholder="Tìm dịch vụ, phụ tùng..."
+                  placeholder="Tìm dịch vụ sửa chữa..."
                   className="flex-1 outline-none text-sm bg-transparent"
                 />
               </div>
@@ -116,10 +106,9 @@ export default function Home() {
             {/* Quick category chips */}
             <div className="mt-5 flex flex-wrap items-center gap-2">
               {[
-                { label: "Mua xe", to: "/cars" },
-                { label: "Phụ kiện", to: "/parts" },
                 { label: "Đặt lịch sửa chữa", to: "/services" },
-                { label: "Tin tức ô tô", to: "/news" },
+                { label: "Phân tích hư hỏng AI", to: "/ai/damage" },
+                { label: "Trợ lý AI", to: "/ai/assistant" },
               ].map((c) => (
                 <Link
                   key={c.to}
@@ -209,7 +198,7 @@ export default function Home() {
             {
               icon: <IconShield size={20} className="text-primary" />,
               title: "Bảo hành rõ ràng",
-              desc: "Phụ tùng chính hãng, đổi trả 14 ngày",
+              desc: "Linh kiện chính hãng, bảo hành dịch vụ 12 tháng",
             },
           ].map((b) => (
             <div
@@ -329,159 +318,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============== XE NỔI BẬT ============== */}
-      <section className="container-page py-8 md:py-12">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <Badge tone="accent" className="mb-2">
-              <IconCar size={14} /> Mua bán xe
-            </Badge>
-            <h2 className="text-2xl md:text-3xl font-bold">Xe nổi bật</h2>
-            <p className="text-ink-light mt-1">
-              Xe đã qua sử dụng chất lượng, giá tốt từ salon &amp; cá nhân
-            </p>
-          </div>
-          <Link
-            to="/cars"
-            className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-          >
-            Xem tất cả <IconArrowRight size={14} />
-          </Link>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {featuredCars.map((car) => (
-            <Link to="/cars" key={car.id} className="group">
-              <Card>
-                <div className="aspect-[4/3] overflow-hidden rounded-t-2xl bg-bgsoft relative">
-                  <img
-                    src={car.image}
-                    alt={car.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {car.isNew && (
-                    <Badge tone="accent" className="absolute top-3 left-3">
-                      Mới
-                    </Badge>
-                  )}
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center gap-1.5 text-xs text-ink-muted mb-1">
-                    <IconMapPin size={14} /> {car.city} · {car.year} ·{" "}
-                    {car.odoKm.toLocaleString("vi-VN")} km
-                  </div>
-                  <h3 className="font-semibold leading-tight mb-2 line-clamp-2">
-                    {car.title}
-                  </h3>
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <div className="text-primary font-bold text-lg">
-                        {compactVND(car.priceVND)}
-                      </div>
-                      <div className="text-xs text-ink-muted">
-                        {car.seller.name}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-ink-muted">
-                      <IconStar size={14} className="text-accent-hover" />
-                      <span className="font-medium text-ink">
-                        {car.rating}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ============== PHỤ KIỆN NỔI BẬT ============== */}
-      <section className="bg-bgsoft/40">
-        <div className="container-page py-12 md:py-16">
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              <Badge tone="primary" className="mb-2">
-                <IconShoppingBag size={14} /> Phụ kiện &amp; phụ tùng
-              </Badge>
-              <h2 className="text-2xl md:text-3xl font-bold">
-                Phụ kiện bán chạy
-              </h2>
-              <p className="text-ink-light mt-1">
-                Chính hãng · Giao nhanh toàn quốc · Đổi trả 14 ngày
-              </p>
-            </div>
-            <Link
-              to="/parts"
-              className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-            >
-              Xem tất cả <IconArrowRight size={14} />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {topParts.map((p) => {
-              const discount = p.originalPriceVND
-                ? Math.round(
-                    ((p.originalPriceVND - p.priceVND) / p.originalPriceVND) *
-                      100,
-                  )
-                : 0;
-              return (
-                <Link to={`/parts/${p.slug}`} key={p.id} className="group">
-                  <Card>
-                    <div className="aspect-square overflow-hidden rounded-t-2xl bg-white relative">
-                      <img
-                        src={p.image}
-                        alt={p.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      {discount > 0 && (
-                        <Badge
-                          tone="accent"
-                          className="absolute top-2 left-2"
-                        >
-                          -{discount}%
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <div className="text-[11px] uppercase tracking-wide text-ink-muted mb-1">
-                        {p.brand} · {p.category}
-                      </div>
-                      <h3 className="text-sm font-medium leading-snug mb-2 line-clamp-2">
-                        {p.name}
-                      </h3>
-                      <div className="flex items-end justify-between">
-                        <div>
-                          <div className="text-primary font-bold text-sm">
-                            {compactVND(p.priceVND)}
-                          </div>
-                          {p.originalPriceVND && (
-                            <div className="text-xs text-ink-muted line-through">
-                              {compactVND(p.originalPriceVND)}
-                            </div>
-                          )}
-                        </div>
-                        {p.rating > 0 && (
-                          <div className="flex items-center gap-1 text-xs text-ink-muted">
-                            <IconStar
-                              size={12}
-                              className="text-accent-hover"
-                            />
-                            <span>{p.rating}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       {/* ============== AI WIDGETS ============== */}
       <section className="container-page py-8 md:py-12">
         <div className="flex items-end justify-between mb-6">
@@ -538,7 +374,7 @@ export default function Home() {
                 <h3 className="text-xl font-bold">Trợ lý AI</h3>
               </div>
               <p className="text-ink-light text-sm leading-relaxed">
-                Hỏi đáp về bảo dưỡng, sửa chữa, phụ tùng... Bằng ngôn ngữ
+                Hỏi đáp về bảo dưỡng, sửa chữa, linh kiện... Bằng ngôn ngữ
                 tự nhiên, có trích dẫn nguồn từ bài viết chuyên môn.
               </p>
               <div className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-primary">
@@ -550,64 +386,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============== TIN TỨC ============== */}
-      <section className="container-page py-8 md:py-12">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold">Bài viết mới</h2>
-            <p className="text-ink-light mt-1">Kiến thức hữu ích cho chủ xe</p>
-          </div>
-          <Link
-            to="/news"
-            className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-          >
-            Xem tất cả <IconArrowRight size={14} />
-          </Link>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {articles.slice(0, 3).map((a) => (
-            <Link to={`/news/${a.slug}`} key={a.id} className="group">
-              <Card>
-                <div className="aspect-[16/10] overflow-hidden rounded-t-2xl bg-bgsoft">
-                  <img
-                    src={a.image}
-                    alt={a.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <div className="p-5">
-                  <Badge tone="primary" className="mb-2">
-                    {a.category}
-                  </Badge>
-                  <h3 className="font-semibold leading-tight mb-2 group-hover:text-primary transition-colors">
-                    {a.title}
-                  </h3>
-                  <p className="text-sm text-ink-light line-clamp-2">
-                    {a.excerpt}
-                  </p>
-                  <div className="mt-3 text-xs text-ink-muted">
-                    {a.publishedAt} · {a.readMinutes} phút đọc
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </section>
-
       {/* ============== VALUE PROP / TRUST ============== */}
       <section className="container-page py-8 md:py-12">
         <div className="grid sm:grid-cols-3 gap-4">
           {[
             {
               icon: <IconShield size={22} className="text-primary" />,
-              title: "Phụ tùng xác minh",
-              desc: "Mọi sản phẩm đều là chính hãng, có bảo hành từ nhà sản xuất.",
+              title: "Phụ tùng chính hãng",
+              desc: "Mọi linh kiện dùng cho sửa chữa đều là chính hãng, có bảo hành từ nhà sản xuất.",
             },
             {
               icon: <IconCheck size={22} className="text-primary" />,
               title: "Bảo hành rõ ràng",
-              desc: "Bảo hành dịch vụ đến 12 tháng, phụ kiện chính hãng.",
+              desc: "Bảo hành dịch vụ đến 12 tháng, cam kết minh bạch từng dòng báo giá.",
             },
             {
               icon: <IconBolt size={22} className="text-primary" />,
@@ -637,16 +428,16 @@ export default function Home() {
             Sẵn sàng chăm sóc xe của bạn?
           </h2>
           <p className="text-ink-light max-w-xl mx-auto mb-6">
-            Đặt lịch sửa chữa tại {GARAGE.name} hoặc mua phụ tùng chính hãng —
-            tất cả chỉ vài thao tác.
+            Đặt lịch sửa chữa tại {GARAGE.name}, hoặc chụp ảnh xe để AI đánh
+            giá hư hỏng và gợi ý phương án — tất cả chỉ vài thao tác.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link to="/services">
               <Button size="lg">Đặt lịch ngay</Button>
             </Link>
-            <Link to="/parts">
+            <Link to="/ai/damage">
               <Button size="lg" variant="outline">
-                Mua phụ tùng
+                Phân tích hư hỏng
               </Button>
             </Link>
           </div>

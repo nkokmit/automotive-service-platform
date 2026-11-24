@@ -23,7 +23,7 @@ import type {
 import {
   formatCompactVND as compactVND,
   formatFullVND as fullVND,
-} from "../../data/cartStore";
+} from "../../utils/format";
 
 // =========================
 // AdminInvoices — Hóa đơn

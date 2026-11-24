@@ -23,6 +23,9 @@ dependencies = [
     # Vector DB
     "qdrant-client>=1.11.0",
     "fastembed>=0.3.0",
+    # PyTorch bản CPU-only: tránh kéo theo ~3GB CUDA libs (nvidia-*-cu13) vô
+    # image. Agent chạy embedding trên CPU nên không cần GPU.
+    "torch>=2.2.0",
     "sentence-transformers>=3.0.0",
     # Relational DB (MySQL + legacy Postgres compatibility)
     "sqlalchemy[asyncio]>=2.0.30",
@@ -45,3 +48,11 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+# Hatchling không tự suy ra được package `agent_service` từ thư mục `app`,
+# nên khai báo rõ để `uv pip install .` build được wheel.
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.hatch.build.targets.sdist]
+include = ["app", "README.md", "pyproject.toml"]

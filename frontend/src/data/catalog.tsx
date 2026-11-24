@@ -30,7 +30,6 @@ import type {
 } from "../api/types";
 import { GARAGE, SERVICE_IMAGE_FALLBACK, partImageFor } from "../config/garage";
 import { mockParts, mockServices } from "./mock";
-import { registerCatalogParts } from "./cartStore";
 import {
   makeSlug,
   type CatalogPart,
@@ -170,12 +169,6 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     window.addEventListener(CATALOG_CHANGED_EVENT, reload);
     return () => window.removeEventListener(CATALOG_CHANGED_EVENT, reload);
   }, [reload]);
-
-  // Đăng ký phụ tùng đang hiển thị cho cartStore để giỏ hàng tra cứu được
-  // tên/giá khi catalog là dữ liệu thật từ inventory-service.
-  useEffect(() => {
-    registerCatalogParts(parts);
-  }, [parts]);
 
   useEffect(() => {
     let cancelled = false;

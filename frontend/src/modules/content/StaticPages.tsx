@@ -24,12 +24,12 @@ const FAQS = [
     a: "Có. Sau khi đăng nhập, mở Tài khoản của tôi → tab “Lịch sử bảo dưỡng” để xem toàn bộ lần sửa chữa đã thực hiện tại xưởng.",
   },
   {
-    q: "Đặt mua phụ tùng như thế nào?",
-    a: "Tìm phụ tùng ở mục Phụ kiện, chọn số lượng rồi bấm “Thêm vào giỏ”. Bạn có thể mua ngay bằng nút “Mua ngay” hoặc thanh toán từ trang Giỏ hàng.",
+    q: "Tôi có thể xem định mức phụ tùng của dịch vụ không?",
+    a: "Có. Mở trang chi tiết dịch vụ, cuộn xuống mục “Định mức phụ tùng đi kèm” để xem linh kiện xưởng dự kiến dùng cho dịch vụ đó.",
   },
   {
     q: "Tôi có thể đánh giá dịch vụ sau khi sửa xe không?",
-    a: "Có. Mở trang chi tiết dịch vụ hoặc phụ tùng, kéo xuống mục “Đánh giá” để gửi nhận xét và điểm số của bạn.",
+    a: "Có. Mở trang chi tiết dịch vụ, kéo xuống mục “Đánh giá” để gửi nhận xét và điểm số của bạn.",
   },
   {
     q: "Hệ thống có hỗ trợ chẩn đoán hư hỏng bằng AI không?",
@@ -153,12 +153,12 @@ const TERMS_SECTIONS = [
     body: "Vui lòng huỷ hoặc đổi lịch trước ít nhất 24 giờ để xưởng sắp xếp lại. Các trường hợp không thông báo trước có thể bị tính phí theo chính sách riêng của từng dịch vụ.",
   },
   {
-    title: "5. Mua bán phụ tùng",
-    body: "Đơn hàng phụ tùng được xác nhận sau khi bạn thanh toán. Thời gian giao hàng phụ thuộc vào tình trạng kho và địa chỉ nhận hàng. Sản phẩm có thể được đổi trả trong vòng 7 ngày nếu còn nguyên tem và bao bì.",
+    title: "5. Linh kiện thay thế",
+    body: "Linh kiện dùng cho quá trình sửa chữa đều là sản phẩm chính hãng, có bảo hành từ nhà sản xuất. Bạn có thể xem định mức linh kiện dự kiến trên từng trang dịch vụ.",
   },
   {
     title: "6. Trách nhiệm của khách hàng",
-    body: "Khách hàng chịu trách nhiệm kiểm tra thông tin đơn hàng, hồ sơ xe và các dữ liệu cung cấp cho xưởng. AutoCare không chịu trách nhiệm đối với thiệt hại phát sinh do thông tin sai lệch hoặc do khách hàng che giấu tình trạng thực tế của xe.",
+    body: "Khách hàng chịu trách nhiệm kiểm tra thông tin lịch hẹn, hồ sơ xe và các dữ liệu cung cấp cho xưởng. AutoCare không chịu trách nhiệm đối với thiệt hại phát sinh do thông tin sai lệch hoặc do khách hàng che giấu tình trạng thực tế của xe.",
   },
   {
     title: "7. Bảo lưu quyền",
@@ -215,11 +215,11 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: "2. Mục đích sử dụng",
-    body: "Xử lý đặt lịch, giao hàng, gửi hóa đơn, hỗ trợ khách hàng, gửi thông báo khuyến mãi khi bạn đồng ý và cải thiện chất lượng dịch vụ.",
+    body: "Xử lý đặt lịch sửa chữa, quản lý hồ sơ xe, gửi hóa đơn, hỗ trợ khách hàng, gửi thông báo khuyến mãi khi bạn đồng ý và cải thiện chất lượng dịch vụ.",
   },
   {
     title: "3. Chia sẻ dữ liệu",
-    body: "Chúng tôi không bán dữ liệu cá nhân của bạn. Dữ liệu chỉ được chia sẻ với đơn vị giao hàng và đối tác kỹ thuật phục vụ trực tiếp cho đơn hàng của bạn, hoặc khi có yêu cầu hợi pháp.",
+    body: "Chúng tôi không bán dữ liệu cá nhân của bạn. Dữ liệu chỉ được chia sẻ với đối tác kỹ thuật phục vụ trực tiếp cho lịch hẹn và hồ sơ xe của bạn, hoặc khi có yêu cầu hợp pháp.",
   },
   {
     title: "4. Lưu trữ và bảo mật",
