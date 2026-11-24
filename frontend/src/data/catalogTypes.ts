@@ -56,10 +56,6 @@ export interface CatalogPart {
   /** Mức tồn tối thiểu — dùng để cảnh báo sắp hết hàng. */
   minStockLevel?: number;
   image: string;
-  /** Link ảnh gốc do admin nhập (null nếu dùng ảnh dự phòng theo nhóm). */
-  imageUrl?: string | null;
-  /** Mô tả sản phẩm do admin nhập. */
-  description?: string | null;
   shortDescription: string;
   compatibleCars: string[];
   rating: number;

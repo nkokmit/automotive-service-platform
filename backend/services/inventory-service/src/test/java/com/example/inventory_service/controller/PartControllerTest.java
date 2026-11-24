@@ -178,32 +178,9 @@ class PartControllerTest {
                 .andExpect(jsonPath("$.result.vehicleBrand").value("Honda"));
     }
 
-    @Test
-    void adjustStockEndpointReturnsUpdatedPart() throws Exception {
-        given(stockService.adjustStock(eq(PART_ID), any())).willReturn(partResponse());
-
-        mvc.perform(post("/api/parts/{partId}/stock", PART_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"mode\":\"ADD\",\"quantity\":20,\"note\":\"Nhập kho đầu\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.result.onHandStock").value(10));
-
-        verify(stockService).adjustStock(eq(PART_ID), any());
-    }
-
-    @Test
-    void adjustStockEndpointRejectsMissingMode() throws Exception {
-        mvc.perform(post("/api/parts/{partId}/stock", PART_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"quantity\":20}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(1000));
-    }
-
     private PartResponse partResponse() {
         return new PartResponse(PART_ID, UUID.randomUUID(), "Dầu nhớt", "SKU-001", null,
-                "Dầu nhớt 5W-30", null, null, null, "LÍT", BigDecimal.valueOf(50), BigDecimal.valueOf(150),
+                "Dầu nhớt 5W-30", null, "LÍT", BigDecimal.valueOf(50), BigDecimal.valueOf(150),
                 10, 4, 6, 5, true, null, null);
     }
 }

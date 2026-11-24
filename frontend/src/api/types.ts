@@ -258,10 +258,6 @@ export interface PartResponse {
   oemCode: string | null;
   name: string;
   brand: string | null;
-  /** Link ảnh sản phẩm do admin nhập (có thể null → dùng ảnh dự phòng). */
-  imageUrl: string | null;
-  /** Mô tả sản phẩm hiển thị ở trang chi tiết phụ kiện. */
-  description: string | null;
   unit: string;
   costPrice: number;
   sellingPrice: number;
@@ -272,14 +268,6 @@ export interface PartResponse {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-/** Lệnh nhập / hiệu chỉnh tồn kho — khớp `StockAdjustmentRequest.java`. */
-export interface StockAdjustmentRequest {
-  /** `ADD` = cộng thêm vào tồn thực, `SET` = đặt tồn thực bằng đúng số lượng. */
-  mode: "ADD" | "SET";
-  quantity: number;
-  note?: string | null;
 }
 
 /** Khớp ServiceBomResponse.java — định mức phụ tùng của một dịch vụ. */

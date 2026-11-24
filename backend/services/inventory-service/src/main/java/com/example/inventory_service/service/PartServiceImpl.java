@@ -4,7 +4,6 @@ import com.example.inventory_service.common.PageResponse;
 import com.example.inventory_service.common.TextUtils;
 import com.example.inventory_service.dto.request.PartCompatibilityRequest;
 import com.example.inventory_service.dto.request.PartRequest;
-import com.example.inventory_service.dto.request.StockAdjustmentRequest;
 import com.example.inventory_service.dto.response.PartCompatibilityResponse;
 import com.example.inventory_service.dto.response.PartResponse;
 import com.example.inventory_service.entity.Part;
@@ -27,8 +26,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.security.SecureRandom;
-import java.text.Normalizer;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -46,7 +43,6 @@ public class PartServiceImpl implements PartService {
     private final PartVehicleCompatibilityRepository compatibilityRepository;
     private final PartMapper partMapper;
     private final PartCompatibilityMapper compatibilityMapper;
-    private final StockService stockService;
 
     @Override
     @Transactional(readOnly = true)
@@ -83,7 +79,10 @@ public class PartServiceImpl implements PartService {
 
     @Override
     public PartResponse createPart(PartRequest request) {
-        String sku = resolveSku(request.sku(), request.name());
+        String sku = request.sku().trim();
+        if (partRepository.existsBySkuIgnoreCase(sku)) {
+            throw new PartAlreadyExistsException("Mã SKU phụ tùng đã tồn tại: " + sku);
+        }
         PartCategory category = findCategory(request.categoryId());
 
         // Tồn kho và giá vốn luôn bắt đầu từ 0: chỉ đổi qua đơn nhập hàng và thao tác kho.
@@ -93,8 +92,6 @@ public class PartServiceImpl implements PartService {
                 .oemCode(TextUtils.trimToNull(request.oemCode()))
                 .name(request.name().trim())
                 .brand(TextUtils.trimToNull(request.brand()))
-                .imageUrl(TextUtils.trimToNull(request.imageUrl()))
-                .description(TextUtils.trimToNull(request.description()))
                 .unit(request.unit().trim())
                 .costPrice(BigDecimal.ZERO)
                 .sellingPrice(request.sellingPrice())
@@ -104,22 +101,16 @@ public class PartServiceImpl implements PartService {
                 .isActive(request.isActive() == null ? Boolean.TRUE : request.isActive())
                 .build());
         log.info("Đã tạo phụ tùng: sku={}", saved.getSku());
-
-        // Tồn kho ban đầu (nếu có) được ghi vào sổ kho dưới dạng IMPORT thủ công.
-        if (request.initialStock() != null && request.initialStock() > 0) {
-            stockService.adjustStock(saved.getId(), new StockAdjustmentRequest(
-                    StockAdjustmentRequest.StockAdjustmentMode.ADD,
-                    request.initialStock(),
-                    "Tồn kho ban đầu khi tạo phụ tùng"));
-        }
         return partMapper.toResponse(saved);
     }
 
     @Override
     public PartResponse updatePart(UUID id, PartRequest request) {
         Part part = findPart(id);
-        // Form admin không bắt nhập SKU nữa: để trống thì giữ nguyên SKU hiện tại.
-        String sku = resolveUpdateSku(part, request);
+        String sku = request.sku().trim();
+        if (partRepository.existsBySkuIgnoreCaseAndIdNot(sku, id)) {
+            throw new PartAlreadyExistsException("Mã SKU phụ tùng đã tồn tại: " + sku);
+        }
         if (!part.getCategory().getId().equals(request.categoryId())) {
             part.setCategory(findCategory(request.categoryId()));
         }
@@ -127,8 +118,6 @@ public class PartServiceImpl implements PartService {
         part.setOemCode(TextUtils.trimToNull(request.oemCode()));
         part.setName(request.name().trim());
         part.setBrand(TextUtils.trimToNull(request.brand()));
-        part.setImageUrl(TextUtils.trimToNull(request.imageUrl()));
-        part.setDescription(TextUtils.trimToNull(request.description()));
         part.setUnit(request.unit().trim());
         part.setSellingPrice(request.sellingPrice());
         if (request.minStockLevel() != null) {
@@ -140,79 +129,6 @@ public class PartServiceImpl implements PartService {
         Part saved = partRepository.save(part);
         log.info("Đã cập nhật phụ tùng: id={}", saved.getId());
         return partMapper.toResponse(saved);
-    }
-
-    /**
-     * Chốt SKU khi tạo mới.
-     *
-     * <p>Nếu người dùng nhập SKU thì dùng luôn (kèm kiểm tra trùng). Nếu để trống
-     * thì tự sinh mã từ tên: {@code PT-<SLUG-TÊN>-<HẬU TỐ NGẪU NHIÊN>} để người
-     * dùng bình thường không phải nghĩ tới khái niệm SKU.
-     */
-    private String resolveSku(String requestedSku, String name) {
-        String trimmed = TextUtils.trimToNull(requestedSku);
-        if (trimmed != null) {
-            if (partRepository.existsBySkuIgnoreCase(trimmed)) {
-                throw new PartAlreadyExistsException("Mã SKU phụ tùng đã tồn tại: " + trimmed);
-            }
-            return trimmed;
-        }
-        return generateSku(name);
-    }
-
-    /**
-     * Chốt SKU khi cập nhật: để trống thì giữ nguyên SKU cũ (đổi tên không nên
-     * làm đổi mã), nhập thì phải không trùng với phụ tùng khác.
-     */
-    private String resolveUpdateSku(Part part, PartRequest request) {
-        String trimmed = TextUtils.trimToNull(request.sku());
-        if (trimmed == null) {
-            return part.getSku();
-        }
-        if (partRepository.existsBySkuIgnoreCaseAndIdNot(trimmed, part.getId())) {
-            throw new PartAlreadyExistsException("Mã SKU phụ tùng đã tồn tại: " + trimmed);
-        }
-        return trimmed;
-    }
-
-    /**
-     * Sinh SKU duy nhất dạng {@code PT-DAU-NHOT-7F3A}.
-     *
-     * <p>Phần đầu lấy từ tên phụ tùng (bỏ dấu tiếng Việt, gộp khoảng trắng thành
-     * dấu gạch), phần sau là hậu tố ngẫu nhiên để tránh trùng khi hai phụ tùng
-     * trùng tên.
-     */
-    private String generateSku(String name) {
-        String slug = Normalizer.normalize(name == null ? "" : name, Normalizer.Form.NFD)
-                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
-                .replaceAll("[^A-Za-z0-9]+", "-")
-                .replaceAll("^-+|-+$", "")
-                .toUpperCase();
-        if (slug.length() > 24) {
-            slug = slug.substring(0, 24).replaceAll("-+$", "");
-        }
-        if (slug.isEmpty()) {
-            slug = "PHU-TUNG";
-        }
-        for (int attempt = 0; attempt < 20; attempt++) {
-            String candidate = "PT-" + slug + "-" + randomSuffix();
-            boolean duplicated = partRepository.existsBySkuIgnoreCase(candidate);
-            if (!duplicated) {
-                return candidate;
-            }
-        }
-        throw new ApiException(ErrorCode.INVALID_REQUEST,
-                "Không tạo được mã SKU tự động, vui lòng nhập SKU thủ công");
-    }
-
-    private String randomSuffix() {
-        String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        StringBuilder builder = new StringBuilder(4);
-        SecureRandom random = new SecureRandom();
-        for (int i = 0; i < 4; i++) {
-            builder.append(alphabet.charAt(random.nextInt(alphabet.length())));
-        }
-        return builder.toString();
     }
 
     @Override

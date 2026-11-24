@@ -12,7 +12,6 @@ import com.example.inventory_service.exception.ApiException;
 import com.example.inventory_service.exception.PartNotFoundException;
 import com.example.inventory_service.exception.ReservationNotFoundException;
 import com.example.inventory_service.mapper.InventoryTransactionMapper;
-import com.example.inventory_service.mapper.PartMapper;
 import com.example.inventory_service.repository.InventoryTransactionRepository;
 import com.example.inventory_service.repository.PartRepository;
 import com.example.inventory_service.security.CurrentActorIdProvider;
@@ -59,8 +58,6 @@ class StockServiceImplTest {
     @Mock
     private InventoryTransactionMapper inventoryTransactionMapper;
     @Mock
-    private PartMapper partMapper;
-    @Mock
     private CurrentActorIdProvider currentActorIdProvider;
 
     private StockServiceImpl stockService;
@@ -71,7 +68,6 @@ class StockServiceImplTest {
                 partRepository,
                 inventoryTransactionRepository,
                 inventoryTransactionMapper,
-                partMapper,
                 currentActorIdProvider);
         lenient().when(currentActorIdProvider.requireCurrentUserId()).thenReturn(ACTOR_ID);
     }

@@ -11,19 +11,14 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Thông tin danh mục phụ tùng.
- *
- * <p>Giá vốn không nằm trong payload này: nó chỉ thay đổi qua đơn nhập hàng và
- * các thao tác kho để sổ kho luôn khớp. Tồn kho tạo mới có thể nhập sẵn qua
- * {@code initialStock}; sau đó mọi biến động đi qua {@code POST /api/parts/{id}/stock}.
- *
- * <p>{@code sku} không bắt buộc: nếu để trống, service sẽ tự sinh mã. Người dùng
- * bình thường không cần biết khái niệm SKU, admin vẫn có thể nhập tay nếu muốn.
+ * Thông tin danh mục phụ tùng. Không chứa tồn kho và giá vốn: hai giá trị này
+ * chỉ thay đổi qua đơn nhập hàng và các thao tác kho để sổ kho luôn khớp.
  */
 public record PartRequest(
         @NotNull(message = "Nhóm phụ tùng không được để trống")
         UUID categoryId,
 
+        @NotBlank(message = "SKU không được để trống")
         @Size(max = 50, message = "SKU tối đa 50 ký tự")
         String sku,
 
@@ -37,12 +32,6 @@ public record PartRequest(
         @Size(max = 100, message = "Hãng tối đa 100 ký tự")
         String brand,
 
-        @Size(max = 500, message = "Đường dẫn ảnh tối đa 500 ký tự")
-        String imageUrl,
-
-        @Size(max = 4000, message = "Mô tả tối đa 4000 ký tự")
-        String description,
-
         @NotBlank(message = "Đơn vị tính không được để trống")
         @Size(max = 20, message = "Đơn vị tính tối đa 20 ký tự")
         String unit,
@@ -54,14 +43,6 @@ public record PartRequest(
 
         @Min(value = 0, message = "Mức tồn tối thiểu không được âm")
         Integer minStockLevel,
-
-        /**
-         * Tồn kho ban đầu khi tạo mới (số lượng thực nhập kho lần đầu).
-         * Chỉ có tác dụng lúc tạo; khi cập nhật phải dùng
-         * {@code POST /api/parts/{partId}/stock}.
-         */
-        @Min(value = 0, message = "Tồn kho ban đầu không được âm")
-        Integer initialStock,
 
         Boolean isActive
 ) {

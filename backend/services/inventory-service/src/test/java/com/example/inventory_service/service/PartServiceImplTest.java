@@ -1,7 +1,6 @@
 package com.example.inventory_service.service;
 
 import com.example.inventory_service.dto.request.PartRequest;
-import com.example.inventory_service.dto.request.StockAdjustmentRequest;
 import com.example.inventory_service.entity.Part;
 import com.example.inventory_service.entity.PartCategory;
 import com.example.inventory_service.exception.PartAlreadyExistsException;
@@ -25,8 +24,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -50,15 +47,13 @@ class PartServiceImplTest {
     private PartMapper partMapper;
     @Mock
     private PartCompatibilityMapper compatibilityMapper;
-    @Mock
-    private StockService stockService;
 
     private PartServiceImpl partService;
 
     @BeforeEach
     void setUp() {
         partService = new PartServiceImpl(partRepository, partCategoryRepository,
-                compatibilityRepository, partMapper, compatibilityMapper, stockService);
+                compatibilityRepository, partMapper, compatibilityMapper);
     }
 
     @Test
@@ -123,49 +118,6 @@ class PartServiceImplTest {
         assertThat(part.getReservedStock()).isEqualTo(3);
     }
 
-    @Test
-    void createPart_generatesSkuFromNameWhenBlank() {
-        given(partRepository.existsBySkuIgnoreCase(anyString())).willReturn(false);
-        given(partCategoryRepository.findById(CATEGORY_ID)).willReturn(Optional.of(category()));
-        given(partRepository.save(any(Part.class))).willAnswer(invocation -> invocation.getArgument(0));
-
-        partService.createPart(request(null));
-
-        ArgumentCaptor<Part> captor = ArgumentCaptor.forClass(Part.class);
-        verify(partRepository).save(captor.capture());
-        assertThat(captor.getValue().getSku())
-                .startsWith("PT-DAU-NHOT-5W-30-")
-                .matches("PT-DAU-NHOT-5W-30-[A-Z0-9]{4}");
-    }
-
-    @Test
-    void createPart_appliesInitialStockThroughStockLedger() {
-        given(partRepository.existsBySkuIgnoreCase(anyString())).willReturn(false);
-        given(partCategoryRepository.findById(CATEGORY_ID)).willReturn(Optional.of(category()));
-        given(partRepository.save(any(Part.class))).willAnswer(invocation -> {
-            Part saved = invocation.getArgument(0);
-            saved.setId(PART_ID);
-            return saved;
-        });
-
-        PartRequest request = new PartRequest(CATEGORY_ID, null, null, "Dầu nhớt 5W-30", null, null, null,
-                "LÍT", BigDecimal.valueOf(150), null, 25, null);
-        partService.createPart(request);
-
-        verify(stockService).adjustStock(eq(PART_ID), any(StockAdjustmentRequest.class));
-    }
-
-    @Test
-    void updatePart_keepsSkuWhenRequestSkuIsBlank() {
-        Part part = part();
-        given(partRepository.findById(PART_ID)).willReturn(Optional.of(part));
-        given(partRepository.save(any(Part.class))).willAnswer(invocation -> invocation.getArgument(0));
-
-        partService.updatePart(PART_ID, request(null));
-
-        assertThat(part.getSku()).isEqualTo("SKU-001");
-    }
-
     private PartCategory category() {
         return PartCategory.builder()
                 .id(CATEGORY_ID)
@@ -191,7 +143,7 @@ class PartServiceImplTest {
     }
 
     private PartRequest request(String sku) {
-        return new PartRequest(CATEGORY_ID, sku, null, "Dầu nhớt 5W-30", null, null, null, "LÍT",
-                BigDecimal.valueOf(150), null, null, null);
+        return new PartRequest(CATEGORY_ID, sku, null, "Dầu nhớt 5W-30", null, "LÍT",
+                BigDecimal.valueOf(150), null, null);
     }
 }

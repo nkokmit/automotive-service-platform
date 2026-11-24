@@ -17,7 +17,6 @@ import type {
   PartResponse,
   ServiceBomResponse,
   ServiceResponse,
-  StockAdjustmentRequest,
 } from "../types";
 
 /** Payload tạo/sửa dịch vụ — khớp `ServiceRequest.java`. */
@@ -34,20 +33,14 @@ export interface ServiceWriteRequest {
 /** Payload tạo/sửa phụ tùng — khớp `PartRequest.java`. */
 export interface PartWriteRequest {
   categoryId: string;
-  /** Để trống thì backend tự sinh SKU từ tên sản phẩm. */
-  sku?: string | null;
+  /** Mã kho — bắt buộc, tối đa 50 ký tự. */
+  sku: string;
   oemCode?: string | null;
   name: string;
   brand?: string | null;
-  /** Link ảnh sản phẩm (tuỳ chọn). */
-  imageUrl?: string | null;
-  /** Mô tả sản phẩm (tuỳ chọn). */
-  description?: string | null;
   unit: string;
   sellingPrice: number;
   minStockLevel?: number;
-  /** Tồn kho ban đầu — chỉ dùng khi tạo mới. */
-  initialStock?: number;
   isActive?: boolean;
 }
 
@@ -203,22 +196,6 @@ export const inventoryApi = {
   /** Vô hiệu hóa phụ tùng (soft delete → isActive = false). Cần `PART_WRITE`. */
   deletePart: async (id: string): Promise<void> => {
     await client.request<void>(`/api/parts/${id}`, { method: "DELETE" });
-  },
-
-  /**
-   * Nhập / hiệu chỉnh tồn kho thủ công. Cần authority `STOCK_WRITE`.
-   *
-   * - `mode: "ADD"` → cộng thêm `quantity` vào tồn thực.
-   * - `mode: "SET"` → đặt tồn thực bằng đúng `quantity`.
-   */
-  adjustPartStock: async (
-    id: string,
-    data: StockAdjustmentRequest,
-  ): Promise<PartResponse> => {
-    return client.request<PartResponse>(`/api/parts/${id}/stock`, {
-      method: "POST",
-      body: data,
-    });
   },
 
   /** Gắn thêm một dòng xe tương thích. Cần authority `PART_WRITE`. */

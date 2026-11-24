@@ -104,14 +104,6 @@ export function mapPart(dto: PartResponse): CatalogPart {
   const cost = Number(dto.costPrice ?? 0);
   // Giá vốn chỉ dùng làm "giá gốc" khi cao hơn giá bán (tức đang giảm giá).
   const hasDiscount = cost > selling && selling > 0;
-  // Ảnh do admin nhập; nếu không có thì rơi về ảnh dự phòng theo nhóm.
-  const image = dto.imageUrl?.trim() || partImageFor(dto.categoryName);
-  // Mô tả do admin nhập; không có thì dựng từ thông tin cơ bản.
-  const description =
-    dto.description?.trim() ||
-    (dto.oemCode
-      ? `Phụ tùng chính hãng. Mã OEM ${dto.oemCode}. Đơn vị: ${dto.unit}.`
-      : `Phụ tùng chính hãng. Đơn vị: ${dto.unit}.`);
   return {
     id: dto.id,
     slug: makeSlug(dto.name, dto.id),
@@ -125,10 +117,10 @@ export function mapPart(dto: PartResponse): CatalogPart {
     originalPriceVND: hasDiscount ? cost : undefined,
     stockQty: dto.availableStock ?? dto.onHandStock ?? 0,
     minStockLevel: dto.minStockLevel ?? 0,
-    image,
-    imageUrl: dto.imageUrl ?? null,
-    description: dto.description ?? null,
-    shortDescription: description,
+    image: partImageFor(dto.categoryName),
+    shortDescription: dto.oemCode
+      ? `Mã OEM ${dto.oemCode}. Đơn vị: ${dto.unit}.`
+      : `Phụ tùng chính hãng. Đơn vị: ${dto.unit}.`,
     compatibleCars: [],
     rating: 0,
     reviewsCount: 0,
