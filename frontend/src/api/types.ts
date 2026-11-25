@@ -46,6 +46,7 @@ export const ErrorCode = {
 } as const;
 
 // ── User / Auth ───────────────────────────────────────────────────────────────
+/** Khớp PermissionResponse.java */
 export interface PermissionResponse {
   id: string;
   name: string;
@@ -53,14 +54,49 @@ export interface PermissionResponse {
   description?: string | null;
 }
 
-/** Role rút gọn — khi embed trong UserResponse thì permissions luôn null. */
+/**
+ * Role rút gọn — khi embed trong UserResponse thì permissions luôn null.
+ *
+ * `permissions` là mảng JSON (backend trả `Set<PermissionResponse>` → serialize
+ * thành array), nên khai báo dạng array cho khớp thực tế.
+ */
 export interface RoleResponse {
   id: string;
   name: string;
   displayName?: string | null;
   description?: string | null;
-  permissions: Set<PermissionResponse> | null;
+  permissions: PermissionResponse[] | null;
 }
+
+/**
+ * Khớp PermissionCreateRequest.java.
+ *
+ * Lưu ý: `name` KHÔNG có tiền tố `PERMISSION_` — backend lưu nguyên văn
+ * và dùng đúng chuỗi này làm authority (`hasAuthority('PERMISSION_READ')`).
+ */
+export interface PermissionCreateRequest {
+  name: string;
+  displayName?: string | null;
+  description?: string | null;
+}
+
+/** Khớp PermissionUpdateRequest.java — mọi field đều optional (null = không đổi). */
+export type PermissionUpdateRequest = PermissionCreateRequest;
+
+/**
+ * Khớp RoleCreateRequest.java.
+ *
+ * Lưu ý: `name` KHÔNG bao gồm prefix `ROLE_` — backend tự thêm khi dựng
+ * authority (`ROLE_<NAME>`). Phần raw name phải là UPPER_SNAKE_CASE.
+ */
+export interface RoleCreateRequest {
+  name: string;
+  displayName?: string | null;
+  description?: string | null;
+}
+
+/** Khớp RoleUpdateRequest.java — mọi field đều optional (null = không đổi). */
+export type RoleUpdateRequest = RoleCreateRequest;
 
 /** Khớp UserResponse.java — không có avatar/tier/memberSince. */
 export interface UserResponse {
@@ -71,7 +107,8 @@ export interface UserResponse {
   fullName: string | null;
   isActive: boolean | null;
   createdAt: string;
-  roles: Set<RoleResponse>;
+  /** Backend trả `Set<RoleResponse>` → JSON là array. */
+  roles: RoleResponse[];
 }
 
 /** Khớp UserUpdateRequest.java — mọi field đều optional (null = không đổi). */
@@ -468,8 +505,189 @@ export interface WorkOrderResponse {
   customerNote: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Snapshot booking lúc tạo Work Order — có thể null với dữ liệu cũ. */
+  booking: WorkOrderBookingSummary | null;
   estimates: EstimateSummaryResponse[];
   statusHistory: WorkOrderStatusHistoryResponse[];
+}
+
+/** Khớp BookingSummaryResponse.java — booking snapshot gắn vào Work Order. */
+export interface WorkOrderBookingSummary {
+  id: string;
+  licensePlateSnapshot: string | null;
+  startAt: string;
+  endAt: string;
+  status: string;
+  source: string;
+  customerNote: string | null;
+  services: WorkOrderBookingServiceSummary[];
+}
+
+/** Khớp BookingServiceSummaryResponse.java */
+export interface WorkOrderBookingServiceSummary {
+  serviceId: string;
+  serviceNameSnapshot: string | null;
+  estimatedDurationMinutes: number | null;
+  requiredTechniciansSnapshot: number | null;
+  sequenceNumber: number | null;
+}
+
+// ── Estimate ──────────────────────────────────────────────────────────────────
+/** Khớp EstimateType.java */
+export type EstimateType = "INITIAL" | "SUPPLEMENTARY";
+
+/** Khớp EstimateStatus.java */
+export type EstimateStatus =
+  | "DRAFT"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "PARTIALLY_APPROVED"
+  | "REJECTED";
+
+/** Khớp WorkOrderServiceStatus.java */
+export type WorkOrderServiceStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "IN_PROGRESS"
+  | "COMPLETED";
+
+/** Khớp WorkOrderPartStatus.java */
+export type WorkOrderPartStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "PARTIALLY_RESERVED"
+  | "RESERVED"
+  | "FAILED"
+  | "ISSUED"
+  | "RETURNED";
+
+/** Khớp EstimateItemType.java */
+export type EstimateItemType = "SERVICE" | "PART";
+
+/** Khớp EstimateItemDecision.java */
+export type EstimateItemDecision = "APPROVED" | "REJECTED";
+
+/** Khớp WorkOrderServiceLineResponse.java */
+export interface WorkOrderServiceLineResponse {
+  id: string;
+  serviceId: string;
+  snapshotName: string | null;
+  durationMinutes: number | null;
+  requiredTechs: number | null;
+  unitPrice: number;
+  totalPrice: number;
+  status: WorkOrderServiceStatus;
+  assignedTechId: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+/** Khớp WorkOrderPartLineResponse.java */
+export interface WorkOrderPartLineResponse {
+  id: string;
+  serviceLineId: string | null;
+  partId: string;
+  snapshotName: string | null;
+  snapshotSku: string | null;
+  snapshotUnit: string | null;
+  requestedQuantity: number;
+  reservedQuantity: number;
+  issuedQuantity: number;
+  releasedQuantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  status: WorkOrderPartStatus;
+  createdAt: string;
+}
+
+/** Khớp EstimateResponse.java */
+export interface EstimateResponse {
+  id: string;
+  code: string;
+  workOrderId: string;
+  type: EstimateType;
+  status: EstimateStatus;
+  totalLaborAmount: number;
+  totalPartsAmount: number;
+  totalAmount: number;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  serviceLines: WorkOrderServiceLineResponse[];
+  partLines: WorkOrderPartLineResponse[];
+}
+
+/** Khớp AssignedServiceLineResponse.java */
+export interface AssignedServiceLineResponse {
+  id: string;
+  estimateId: string;
+  workOrderId: string;
+  workOrderCode: string;
+  serviceId: string;
+  snapshotName: string | null;
+  durationMinutes: number | null;
+  requiredTechs: number | null;
+  unitPrice: number;
+  totalPrice: number;
+  status: WorkOrderServiceStatus;
+  assignedTechId: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+// ── Request DTO của work-order-service ───────────────────────────────────────
+/** Khớp CreateWorkOrderRequest.java */
+export interface CreateWorkOrderRequest {
+  bookingId: string;
+  /** Số km vào xưởng — bắt buộc, >= 0. */
+  odometerIn: number;
+  /** Tình trạng xe khi vào (tối đa 65535 ký tự). */
+  vehicleCondition?: string | null;
+  /** Ghi chú của khách về xe. */
+  customerNote?: string | null;
+}
+
+/** Khớp CreateEstimateRequest.java */
+export interface CreateEstimateRequest {
+  type: EstimateType;
+}
+
+/** Khớp AddServiceToEstimateRequest.java */
+export interface AddServiceToEstimateRequest {
+  serviceId: string;
+}
+
+/** Khớp AddPartToEstimateRequest.java */
+export interface AddPartToEstimateRequest {
+  partId: string;
+  /** Số lượng > 0. */
+  quantity: number;
+}
+
+/** Khớp EstimateItemDecisionRequest.java */
+export interface EstimateItemDecisionRequest {
+  itemType: EstimateItemType;
+  /** id của service line hoặc part line (KHÔNG phải id catalog). */
+  itemId: string;
+  decision: EstimateItemDecision;
+}
+
+/** Khớp EstimateDecisionRequest.java */
+export interface EstimateDecisionRequest {
+  items: EstimateItemDecisionRequest[];
+}
+
+/** Khớp AssignMechanicRequest.java */
+export interface AssignMechanicRequest {
+  /** id của hồ sơ nhân viên (staff profile), không phải user id. */
+  mechanicId: string;
+}
+
+/** Khớp PartQuantityRequest.java */
+export interface PartQuantityRequest {
+  quantity: number;
 }
 
 // ── Billing service (billing-service) ─────────────────────────────────────────
@@ -598,13 +816,53 @@ export interface StaffBookingPageResponse {
   totalPages: number;
 }
 
+/**
+ * Khớp `StaffBookingVehicleRequest.java` — payload cho
+ * `POST /api/staff/bookings/{id}/check-in`.
+ */
+export interface StaffBookingVehicleRequest {
+  /** Xe thực tế đưa vào xưởng (bắt buộc — booking chưa gắn xe thì không tạo được Work Order). */
+  vehicleId: string;
+  /** Số km vào xưởng, >= 0. */
+  odometerIn: number;
+  /** Tình trạng xe khi nhận. */
+  vehicleCondition?: string | null;
+  /** Ghi chú của khách. */
+  customerNote?: string | null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Nhãn tiếng Việt cho tên role của backend.
+ *
+ * Backend trả `roles[].name` ở dạng "ADMIN", "MECHANIC", "MANAGER",
+ * "SERVICE_ADVISOR", "CASHIER", "CUSTOMER". Giao diện hiển thị nhãn tiếng Việt
+ * tương ứng; role lạ (do admin tự tạo) thì giữ nguyên tên gốc.
+ */
+export const ROLE_LABEL: Record<string, string> = {
+  ADMIN: "Quản trị viên",
+  MANAGER: "Quản lý",
+  MECHANIC: "Kỹ thuật viên",
+  TECHNICIAN: "Kỹ thuật viên",
+  SERVICE_ADVISOR: "Tư vấn viên",
+  CASHIER: "Thu ngân",
+  CUSTOMER: "Khách hàng",
+};
+
+/** Nhãn hiển thị cho một danh sách tên role. */
+export function roleLabel(names: string[] | undefined | null): string {
+  if (!names || names.length === 0) return "Quản trị viên";
+  const first = names[0]?.toUpperCase() ?? "";
+  return ROLE_LABEL[first] ?? names[0] ?? "Quản trị viên";
+}
+
 /** Kiểm tra user có authority cụ thể không (role ADMIN ⇒ ROLE_ADMIN). */
 export function hasAuthority(user: UserResponse | null, authority: string): boolean {
   if (!user?.roles) return false;
   for (const role of user.roles) {
     if (role.name === authority) return true;
-    const perms = role.permissions ? Array.from(role.permissions) : [];
+    const perms = role.permissions ? role.permissions : [];
     if (perms.some((p) => p.name === authority)) return true;
   }
   return false;
@@ -613,6 +871,6 @@ export function hasAuthority(user: UserResponse | null, authority: string): bool
 /** Lấy tên role đầu tiên — dùng cho phân nhánh UI CUSTOMER / ADMIN. */
 export function primaryRole(user: UserResponse | null): string | null {
   if (!user?.roles) return null;
-  const names = Array.from(user.roles).map((r) => r.name);
+  const names = user.roles.map((r) => r.name);
   return names.length > 0 ? names[0] : null;
 }

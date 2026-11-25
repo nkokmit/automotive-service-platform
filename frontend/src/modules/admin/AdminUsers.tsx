@@ -9,13 +9,15 @@ import {
   IconClose,
   IconRefresh,
   IconTrash,
+  IconList,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { ConfirmModal } from "../../components/AdminTable";
 import { useToast } from "../../components/Toast";
 import { adminUserApi } from "../../api/endpoints/user";
-import type { UserResponse } from "../../api/types";
+import { roleApi, userRoleApi } from "../../api/endpoints/rbac";
+import type { RoleResponse, UserResponse } from "../../api/types";
 import {
   getRoleLabel,
   type AdminUser,
@@ -57,7 +59,7 @@ function avatarFor(seed: string): string {
 
 /** Map role của backend sang nhóm hiển thị của admin. */
 function mapRole(user: UserResponse): AdminUserRole {
-  const names = Array.from(user.roles ?? []).map((r) => r.name?.toUpperCase() ?? "");
+  const names = (user.roles ?? []).map((r) => r.name?.toUpperCase() ?? "");
   if (names.includes("ADMIN")) return "admin";
   if (
     names.some((n) =>
@@ -70,6 +72,7 @@ function mapRole(user: UserResponse): AdminUserRole {
 
 function mapUser(dto: UserResponse): AdminUser {
   const name = dto.fullName?.trim() || dto.username;
+  const roleNames = (dto.roles ?? []).map((r) => r.name?.toUpperCase() ?? "");
   return {
     id: dto.id,
     name,
@@ -77,6 +80,7 @@ function mapUser(dto: UserResponse): AdminUser {
     phone: dto.phone ?? "—",
     avatar: avatarFor(dto.id),
     role: mapRole(dto),
+    roleNames,
     city: "—",
     joinedAt: "—",
     totalOrders: 0,
@@ -98,6 +102,16 @@ export default function AdminUsers() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // ── Gán role cho user (POST/DELETE /api/users/{id}/roles) ───────────────
+  const [roles, setRoles] = useState<RoleResponse[]>([]);
+  const [roleIdsByUser, setRoleIdsByUser] = useState<Record<string, string[]>>(
+    {},
+  );
+  const [roleTarget, setRoleTarget] = useState<AdminUser | null>(null);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [roleSaving, setRoleSaving] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
+
   // Nhận `?q=` từ ô tìm kiếm trên topbar admin
   const [params] = useSearchParams();
   const urlQuery = params.get("q") ?? "";
@@ -111,6 +125,13 @@ export default function AdminUsers() {
     try {
       const page = await adminUserApi.listUsers({ size: 100 });
       setUsers((page.items ?? []).map(mapUser));
+      // Nhớ luôn id các role của từng user để mở modal gán role không phải
+      // gọi lại API.
+      const map: Record<string, string[]> = {};
+      for (const dto of page.items ?? []) {
+        map[dto.id] = (dto.roles ?? []).map((r) => r.id);
+      }
+      setRoleIdsByUser(map);
     } catch (err) {
       setUsers([]);
       setError(
@@ -126,6 +147,87 @@ export default function AdminUsers() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Danh sách role dùng cho modal gán role (cần authority `ROLE_READ`). */
+  useEffect(() => {
+    let cancelled = false;
+    roleApi
+      .listRoles({ size: 200 })
+      .then((page) => {
+        if (!cancelled) setRoles(page.items ?? []);
+      })
+      .catch(() => {
+        // Không tải được danh sách role → modal gán role sẽ báo lỗi khi mở.
+        if (!cancelled) setRoles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Mở modal gán role — chọn sẵn các role user đang có. */
+  const openRoleEditor = useCallback((u: AdminUser) => {
+    setRoleError(null);
+    setRoleTarget(u);
+    setSelectedRoles(roleIdsByUser[u.id] ?? []);
+  }, [roleIdsByUser]);
+
+  const toggleRole = (id: string) => {
+    setSelectedRoles((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  /** Lưu tập role mới cho user — endpoint thay thế TOÀN BỘ role cũ. */
+  const saveRoles = async () => {
+    if (!roleTarget || roleSaving) return;
+    setRoleSaving(true);
+    setRoleError(null);
+    try {
+      const saved = await userRoleApi.assignRoles(
+        roleTarget.id,
+        selectedRoles,
+      );
+      const next = mapUser(saved);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === roleTarget.id ? { ...next, id: u.id } : u)),
+      );
+      setRoleIdsByUser((prev) => ({
+        ...prev,
+        [roleTarget.id]: (saved.roles ?? []).map((r) => r.id),
+      }));
+      t.success(`Đã cập nhật vai trò cho "${roleTarget.name}".`);
+      setRoleTarget(null);
+    } catch (err) {
+      setRoleError(
+        err instanceof Error ? err.message : "Không lưu được vai trò.",
+      );
+    } finally {
+      setRoleSaving(false);
+    }
+  };
+
+  /** Gỡ một role khỏi user (DELETE /api/users/{id}/roles/{roleId}). */
+  const removeRoleFromUser = async (
+    user: AdminUser,
+    roleId: string,
+  ) => {
+    try {
+      const saved = await userRoleApi.removeRole(user.id, roleId);
+      const next = mapUser(saved);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...next, id: u.id } : u)),
+      );
+      const remaining = (saved.roles ?? []).map((r) => r.id);
+      setRoleIdsByUser((prev) => ({ ...prev, [user.id]: remaining }));
+      setSelectedRoles(remaining);
+      t.success("Đã gỡ vai trò khỏi tài khoản.");
+    } catch (err) {
+      t.error(
+        err instanceof Error ? err.message : "Không gỡ được vai trò.",
+      );
+    }
+  };
 
   const filtered = useMemo(() => {
     return users.filter((u) => {
@@ -330,7 +432,23 @@ export default function AdminUsers() {
                       <div className="text-ink-muted">{u.phone}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Badge tone={ROLE_TONE[u.role]}>{getRoleLabel(u.role)}</Badge>
+                      <div className="flex flex-col items-center gap-1">
+                        <Badge tone={ROLE_TONE[u.role]}>
+                          {getRoleLabel(u.role)}
+                        </Badge>
+                        {u.roleNames.length > 0 && (
+                          <div className="flex flex-wrap justify-center gap-1">
+                            {u.roleNames.map((rn) => (
+                              <span
+                                key={rn}
+                                className="text-[10px] font-mono text-ink-muted bg-bgsoft px-1.5 py-0.5 rounded"
+                              >
+                                {rn}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {u.status === "active" ? (
@@ -344,6 +462,15 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1.5 justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="Gán vai trò"
+                          onClick={() => openRoleEditor(u)}
+                        >
+                          <IconList size={12} />
+                          <span className="hidden sm:inline">Vai trò</span>
+                        </Button>
                         {u.role !== "admin" &&
                           (u.status === "active" ? (
                             <Button
@@ -435,6 +562,114 @@ export default function AdminUsers() {
             void applyAction(actionConfirm.user, actionConfirm.action)
           }
         />
+      )}
+
+      {/* Modal gán vai trò cho tài khoản */}
+      {roleTarget && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/50 flex items-center justify-center p-4"
+          onClick={() => !roleSaving && setRoleTarget(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col"
+          >
+            <div className="flex items-center justify-between p-5 border-b border-ink/8 sticky top-0 bg-white">
+              <div>
+                <h3 className="font-bold text-base">Vai trò của tài khoản</h3>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  {roleTarget.name} · {roleTarget.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoleTarget(null)}
+                className="p-1.5 rounded-md hover:bg-bgsoft text-ink-muted"
+                aria-label="Đóng"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 flex-1 overflow-y-auto space-y-3">
+              {roles.length === 0 ? (
+                <p className="text-sm text-ink-muted">
+                  Không tải được danh sách vai trò. Cần authority{" "}
+                  <code className="bg-bgsoft px-1 py-0.5 rounded">ROLE_READ</code>{" "}
+                  để xem danh sách này.
+                </p>
+              ) : (
+                <div className="border border-ink/8 rounded-xl divide-y divide-ink/5">
+                  {roles.map((r) => {
+                    const checked = selectedRoles.includes(r.id);
+                    return (
+                      <label
+                        key={r.id}
+                        className="flex items-start gap-3 px-3 py-2.5 hover:bg-bgsoft/50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleRole(r.id)}
+                          className="mt-0.5 accent-primary w-4 h-4 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono text-[13px] font-semibold">
+                            {r.name}
+                          </div>
+                          {r.displayName && (
+                            <div className="text-xs text-ink-muted line-clamp-1">
+                              {r.displayName}
+                            </div>
+                          )}
+                        </div>
+                        {checked && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              void removeRoleFromUser(roleTarget, r.id);
+                            }}
+                            title="Gỡ quyền này khỏi tài khoản"
+                            className="text-xs text-red-500 hover:text-red-600 inline-flex items-center gap-1 shrink-0"
+                          >
+                            <IconClose size={12} />
+                            Gỡ
+                          </button>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              {roleError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {roleError}
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-ink/8 flex gap-2 justify-end sticky bottom-0 bg-white">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setRoleTarget(null)}
+                disabled={roleSaving}
+              >
+                Huỷ
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void saveRoles()}
+                disabled={roleSaving}
+              >
+                <IconCheck size={14} />
+                {roleSaving ? "Đang lưu..." : "Lưu vai trò"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

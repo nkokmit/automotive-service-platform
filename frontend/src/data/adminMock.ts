@@ -214,6 +214,8 @@ export interface AdminUser {
   phone: string;
   avatar: string;
   role: AdminUserRole;
+  /** Tên role thật từ backend (VD: ["ADMIN", "MECHANIC"]). */
+  roleNames: string[];
   city: string;
   joinedAt: string;
   totalOrders: number;
@@ -259,6 +261,7 @@ export const adminUsers: AdminUser[] = [
     phone: u.phone,
     avatar: u.avatar,
     role: "customer",
+    roleNames: ["CUSTOMER"],
     city: "Hà Nội",
     joinedAt: u.memberSince,
     totalOrders: 0,
@@ -273,6 +276,7 @@ export const adminUsers: AdminUser[] = [
     phone: "024 3876 1234",
     avatar: IMG(avatarSeeds[1]),
     role: "garage_owner",
+    roleNames: ["MANAGER"],
     city: "Hà Nội",
     joinedAt: "01/04/2025",
     totalOrders: 184,
@@ -288,6 +292,7 @@ export const adminUsers: AdminUser[] = [
     phone: "1900 6868",
     avatar: IMG(avatarSeeds[0]),
     role: "admin",
+    roleNames: ["ADMIN"],
     city: "TP.HCM",
     joinedAt: "01/01/2024",
     totalOrders: 0,
@@ -302,6 +307,7 @@ export const adminUsers: AdminUser[] = [
     phone: `09${(10000000 + idx * 1234567).toString().slice(0, 8)}`,
     avatar: IMG(avatarSeeds[idx % avatarSeeds.length]),
     role: "customer",
+    roleNames: ["CUSTOMER"],
     city: c.city,
     joinedAt: `${10 + idx}/0${(idx % 9) + 1}/2026`,
     totalOrders: (idx % 5) + 1,

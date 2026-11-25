@@ -84,7 +84,7 @@ export function mapUserFromApi(dto: UserResponse): AuthUser {
     loyaltyPoints: 0,
     tier: "Thành viên",
     username: dto.username,
-    roles: dto.roles ? Array.from(dto.roles).map((r) => r.name) : [],
+    roles: dto.roles ? dto.roles.map((r) => r.name) : [],
   };
 }
 

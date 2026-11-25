@@ -19,6 +19,7 @@ import type {
   BookingStatus,
   StaffBookingPageResponse,
   StaffBookingResponse,
+  StaffBookingVehicleRequest,
 } from "../types";
 
 export interface AvailabilityParams {
@@ -143,6 +144,30 @@ export const staffBookingApi = {
       {
         method: "PATCH",
         body: { status, reason: reason ?? null },
+      },
+    );
+  },
+
+  /**
+   * Tiếp nhận xe — **endpoint riêng**, KHÔNG dùng `updateStatus("CHECKED_IN")`.
+   *
+   * Backend trả lỗi 5003 nếu đặt CHECKED_IN qua `/status` ("Trạng thái
+   * CHECKED_IN không được đặt trực tiếp"). Endpoint này bắt buộc có:
+   *  - `vehicleId`: xe thực tế đưa vào xưởng — booking chưa gắn xe thì không
+   *    tạo được Work Order (lỗi 6203).
+   *  - `odometerIn`: số km vào xưởng.
+   *
+   * Cần authority `BOOKING_CHECK_IN`.
+   */
+  checkIn: async (
+    bookingId: string,
+    data: StaffBookingVehicleRequest,
+  ): Promise<StaffBookingResponse> => {
+    return client.request<StaffBookingResponse>(
+      `/api/staff/bookings/${bookingId}/check-in`,
+      {
+        method: "POST",
+        body: data,
       },
     );
   },

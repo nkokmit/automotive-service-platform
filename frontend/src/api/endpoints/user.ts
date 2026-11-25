@@ -5,11 +5,11 @@ import client from "../client";
 import type {
   CustomerResponse,
   PageResponse,
-  RoleResponse,
   UserResponse,
   UserUpdateRequest,
 } from "../types";
 import { customerVehicleApi } from "./customerVehicle";
+import { roleApi, userRoleApi } from "./rbac";
 
 export const userApi = {
   me: (): Promise<UserResponse> => client.request<UserResponse>("/api/users/me"),
@@ -80,18 +80,20 @@ export const adminUserApi = {
     id: string,
     roleIds: string[],
   ): Promise<UserResponse> => {
-    return client.request<UserResponse>(`/api/users/${id}/roles`, {
-      method: "POST",
-      body: roleIds,
-    });
+    return userRoleApi.assignRoles(id, roleIds);
+  },
+
+  /** Gỡ một role khỏi user (cần `USER_UPDATE`). */
+  removeRole: async (
+    id: string,
+    roleId: string,
+  ): Promise<UserResponse> => {
+    return userRoleApi.removeRole(id, roleId);
   },
 
   /** Danh sách role (cần `ROLE_READ`). */
   listRoles: async (size = 50) => {
-    return client.requestPage<PageResponse<RoleResponse>>("/api/roles", {
-      page: 0,
-      size,
-    });
+    return roleApi.listRoles({ page: 0, size });
   },
 };
 

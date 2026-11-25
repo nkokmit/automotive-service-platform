@@ -20,8 +20,10 @@ import {
   IconActivity,
   IconCalendar,
   IconCash,
+  IconShield,
 } from "./icons";
 import { useAuth } from "../data/authStore";
+import { roleLabel } from "../api/types";
 import { useToast } from "./Toast";
 import SearchBox from "./SearchBox";
 import { recentActivities } from "../data/adminMock";
@@ -55,6 +57,11 @@ const navGroups: NavGroup[] = [
       { to: "/admin/bookings", label: "Lịch hẹn xưởng", icon: IconCalendar },
       { to: "/admin/invoices", label: "Hóa đơn", icon: IconCash },
       { to: "/admin/work-orders", label: "Phiếu sửa chữa", icon: IconWrench },
+      {
+        to: "/admin/work-orders/mine",
+        label: "Việc của tôi",
+        icon: IconCheck,
+      },
       { to: "/admin/staff", label: "Kỹ thuật viên", icon: IconUsers },
       { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
       { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
@@ -66,6 +73,8 @@ const navGroups: NavGroup[] = [
   {
     label: "Hệ thống",
     items: [
+      { to: "/admin/permissions", label: "Quyền", icon: IconShield },
+      { to: "/admin/roles", label: "Vai trò", icon: IconShield },
       { to: "/admin/reports", label: "Báo cáo", icon: IconChart },
       { to: "/admin/settings", label: "Cài đặt", icon: IconSettings },
     ],
@@ -146,6 +155,16 @@ export default function AdminLayout() {
       match: /người dùng|user|tài khoản/,
       to: "/admin/users",
       routeWords: ["người dùng", "user", "users", "tài khoản"],
+    },
+    {
+      match: /quyền|permission|phân quyền/,
+      to: "/admin/permissions",
+      routeWords: ["quyền", "quyen", "permission", "permissions", "phân quyền"],
+    },
+    {
+      match: /vai trò|role/,
+      to: "/admin/roles",
+      routeWords: ["vai trò", "vai tro", "role", "roles"],
     },
   ];
 
@@ -347,7 +366,7 @@ export default function AdminLayout() {
                   {user?.name || "Admin AutoCare"}
                 </div>
                 <div className="text-[10px] text-primary font-medium uppercase">
-                  Quản trị viên
+                  {roleLabel(user?.roles)}
                 </div>
               </div>
             </div>
@@ -410,7 +429,13 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
-                    end={item.to === "/admin"}
+                    end={
+                      item.to === "/admin" ||
+                      // Route con của "Phiếu sửa chữa" — `end` để trang cha
+                      // không bị highlight khi đang ở trang con.
+                      item.to === "/admin/work-orders" ||
+                      item.to === "/admin/work-orders/mine"
+                    }
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       [

@@ -47,6 +47,9 @@ import AdminBookings from "./modules/admin/AdminBookings";
 import AdminInvoices from "./modules/admin/AdminInvoices";
 import AdminStaff from "./modules/admin/AdminStaff";
 import AdminWorkOrders from "./modules/admin/AdminWorkOrders";
+import TechnicianWorkOrders from "./modules/admin/TechnicianWorkOrders";
+import AdminPermissions from "./modules/admin/AdminPermissions";
+import AdminRoles from "./modules/admin/AdminRoles";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
@@ -114,8 +117,11 @@ hydrateUser().finally(() => {
               <Route path="invoices" element={<AdminInvoices />} />
               <Route path="staff" element={<AdminStaff />} />
               <Route path="work-orders" element={<AdminWorkOrders />} />
+              <Route path="work-orders/mine" element={<TechnicianWorkOrders />} />
               <Route path="vehicles" element={<AdminCustomerVehicles />} />
               <Route path="users" element={<AdminUsers />} />
+              <Route path="permissions" element={<AdminPermissions />} />
+              <Route path="roles" element={<AdminRoles />} />
               <Route
                 path="reports"
                 element={

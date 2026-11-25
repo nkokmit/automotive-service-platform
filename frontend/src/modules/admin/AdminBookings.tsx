@@ -17,10 +17,12 @@ import Button from "../../components/Button";
 import Card from "../../components/Card";
 import { useToast } from "../../components/Toast";
 import { staffBookingApi } from "../../api/endpoints/booking";
+import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
 import { workOrderApi } from "../../api/endpoints/workOrder";
 import type {
   BookingStatus,
   StaffBookingResponse,
+  VehicleResponse,
   WorkOrderListItemResponse,
 } from "../../api/types";
 
@@ -79,6 +81,8 @@ export default function AdminBookings() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [workOrders, setWorkOrders] = useState<WorkOrderListItemResponse[]>([]);
+  /** Lịch hẹn đang mở modal tiếp nhận xe. */
+  const [checkInFor, setCheckInFor] = useState<StaffBookingResponse | null>(null);
 
   // Nhận `?q=` từ ô tìm kiếm trên topbar admin
   const [params] = useSearchParams();
@@ -157,6 +161,40 @@ export default function AdminBookings() {
         err instanceof Error
           ? err.message
           : "Không cập nhật được trạng thái lịch hẹn",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  /**
+   * Tiếp nhận xe — dùng endpoint RIÊNG `POST /api/staff/bookings/{id}/check-in`.
+   *
+   * KHÔNG dùng `updateStatus("CHECKED_IN")`: backend trả lỗi 5003
+   * ("Trạng thái CHECKED_IN không được đặt trực tiếp"). Endpoint check-in bắt
+   * buộc có `vehicleId` + `odometerIn` và chỉ chạy được trong ngày hẹn.
+   */
+  const handleCheckIn = async (
+    booking: StaffBookingResponse,
+    vehicleId: string,
+    odometerIn: number,
+    vehicleCondition: string,
+  ) => {
+    setBusyId(booking.id);
+    try {
+      const updated = await staffBookingApi.checkIn(booking.id, {
+        vehicleId,
+        odometerIn,
+        vehicleCondition: vehicleCondition.trim() || null,
+        customerNote: booking.customerNote ?? null,
+      });
+      setBookings((prev) =>
+        prev.map((b) => (b.id === booking.id ? { ...b, ...updated } : b)),
+      );
+      t.success("Đã tiếp nhận xe thành công");
+    } catch (err) {
+      t.error(
+        err instanceof Error ? err.message : "Không tiếp nhận được xe",
       );
     } finally {
       setBusyId(null);
@@ -374,7 +412,7 @@ export default function AdminBookings() {
                             <Button
                               size="sm"
                               disabled={busyId === b.id}
-                              onClick={() => void handleStatus(b, "CHECKED_IN")}
+                              onClick={() => setCheckInFor(b)}
                             >
                               <IconCheckCircle size={12} />
                               Nhận xe
@@ -465,6 +503,14 @@ export default function AdminBookings() {
         </Card>
       )}
 
+      {checkInFor && (
+        <BookingCheckInModal
+          booking={checkInFor}
+          onClose={() => setCheckInFor(null)}
+          onSubmit={handleCheckIn}
+        />
+      )}
+
       {error && (
         <p className="text-xs text-ink-muted flex items-center gap-1">
           <IconWarning size={12} />
@@ -498,6 +544,175 @@ function StatCard({
         <div className="text-xs text-ink-muted">{label}</div>
       </div>
       <div className="text-2xl font-bold mt-2">{value}</div>
+    </div>
+  );
+}
+
+// =========================
+// Modal tiếp nhận xe
+// =========================
+
+/**
+ * `POST /api/staff/bookings/{id}/check-in` yêu cầu:
+ *  - `vehicleId` (bắt buộc) — xe thực tế đưa vào xưởng. Booking chưa gắn xe
+ *    thì không tạo được Work Order (lỗi 6203).
+ *  - `odometerIn` (bắt buộc, >= 0).
+ *
+ * Backend cũng chỉ cho tiếp nhận trong **ngày hẹn** (lỗi 5305) và bắt buộc biển
+ * số của xe phải khớp `licensePlateSnapshot` của booking (lỗi 5303).
+ */
+function BookingCheckInModal({
+  booking,
+  onClose,
+  onSubmit,
+}: {
+  booking: StaffBookingResponse;
+  onClose: () => void;
+  onSubmit: (
+    booking: StaffBookingResponse,
+    vehicleId: string,
+    odometerIn: number,
+    vehicleCondition: string,
+  ) => Promise<void>;
+}) {
+  const t = useToast();
+  const [vehicles, setVehicles] = useState<VehicleResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [vehicleId, setVehicleId] = useState("");
+  const [odometer, setOdometer] = useState("");
+  const [condition, setCondition] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    customerVehicleApi
+      .listVehicles({ licensePlate: booking.licensePlateSnapshot, size: 20 })
+      .then((page) => setVehicles(page.items ?? []))
+      .catch(() => setVehicles([]))
+      .finally(() => setLoading(false));
+  }, [booking.licensePlateSnapshot]);
+
+  const submit = async () => {
+    if (!vehicleId) {
+      t.error("Chọn xe thực tế đưa vào xưởng");
+      return;
+    }
+    const odo = Number(odometer);
+    if (!Number.isFinite(odo) || odo < 0) {
+      t.error("Số km vào xưởng phải là số không âm");
+      return;
+    }
+    setBusy(true);
+    await onSubmit(booking, vehicleId, Math.floor(odo), condition);
+    setBusy(false);
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-ink/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-lg p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-ink/8 pb-4 mb-4">
+          <div>
+            <h3 className="font-bold text-lg">Tiếp nhận xe</h3>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Biển số{" "}
+              <span className="font-mono font-semibold text-ink">
+                {booking.licensePlateSnapshot}
+              </span>{" "}
+              · {booking.startAt ? fmtTime(booking.startAt) : ""}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-bgsoft"
+            aria-label="Đóng"
+          >
+            <IconClose size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-ink mb-1.5 block">
+              Xe đưa vào xưởng <span className="text-red-500">*</span>
+            </label>
+            {loading ? (
+              <p className="text-sm text-ink-muted">Đang tải danh sách xe...</p>
+            ) : vehicles.length === 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Không tìm thấy xe nào khớp biển số{" "}
+                {booking.licensePlateSnapshot}. Hãy kiểm tra hồ sơ xe trong
+                trang <strong>Khách hàng &amp; Xe</strong> trước.
+              </div>
+            ) : (
+              <select
+                value={vehicleId}
+                onChange={(e) => setVehicleId(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm outline-none focus:border-primary"
+              >
+                <option value="">-- chọn xe --</option>
+                {vehicles.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.licensePlate}
+                    {v.make ? ` · ${v.make}` : ""}
+                    {v.model ? ` ${v.model}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-ink mb-1.5 block">
+              Số km vào xưởng <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={odometer}
+              onChange={(e) => setOdometer(e.target.value)}
+              placeholder="VD: 45000"
+              className="w-full h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm outline-none focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-ink mb-1.5 block">
+              Tình trạng xe
+            </label>
+            <input
+              type="text"
+              placeholder="VD: xướt chốt sân, vô-lăng bển…"
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+              className="w-full h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm outline-none focus:border-primary"
+            />
+          </div>
+
+          <p className="text-[11px] text-ink-muted">
+            Lưu ý: backend chỉ cho tiếp nhận xe trong ngày hẹn, và biển số xe
+            phải khớp biển số trên lịch hẹn.
+          </p>
+        </div>
+
+        <div className="flex gap-2 justify-end mt-5 pt-4 border-t border-ink/8">
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Huỷ
+          </Button>
+          <Button
+            onClick={() => void submit()}
+            disabled={busy || vehicles.length === 0}
+          >
+            <IconCheckCircle size={14} />
+            {busy ? "Đang tiếp nhận..." : "Tiếp nhận xe"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -9,14 +9,20 @@ import {
   IconUsers,
   IconClock,
   IconClose,
+  IconPlus,
+  IconCheckCircle,
+  IconArrowRight,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { useToast } from "../../components/Toast";
 import { workOrderApi } from "../../api/endpoints/workOrder";
+import { staffBookingApi } from "../../api/endpoints/booking";
+import { hasTokenAuthority } from "../../api/session";
+import AdminWorkOrderDetail from "./AdminWorkOrderDetail";
 import type {
+  StaffBookingResponse,
   WorkOrderListItemResponse,
-  WorkOrderResponse,
   WorkOrderStatus,
 } from "../../api/types";
 
@@ -85,11 +91,11 @@ export default function AdminWorkOrders() {
   const [items, setItems] = useState<WorkOrderListItemResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<WorkOrderListItemResponse | null>(
-    null,
-  );
-  const [detail, setDetail] = useState<WorkOrderResponse | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+
+  /** Id của phiếu đang mở chi tiết. */
+  const [detailId, setDetailId] = useState<string | null>(null);
+  /** Mở modal tạo phiếu mới. */
+  const [showCreate, setShowCreate] = useState(false);
 
   const [params] = useSearchParams();
   const urlQuery = params.get("q") ?? "";
@@ -133,22 +139,7 @@ export default function AdminWorkOrders() {
     );
   }, [items, search]);
 
-  const openDetail = async (wo: WorkOrderListItemResponse) => {
-    setSelected(wo);
-    setDetail(null);
-    setDetailLoading(true);
-    try {
-      setDetail(await workOrderApi.getWorkOrder(wo.id));
-    } catch (err) {
-      t.error(
-        err instanceof Error
-          ? err.message
-          : "Không tải được chi tiết phiếu sửa chữa",
-      );
-    } finally {
-      setDetailLoading(false);
-    }
-  };
+  const canCreate = hasTokenAuthority("WORK_ORDER_CREATE");
 
   return (
     <div className="space-y-4">
@@ -169,15 +160,22 @@ export default function AdminWorkOrders() {
             · {items.length} phiếu
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void load()}
-          disabled={loading}
-        >
-          <IconRefresh size={14} className={loading ? "animate-spin" : ""} />
-          Làm mới
-        </Button>
+        <div className="flex gap-2">
+          {canCreate && (
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              <IconPlus size={14} /> Tạo phiếu
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void load()}
+            disabled={loading}
+          >
+            <IconRefresh size={14} className={loading ? "animate-spin" : ""} />
+            Làm mới
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -259,7 +257,7 @@ export default function AdminWorkOrders() {
                   >
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => void openDetail(w)}
+                        onClick={() => setDetailId(w.id)}
                         className="font-mono font-bold text-primary hover:underline"
                       >
                         {w.code}
@@ -300,7 +298,7 @@ export default function AdminWorkOrders() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => void openDetail(w)}
+                        onClick={() => setDetailId(w.id)}
                       >
                         Chi tiết
                       </Button>
@@ -325,138 +323,227 @@ export default function AdminWorkOrders() {
         </p>
       )}
 
+      {/* Modal tạo phiếu */}
+      {showCreate && (
+        <CreateWorkOrderModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            setShowCreate(false);
+            void load();
+            t.success("Đã tạo phiếu sửa chữa");
+          }}
+        />
+      )}
+
       {/* Modal chi tiết */}
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 bg-ink/50 flex items-center justify-center p-4"
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6"
-            onClick={(e) => e.stopPropagation()}
+      {detailId && (
+        <AdminWorkOrderDetail
+          workOrderId={detailId}
+          onClose={() => setDetailId(null)}
+          onChanged={() => void load()}
+        />
+      )}
+    </div>
+  );
+}
+
+// =========================
+// Tạo Work Order từ booking đã check-in
+// =========================
+
+/**
+ * Backend yêu cầu booking đã CHECK-IN và đã gắn xe (lỗi 6202 / 6203), nên
+ * modal này chỉ liệt kê các booking ở trạng thái CHECKED_IN.
+ */
+function CreateWorkOrderModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const t = useToast();
+  const [bookings, setBookings] = useState<StaffBookingResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [odometer, setOdometer] = useState("0");
+  const [condition, setCondition] = useState("");
+  const [note, setNote] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    staffBookingApi
+      .listBookings({ status: "CHECKED_IN", size: 50 })
+      .then((page) => setBookings(page.items ?? []))
+      .catch((err) =>
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Không tải được lịch hẹn đã tiếp nhận xe",
+        ),
+      )
+      .finally(() => setLoading(false));
+  }, []);
+
+  const submit = async () => {
+    if (!selected) {
+      t.error("Hãy chọn một lịch hẹn đã tiếp nhận xe");
+      return;
+    }
+    const odo = Number(odometer);
+    if (!Number.isFinite(odo) || odo < 0) {
+      t.error("Số km vào xưởng phải là số không âm");
+      return;
+    }
+    setBusy(true);
+    try {
+      await workOrderApi.createWorkOrder({
+        bookingId: selected,
+        odometerIn: Math.floor(odo),
+        vehicleCondition: condition.trim() || null,
+        customerNote: note.trim() || null,
+      });
+      onCreated();
+    } catch (err) {
+      t.error(
+        err instanceof Error ? err.message : "Không tạo được phiếu sửa chữa",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-ink/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-ink/8 pb-4 mb-4">
+          <div>
+            <h3 className="font-bold text-lg">Tạo phiếu sửa chữa</h3>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Chọn lịch hẹn đã tiếp nhận xe — backend tạo phiếu ở trạng thái
+              CREATED, idempotent theo booking.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-bgsoft"
+            aria-label="Đóng"
           >
-            <div className="flex items-start justify-between gap-3 border-b border-ink/8 pb-4 mb-4">
-              <div>
-                <div className="text-xs text-ink-muted mb-1">Mã phiếu</div>
-                <h3 className="font-mono font-bold text-lg">{selected.code}</h3>
-              </div>
-              <button
-                onClick={() => setSelected(null)}
-                className="p-1.5 rounded-lg hover:bg-bgsoft"
-                aria-label="Đóng"
-              >
-                <IconClose size={18} />
-              </button>
-            </div>
+            <IconClose size={18} />
+          </button>
+        </div>
 
-            {detailLoading ? (
-              <div className="py-8 text-center text-sm text-ink-muted">
-                Đang tải chi tiết...
-              </div>
-            ) : detail ? (
-              <div className="space-y-4">
-                <div className="grid sm:grid-cols-3 gap-3 text-sm">
-                  <div>
-                    <div className="text-xs text-ink-muted">Trạng thái</div>
-                    <div className="mt-1">
-                      <Badge tone={STATUS_TONE[detail.status] ?? "default"}>
-                        {STATUS_LABEL[detail.status] ?? detail.status}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-ink-muted">Khách hàng</div>
-                    <div className="font-semibold text-xs">
-                      {detail.customer?.fullName ?? "—"}
-                    </div>
-                    <div className="text-[11px] text-ink-muted">
-                      {detail.customer?.phone ?? ""}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-ink-muted">Phương tiện</div>
-                    <div className="font-semibold text-xs">
-                      {detail.vehicle
-                        ? `${detail.vehicle.make ?? ""} ${detail.vehicle.model ?? ""}`.trim() ||
-                          "—"
-                        : "—"}
-                    </div>
-                    <div className="text-[11px] text-ink-muted font-mono">
-                      {detail.vehicle?.licensePlate ?? ""}
-                    </div>
-                  </div>
-                </div>
-
-                {detail.customerNote && (
-                  <div className="bg-bgsoft/60 rounded-lg p-3 text-sm text-ink-light">
-                    <span className="font-medium text-ink">Ghi chú khách: </span>
-                    {detail.customerNote}
-                  </div>
-                )}
-
-                {detail.estimates.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">
-                      Báo giá
-                    </h4>
-                    <div className="border border-ink/8 rounded-xl divide-y divide-ink/5">
-                      {detail.estimates.map((e) => (
-                        <div
-                          key={e.id}
-                          className="flex items-center justify-between gap-3 p-3 text-sm"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-mono text-xs font-semibold">
-                              {e.code}
-                            </div>
-                            <div className="text-[11px] text-ink-muted">
-                              {e.type} · {e.status}
-                            </div>
-                          </div>
-                          <div className="font-semibold text-primary shrink-0">
-                            {e.totalAmount.toLocaleString("vi-VN")}đ
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {detail.statusHistory.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-bold text-ink-muted uppercase tracking-wider mb-2">
-                      Lịch sử trạng thái
-                    </h4>
-                    <div className="space-y-1.5">
-                      {detail.statusHistory.map((h) => (
-                        <div
-                          key={h.id}
-                          className="text-xs flex items-center gap-2 flex-wrap"
-                        >
-                          <span className="text-ink-muted">
-                            {fmtTime(h.createdAt)}
-                          </span>
-                          <span className="text-ink">
-                            {h.statusFrom ?? "—"} →{" "}
-                            <strong>{h.statusTo}</strong>
-                          </span>
-                          {h.note && (
-                            <span className="text-ink-muted">({h.note})</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+        <div className="space-y-4">
+          {/* Chọn booking */}
+          <div>
+            <label className="text-sm font-medium text-ink mb-1.5 block">
+              Lịch hẹn đã tiếp nhận xe <span className="text-red-500">*</span>
+            </label>
+            {loading ? (
+              <p className="text-sm text-ink-muted">Đang tải lịch hẹn...</p>
+            ) : error ? (
+              <p className="text-sm text-red-600">{error}</p>
+            ) : bookings.length === 0 ? (
+              <p className="text-sm text-ink-muted">
+                Chưa có lịch hẹn nào ở trạng thái "đã tiếp nhận xe". Hãy vào
+                trang <strong>Lịch hẹn xưởng</strong> để tiếp nhận xe trước.
+              </p>
             ) : (
-              <div className="py-8 text-center text-sm text-ink-muted">
-                Không tải được chi tiết phiếu sửa chữa.
+              <div className="max-h-56 overflow-y-auto border border-ink/10 rounded-xl divide-y divide-ink/5">
+                {bookings.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => setSelected(b.id)}
+                    className={[
+                      "w-full text-left px-3 py-2.5 text-sm flex items-center justify-between gap-3",
+                      selected === b.id ? "bg-primary/5" : "hover:bg-bgsoft",
+                    ].join(" ")}
+                  >
+                    <span className="min-w-0">
+                      <span className="font-mono font-semibold text-xs">
+                        {b.licensePlateSnapshot}
+                      </span>
+                      <span className="text-[11px] text-ink-muted ml-2">
+                        {b.startAt ? fmtTime(b.startAt) : ""}
+                      </span>
+                      {b.customerNote && (
+                        <span className="block text-[11px] text-ink-muted truncate">
+                          {b.customerNote}
+                        </span>
+                      )}
+                    </span>
+                    {selected === b.id && (
+                      <IconCheckCircle
+                        size={16}
+                        className="text-primary shrink-0"
+                      />
+                    )}
+                  </button>
+                ))}
               </div>
             )}
           </div>
+
+          {/* ODO */}
+          <div>
+            <label className="text-sm font-medium text-ink mb-1.5 block">
+              Số km vào xưởng <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={odometer}
+              onChange={(e) => setOdometer(e.target.value)}
+              className="w-full h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm outline-none focus:border-primary"
+            />
+          </div>
+
+          {/* Tình trạng xe */}
+          <div>
+            <label className="text-sm font-medium text-ink mb-1.5 block">
+              Tình trạng xe
+            </label>
+            <input
+              type="text"
+              placeholder="VD: xướt chốt sân, vô-lăng bển…"
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+              className="w-full h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm outline-none focus:border-primary"
+            />
+          </div>
+
+          {/* Ghi chú */}
+          <div>
+            <label className="text-sm font-medium text-ink mb-1.5 block">
+              Ghi chú của khách
+            </label>
+            <textarea
+              rows={3}
+              placeholder="Nội dung khách yêu cầu..."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-ink/15 bg-white text-sm outline-none focus:border-primary"
+            />
+          </div>
         </div>
-      )}
+
+        <div className="flex gap-2 justify-end mt-5 pt-4 border-t border-ink/8">
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Huỷ
+          </Button>
+          <Button onClick={() => void submit()} disabled={busy || !selected}>
+            <IconArrowRight size={14} />
+            {busy ? "Đang tạo..." : "Tạo phiếu"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
