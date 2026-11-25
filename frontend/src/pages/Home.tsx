@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconSearch,
@@ -31,6 +31,9 @@ const CATEGORY_ICONS: Record<string, string> = {
   "Bảo dưỡng xe điện": "🔋",
 };
 
+/** Số dịch vụ tối đa hiển thị ở trang chủ. */
+const HOME_SERVICE_LIMIT = 8;
+
 const compactVND = (n: number) => {
   // 489.000.000 -> "489tr", 1.450.000 -> "1,4tr"
   if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + " tỷ";
@@ -41,22 +44,37 @@ const compactVND = (n: number) => {
 export default function Home() {
   const { services } = useCatalog();
 
+  /** Danh mục dịch vụ đang chọn — "Tất cả" hoặc tên nhóm. */
+  const [activeCategory, setActiveCategory] = useState("Tất cả");
+
   // Chip danh mục dịch vụ — suy ra từ catalog đang hiển thị (API thật hoặc mẫu).
   const categoryChips = useMemo(() => {
     const names = Array.from(new Set(services.map((s) => s.category))).filter(
       Boolean,
     );
-    return names.slice(0, 8).map((name) => ({
-      name,
-      icon: CATEGORY_ICONS[name] ?? "🔧",
-    }));
+    // Luôn có "Tất cả" ở đầu để người dùng bỏ lọc nhanh.
+    return [
+      { name: "Tất cả", icon: "✨", count: services.length },
+      ...names.slice(0, 8).map((name) => ({
+        name,
+        icon: CATEGORY_ICONS[name] ?? "🔧",
+        count: services.filter((s) => s.category === name).length,
+      })),
+    ];
   }, [services]);
 
-  // Top 4 dịch vụ nổi bật
-  const featuredServices = [...services]
-    .filter((s) => s.isFeatured)
-    .sort((a, b) => b.bookingsCount - a.bookingsCount)
-    .slice(0, 4);
+  // Dịch vụ hiển thị: lọc theo danh mục đang chọn.
+  const visibleServices = useMemo(() => {
+    const filtered =
+      activeCategory === "Tất cả"
+        ? services
+        : services.filter((s) => s.category === activeCategory);
+
+    // Backend chưa có cột `is_featured` / `bookings_count` (xem entity
+    // `Service.java`) nên không có tiêu chí "nổi bật" thật để sắp xếp.
+    // Giữ thứ tự backend trả về (mới nhất trước) thay vì bịa tiêu chí.
+    return filtered.slice(0, HOME_SERVICE_LIMIT);
+  }, [services, activeCategory]);
 
   return (
     <>
@@ -217,50 +235,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============== DỊCH VỤ PHỔ BIẾN (category chips) ============== */}
+      {/* ============ DỊCH VỤ PHỔ BIẾN + DANH MỤC (gộp 1 section) ============ */}
       <section className="container-page py-12 md:py-16">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold">
-              Dịch vụ phổ biến
-            </h2>
-            <p className="text-ink-light mt-1">
-              Khám phá nhanh các dịch vụ cần thiết
-            </p>
-          </div>
-          <Link
-            to="/services"
-            className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-          >
-            Xem tất cả <IconArrowRight size={14} />
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {categoryChips.map((s) => (
-            <Link
-              to={`/services?category=${encodeURIComponent(s.name)}`}
-              key={s.name}
-              className="group bg-white border border-ink/8 rounded-2xl p-4 text-center hover:bg-bgsoft transition-colors"
-            >
-              <div className="text-3xl mb-2">{s.icon}</div>
-              <div className="text-xs sm:text-sm font-medium">{s.name}</div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ============== DỊCH VỤ NỔI BẬT ============== */}
-      <section className="container-page py-8 md:py-12">
         <div className="flex items-end justify-between mb-6">
           <div>
             <Badge tone="primary" className="mb-2">
               <IconWrench size={14} /> Đặt lịch sửa chữa
             </Badge>
             <h2 className="text-2xl md:text-3xl font-bold">
-              Dịch vụ của {GARAGE.name}
+              Dịch vụ phổ biến
             </h2>
             <p className="text-ink-light mt-1">
-              Đặt lịch nhanh — xác nhận trong 30 phút
+              Khám phá nhanh các dịch vụ cần thiết tại {GARAGE.name} — đặt lịch
+              trực tuyến, xác nhận trong 30 phút
             </p>
           </div>
           <Link
@@ -271,50 +258,110 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {featuredServices.map((s) => (
-            <Link to={`/services/${s.slug}`} key={s.id} className="group">
-              <Card>
-                <div className="aspect-[4/3] overflow-hidden rounded-t-2xl bg-bgsoft">
-                  <img
-                    src={s.image}
-                    alt={s.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <div className="p-4">
-                  <Badge tone="default" className="mb-2">
-                    {s.category}
-                  </Badge>
-                  <h3 className="font-semibold leading-tight mb-1 line-clamp-2">
+        {/* Chip danh mục — dòng trên, cuộn ngang khi nhiều danh mục */}
+        <div className="-mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-none">
+            {categoryChips.map((s) => {
+              const isActive = activeCategory === s.name;
+              return (
+                <button
+                  key={s.name}
+                  onClick={() => setActiveCategory(s.name)}
+                  aria-pressed={isActive}
+                  className={[
+                    "group shrink-0 snap-start w-[104px] sm:w-auto bg-white border rounded-2xl px-4 py-3 text-center transition-colors",
+                    isActive
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                      : "border-ink/8 hover:bg-bgsoft",
+                  ].join(" ")}
+                >
+                  <div className="text-2xl mb-1">{s.icon}</div>
+                  <div
+                    className={[
+                      "text-xs sm:text-sm font-medium leading-tight line-clamp-2",
+                      isActive ? "text-primary" : "",
+                    ].join(" ")}
+                  >
                     {s.name}
-                  </h3>
-                  <div className="text-xs text-ink-muted mb-2">
-                    {GARAGE.name} · ~{s.durationMin} phút
                   </div>
-                  <div className="flex items-end justify-between">
-                    <div className="text-primary font-bold text-sm">
-                      {compactVND(s.priceFrom)}
+                  <div className="text-[11px] text-ink-muted mt-0.5">
+                    {s.count} dịch vụ
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Danh sách dịch vụ theo danh mục đang chọn */}
+        {visibleServices.length === 0 ? (
+          <Card>
+            <div className="p-10 text-center text-ink-muted">
+              <IconWrench size={40} className="mx-auto mb-3 text-ink-muted" />
+              <p className="font-medium">Chưa có dịch vụ phù hợp</p>
+              <p className="text-sm mt-1">
+                Xem tất cả dịch vụ của {GARAGE.name} để đặt lịch.
+              </p>
+              <Link to="/services" className="inline-block mt-4">
+                <Button size="sm">Xem tất cả dịch vụ</Button>
+              </Link>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {visibleServices.map((s) => (
+              <Link to={`/services/${s.slug}`} key={s.id} className="group">
+                <Card>
+                  <div className="aspect-[4/3] overflow-hidden rounded-t-2xl bg-bgsoft">
+                    <img
+                      src={s.image}
+                      alt={s.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <Badge tone="default" className="mb-2">
+                      {s.category}
+                    </Badge>
+                    <h3 className="font-semibold leading-tight mb-1 line-clamp-2">
+                      {s.name}
+                    </h3>
+                    <div className="text-xs text-ink-muted mb-2">
+                      {GARAGE.name} · ~{s.durationMin} phút
                     </div>
-                    {s.rating > 0 && (
-                      <div className="flex items-center gap-1 text-xs">
-                        <IconStar
-                          size={14}
-                          className="text-accent-hover"
-                        />
-                        <span className="font-medium">{s.rating}</span>
-                        {s.bookingsCount > 0 && (
-                          <span className="text-ink-muted">
-                            ({s.bookingsCount})
-                          </span>
-                        )}
+                    <div className="flex items-end justify-between">
+                      <div className="text-primary font-bold text-sm">
+                        {compactVND(s.priceFrom)}
                       </div>
-                    )}
+                      {s.rating > 0 && (
+                        <div className="flex items-center gap-1 text-xs">
+                          <IconStar
+                            size={14}
+                            className="text-accent-hover"
+                          />
+                          <span className="font-medium">{s.rating}</span>
+                          {s.bookingsCount > 0 && (
+                            <span className="text-ink-muted">
+                              ({s.bookingsCount})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Nút "Xem tất cả" cho mobile — trên desktop đã có ở góc trên */}
+        <div className="mt-6 sm:hidden">
+          <Link to="/services">
+            <Button variant="outline" fullWidth>
+              Xem tất cả dịch vụ <IconArrowRight size={14} />
+            </Button>
+          </Link>
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconWrench,
@@ -6,6 +6,7 @@ import {
   IconClock,
   IconRefresh,
   IconPackage,
+  IconPlus,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
@@ -23,6 +24,10 @@ import { GARAGE } from "../../config/garage";
 import {
   formatCompactVND as compactVND,
 } from "../../utils/format";
+import ServiceCategoryManager, {
+  useServiceCountByCategoryId,
+} from "./ServiceCategoryManager";
+import ServiceCategoryEditor from "./ServiceCategoryEditor";
 
 // =========================
 // AdminServices — quản lý dịch vụ
@@ -112,10 +117,6 @@ const columns: AdminTableColumn<CatalogService>[] = [
     render: (s) =>
       s.isActive === false ? (
         <Badge tone="warning">Đã ẩn</Badge>
-      ) : s.isPopular ? (
-        <Badge tone="primary">Phổ biến</Badge>
-      ) : s.isFeatured ? (
-        <Badge tone="accent">Nổi bật</Badge>
       ) : (
         <Badge tone="default">Bình thường</Badge>
       ),
@@ -123,8 +124,6 @@ const columns: AdminTableColumn<CatalogService>[] = [
 ];
 
 const filters: AdminTableFilter<CatalogService>[] = [
-  { id: "popular", label: "Phổ biến", predicate: (s) => !!s.isPopular },
-  { id: "featured", label: "Nổi bật", predicate: (s) => !!s.isFeatured },
   { id: "inactive", label: "Đã ẩn", predicate: (s) => s.isActive === false },
 ];
 
@@ -146,6 +145,17 @@ export default function AdminServices() {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  /** Modal tạo nhóm dịch vụ, mở từ nút phụ cạnh dropdown "Danh mục". */
+  const [categoryEditorOpen, setCategoryEditorOpen] = useState(false);
+  /**
+   * Callback của `AdminTable` để cập nhật option của dropdown sau khi tạo
+   * nhóm mới. Lưu trong ref vì nó được truyền qua `form` (useMemo) và không
+   * nên là dependency gây render lại.
+   */
+  const pendingCategorySync = useRef<
+    ((options: { value: string; label: string }[]) => void) | null
+  >(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -169,9 +179,32 @@ export default function AdminServices() {
     }
   }, []);
 
+  /**
+   * Tải lại RIÊNG danh sách nhóm dịch vụ.
+   *
+   * <p>Dùng sau khi thêm/sửa/xoá nhóm trong panel quản lý nhóm: không cần
+   * tải lại toàn bộ danh sách dịch vụ (làm chậm và nhảy layout), chỉ đồng bộ
+   * dropdown "Danh mục" trong form thêm/sửa dịch vụ.
+   */
+  const loadCategories = useCallback(async () => {
+    try {
+      const catRes = await inventoryApi.listServiceCategories({ size: 100 });
+      setCategories(catRes.items ?? []);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Không tải được danh sách nhóm dịch vụ từ máy chủ",
+      );
+    }
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Số dịch vụ của từng nhóm — để cảnh báo khi xoá nhóm còn dịch vụ. */
+  const serviceCountByCategoryId = useServiceCountByCategoryId(services);
 
   /** Tìm categoryId theo tên nhóm đã chọn trong form. */
   const resolveCategoryId = (name: string): string | undefined =>
@@ -195,6 +228,25 @@ export default function AdminServices() {
           type: "select",
           required: true,
           options: categories.map((c) => ({ value: c.name, label: c.name })),
+          // Nút phụ: tạo nhóm dịch vụ mới ngay tại chỗ, không phải rời trang
+          // sang `/admin/categories`. Danh sách option dropdown được cập nhật
+          // ngay sau khi tạo xong (không cần đóng/mở lại modal form).
+          action: ({ onDone }) => (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              title="Tạo nhóm dịch vụ mới"
+              onClick={() => {
+                setCategoryEditorOpen(true);
+                // Khi modal nhóm đóng lại, đồng bộ option của dropdown.
+                pendingCategorySync.current = onDone;
+              }}
+            >
+              <IconPlus size={14} />
+              Thêm nhóm
+            </Button>
+          ),
         },
         {
           key: "durationMin",
@@ -218,17 +270,12 @@ export default function AdminServices() {
           placeholder: "200000",
         },
         {
-          key: "warrantyMonths",
-          label: "Bảo hành (tháng)",
-          type: "number",
-          placeholder: "3",
-        },
-        {
           key: "description",
           label: "Mô tả",
           type: "textarea",
           rows: 3,
           placeholder: "Mô tả dịch vụ...",
+          hint: "Chỉ dùng để hiển thị tạm thời — backend chưa lưu trường này.",
         },
       ],
       onSubmit: async (values, initial) => {
@@ -329,6 +376,45 @@ export default function AdminServices() {
         onDuplicate={(row) => void handleDuplicate(row)}
         emptyMessage={loading ? "Đang tải..." : "Chưa có dịch vụ nào."}
       />
+
+      {/* ── Quản lý nhóm dịch vụ (ngay tại màn quản lý dịch vụ) ──────────────
+          Nhóm dịch vụ là dữ liệu của backend (bảng `service_categories`).
+          Panel này dùng API có sẵn nên không cần chờ backend làm thêm gì.
+          Thêm nhóm mới ở đây giúp admin không phải rời trang sang
+          `/admin/categories` mỗi khi gặp dịch vụ chưa có nhóm phù hợp. */}
+      <ServiceCategoryManager
+        categories={categories}
+        onChange={setCategories}
+        onReload={loadCategories}
+        serviceCountByCategoryId={serviceCountByCategoryId}
+      />
+
+      {/* ── Modal tạo nhóm dịch vụ (mở từ nút phụ cạnh dropdown "Danh mục") ──
+          Sau khi tạo xong, danh sách option của dropdown được cập nhật ngay
+          để admin chọn được nhóm vừa tạo mà không cần đóng/mở lại form. */}
+      {categoryEditorOpen && (
+        <ServiceCategoryEditor
+          editing={null}
+          onClose={() => setCategoryEditorOpen(false)}
+          onSaved={(saved) => {
+            // Functional update để luôn có danh sách nhóm MỚI NHẤT (state
+            // `categories` trong closure có thể đã cũ).
+            setCategories((prev) => {
+              const next = prev.some((c) => c.id === saved.id)
+                ? prev.map((c) => (c.id === saved.id ? saved : c))
+                : [...prev, saved];
+
+              // Đồng bộ option của dropdown "Danh mục" trong form thêm/sửa.
+              pendingCategorySync.current?.(
+                next.map((c) => ({ value: c.name, label: c.name })),
+              );
+              pendingCategorySync.current = null;
+
+              return next;
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

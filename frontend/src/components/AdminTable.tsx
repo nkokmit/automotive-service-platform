@@ -671,6 +671,20 @@ export interface AdminFormField {
   ) => string;
   /** Gợi ý nhỏ hiển thị dưới ô nhập. */
   hint?: string;
+  /**
+   * Nút phụ hiển thị bên cạnh ô nhập (chỉ dùng cho `type: "select"`).
+   *
+   * <p>Dùng cho trường "Danh mục" của màn quản lý dịch vụ: nút "＋ Thêm nhóm"
+   * mở modal tạo nhóm dịch vụ ngay tại chỗ, thay vì bắt admin rời trang sang
+   * `/admin/categories`.
+   *
+   * <p>Callback nhận 2 giá trị: `onDone` (danh sách option mới sau khi thêm)
+   * và `onCancel` (đóng mà không thay đổi gì).
+   */
+  action?: (ctx: {
+    onDone: (options: { value: string; label: string }[]) => void;
+    onCancel: () => void;
+  }) => ReactNode;
 }
 
 export interface AdminFormProps<T> {
@@ -722,6 +736,16 @@ function FormModal({
     }
     return init;
   });
+
+  /**
+   * Option động cho các field `select` có nút phụ (VD: danh mục dịch vụ).
+   *
+   * <p>Khi admin bấm "＋ Thêm nhóm" và tạo xong, danh sách option trong
+   * dropdown được cập nhật ngay mà không cần đóng/mở lại modal form.
+   */
+  const [dynamicOptions, setDynamicOptions] = useState<
+    Record<string, { value: string; label: string }[]>
+  >({});
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -775,21 +799,36 @@ function FormModal({
                     className="w-full px-3 py-2 rounded-xl border border-ink/15 bg-white text-sm focus:border-primary focus:outline-none disabled:bg-bgsoft disabled:text-ink-muted"
                   />
                 ) : f.type === "select" ? (
-                  <select
-                    value={displayValue}
-                    disabled={f.readonly}
-                    onChange={(e) =>
-                      setValues({ ...values, [f.key]: e.target.value })
-                    }
-                    className="w-full h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm focus:border-primary focus:outline-none disabled:bg-bgsoft disabled:text-ink-muted"
-                  >
-                    <option value="">-- Chọn --</option>
-                    {f.options?.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-start gap-2">
+                    <select
+                      value={displayValue}
+                      disabled={f.readonly}
+                      onChange={(e) =>
+                        setValues({ ...values, [f.key]: e.target.value })
+                      }
+                      className="flex-1 min-w-0 h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm focus:border-primary focus:outline-none disabled:bg-bgsoft disabled:text-ink-muted"
+                    >
+                      <option value="">-- Chọn --</option>
+                      {(dynamicOptions[f.key] ?? f.options)?.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    {f.action && (
+                      <div className="shrink-0">
+                        {f.action({
+                          onDone: (options) => {
+                            setDynamicOptions((prev) => ({
+                              ...prev,
+                              [f.key]: options,
+                            }));
+                          },
+                          onCancel: () => {},
+                        })}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <Input
                     type={f.type}

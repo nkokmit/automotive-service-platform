@@ -88,9 +88,16 @@ export function mapService(dto: ServiceResponse): CatalogService {
     warrantyMonths: 3,
     includes: [],
     requirements: [],
-    // Backend chưa có cờ nổi bật / phổ biến → tự suy ra để UI không rỗng.
-    isPopular: true,
-    isFeatured: true,
+    // Backend `services` KHÔNG có cột cờ nổi bật / phổ biến (xem entity
+    // `Service.java` — chỉ có id, category, code, name, durationMinutes,
+    // requiredTechs, baseLaborPrice, isActive, createdAt, updatedAt).
+    //
+    // Trước đây hai cờ này được hard-code `true` khiến MỌI dịch vụ đều hiện
+    // badge "Phổ biến" / "Nổi bật" và 2 filter chip trong admin lọc được mọi
+    // dòng → hiển thị sai dữ liệu. Giờ để `false` cho tới khi backend có cột
+    // thật; UI chỉ hiện badge khi cờ thật sự bật.
+    isPopular: false,
+    isFeatured: false,
     rating: 0,
     reviewsCount: 0,
     bookingsCount: 0,
