@@ -144,9 +144,15 @@ export default function AdminLayout() {
       routeWords: ["lịch hẹn", "lịch", "booking", "bookings", "hẹn"],
     },
     {
-      match: /hóa đơn|invoice|bill/,
+      match: /hóa đơn|invoice|bill|thanh toán|hoàn tiền/,
       to: "/admin/invoices",
-      routeWords: ["hóa đơn", "invoice", "invoices"],
+      routeWords: [
+        "hóa đơn",
+        "invoice",
+        "invoices",
+        "thanh toán",
+        "hoàn tiền",
+      ],
     },
     {
       match: /phiếu|work.?order/,

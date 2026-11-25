@@ -49,7 +49,7 @@ import AdminServiceBom from "./modules/admin/AdminServiceBom";
 import AdminUsers from "./modules/admin/AdminUsers";
 import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
 import AdminBookings from "./modules/admin/AdminBookings";
-import AdminInvoices from "./modules/admin/AdminInvoices";
+import AdminBilling from "./modules/admin/AdminBilling";
 import AdminStaff from "./modules/admin/AdminStaff";
 import AdminStaffSchedule from "./modules/admin/AdminStaffSchedule";
 import AdminWorkShifts from "./modules/admin/AdminWorkShifts";
@@ -130,7 +130,7 @@ hydrateUser().finally(() => {
                 element={<AdminInventoryTransactions />}
               />
               <Route path="bookings" element={<AdminBookings />} />
-              <Route path="invoices" element={<AdminInvoices />} />
+              <Route path="invoices" element={<AdminBilling />} />
               <Route path="staff" element={<AdminStaff />} />
               <Route
                 path="staff/:staffId/schedule"

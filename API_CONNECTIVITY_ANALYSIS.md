@@ -261,15 +261,84 @@ case kỳ vọng backend từ chối).
 
 ---
 
-### 5. **BILLING - HÓA ĐƠN & THANH TOÁN**
-- ❌ `POST /api/invoices/from-work-order/{workOrderId}` - Tạo hóa đơn từ work order
-- ❌ `PATCH /api/invoices/{id}/discount` - Cập nhật chiết khấu
-- ❌ `POST /api/invoices/{id}/void` - Hủy hóa đơn
-- ❌ `POST /api/payments` - Tạo thanh toán
-- ❌ `POST /api/payments/{id}/refund` - Hoàn tiền
+### 5. **BILLING - HÓA ĐƠN & THANH TOÁN** — ✅ Đã kết nối ở Phase 1
+- ✅ `POST /api/invoices/from-work-order/{workOrderId}` - Tạo hóa đơn từ work order
+- ✅ `PATCH /api/invoices/{id}/discount` - Cập nhật chiết khấu
+- ✅ `POST /api/invoices/{id}/void` - Hủy hóa đơn
+- ✅ `POST /api/payments` - Tạo thanh toán
+- ✅ `POST /api/payments/{id}/refund` - Hoàn tiền
 
 **Location:** `billing-service/InvoiceController`, `billing-service/PaymentController`
 **Độ ưu tiên:** ⭐⭐ QUAN TRỌNG - Quản lý tài chính
+
+**Endpoint client:** `frontend/src/api/endpoints/billing.ts` — `billingApi`
+(list/search/detail/create-from-WO/discount/void) + `paymentApi` (record/refund).
+
+**Authority:** `INVOICE_READ` (GET), `INVOICE_WRITE` (tạo/chiết khấu/huỷ),
+`PAYMENT_WRITE` (ghi nhận), `PAYMENT_REFUND` (hoàn tiền).
+
+**UI:** `/admin/invoices` → `AdminBilling.tsx` (+ `billingWidgets.tsx`,
+`billingModals.tsx`, `billingShared.ts`).
+- Bảng tra cứu + lọc theo trạng thái + tìm kiếm mã hóa đơn / WO / khách hàng.
+- Modal chi tiết: dòng hàng, bốn số tiền (công / phụ tùng / chiết khấu / thuế),
+  số dư còn phải thu, lịch sử thanh toán kèm nút Hoàn.
+- Modal chiết khấu (validate tối đa = công + phụ tùng + thuế), modal ghi nhận
+  thanh toán (CASH / BANK_TRANSFER / CARD, `idempotencyKey` UUID sinh tự động),
+  modal huỷ hóa đơn, modal hoàn tiền.
+- Nút **Tạo hóa đơn** trong `AdminWorkOrderDetail.tsx` khi phiếu ở
+  `PENDING_PAYMENT` (authority `INVOICE_WRITE`).
+
+**Quy tắc nghiệp vụ backend (đã mirror sang UI):**
+- Tạo hóa đơn: Work Order phải `PENDING_PAYMENT` và có ít nhất một dịch vụ
+  `COMPLETED` hoặc phụ tùng đã cấp (`issuedQuantity > 0`). Idempotent — gọi lại
+  trả về hóa đơn cũ.
+- Chiết khấu: chỉ khi `status == UNPAID` **và** `paidAmount == 0`; tối đa bằng
+  `subtotalLabor + subtotalParts + taxAmount`; `grandTotal` được tính lại.
+- Huỷ: chỉ khi `paidAmount == 0`; huỷ hóa đơn đã có thanh toán sẽ bị từ chối
+  (phải hoàn tiền trước).
+- Thanh toán: hóa đơn phải `UNPAID`/`PARTIALLY_PAID`; `amount > 0` và không vượt
+  số dư còn lại; idempotent theo `idempotencyKey`; trả đủ → `PAID`, trả một
+  phần → `PARTIALLY_PAID`.
+- Hoàn tiền: chỉ giao dịch `SUCCEEDED`; hóa đơn trừ `paidAmount` và trở về
+  `UNPAID`/`PARTIALLY_PAID`.
+
+**Kiểm thử:** `scripts/section5-smoke.mjs` (tra cứu / lọc / chi tiết / tạo từ
+WO / idempotency / chiết khấu / thanh toán / hoàn tiền / các case kỳ vọng
+backend từ chối). Script dùng token đăng nhập thật trong `.tok` (`sub` =
+username `"admin"` — đúng trường hợp từng gây lỗi); chạy `node
+scripts/section5-smoke.mjs --mint` để dùng token tự ký nếu không có `.tok`.
+**Kết quả: 29/29 pass.**
+
+> ✅ **2 bug backend đã được sửa trong `billing-service`:**
+>
+> 1. **Đọc sai claim JWT.** `InvoiceController.userId()` và
+>    `PaymentController.record()` dùng `UUID.fromString(jwt.getSubject())` — nhưng
+>    `sub` là **username** (`"admin"`), còn UUID nằm ở claim `userId`.
+>    → `IllegalArgumentException: Invalid UUID string: admin` → HTTP 500.
+>    Chạm: `GET /api/invoices/me`, `POST /api/invoices/from-work-order/{id}`,
+>    `POST /api/payments`.
+>    **Đã sửa:** tạo `security/JwtUserIdResolver` đọc `jwt.getClaimAsString("userId")`,
+>    fallback về `jwt.getSubject()`; controller dùng hàm này. Khi token không có
+>    định danh UUID hợp lệ → `ApiException(UNAUTHENTICATED)` (HTTP 401) thay vì 500.
+>    Regression test: `JwtUserIdResolverTest` (6 case).
+> 2. **Ghi `outbox_events` gây `StaleObjectStateException`.** `OutboxEvent.id` có
+>    `@GeneratedValue(strategy = UUID)` trong khi `OutboxEventService.add()` tự gán
+>    `UUID.randomUUID()` → Spring Data đi qua `merge()` → Hibernate 7 ném
+>    `StaleObjectStateException` vì dòng chưa tồn tại → HTTP 500.
+>    Chạm: `POST /api/invoices/{id}/void`, `POST /api/payments` (khi trả đủ),
+>    `POST /api/payments/{id}/refund`.
+>    **Đã sửa:** bỏ `@GeneratedValue` khỏi `OutboxEvent.id` (khớp với
+>    `work-order-service`) — ID được gán bởi ứng dụng nên `save()` dùng `persist()`.
+>    Regression test: `OutboxEventPersistenceTest` (`@DataJpaTest`) — đã xác minh
+>    test bắt đúng lỗi khi cố tình thêm lại `@GeneratedValue`.
+>
+> Kết quả sau khi sửa: `scripts/section5-smoke.mjs` **29/29 pass** với token thật
+> (`sub="admin"`); log `billing-service` không còn `Invalid UUID string` /
+> `StaleObjectStateException`; các event outbox (`PaymentCompletedEvent`,
+> `PaymentRefundedEvent`, `InvoiceVoidedEvent`) ghi và publish Kafka thành công
+> (`status=SENT`, `retry_count=0`). Backend test: `billing-service` **21/21 pass**.
+
+
 
 ---
 
@@ -329,7 +398,7 @@ case kỳ vọng backend từ chối).
 2. **Staff Management** - 24 endpoints — ✅ **Đã kết nối ở Phase 1**
    - Quản lý nhân viên, ca trực, lịch trình
    
-3. **Billing** - 5 endpoints
+3. **Billing** - 5 endpoints — ✅ **Đã kết nối ở Phase 1**
    - Hóa đơn, thanh toán
 
 ### ⭐ NÂNG CAO (Enhancement)
@@ -347,7 +416,7 @@ case kỳ vọng backend từ chối).
 ### Phase 2 (Important - 3-4 tuần)
 - [ ] Inventory Management (25+ endpoints)
 - [ ] Staff Management (24 endpoints)
-- [ ] Billing APIs (5 endpoints)
+- [x] Billing APIs (5 endpoints) — **xong** (2 bug backend đã sửa)
 
 ### Phase 3 (Enhancement - 2 tuần)
 - [ ] Notifications (7 endpoints)

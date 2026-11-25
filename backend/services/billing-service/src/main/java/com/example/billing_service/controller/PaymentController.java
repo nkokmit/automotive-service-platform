@@ -5,6 +5,7 @@ import com.example.billing_service.dto.request.PaymentCreateRequest;
 import com.example.billing_service.dto.request.PaymentRefundRequest;
 import com.example.billing_service.dto.response.PaymentResponse;
 import com.example.billing_service.service.PaymentService;
+import com.example.billing_service.security.JwtUserIdResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,7 +38,7 @@ public class PaymentController {
             @Valid @RequestBody PaymentCreateRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        return ApiResponse.success(paymentService.record(request, UUID.fromString(jwt.getSubject())));
+        return ApiResponse.success(paymentService.record(request, JwtUserIdResolver.resolveUserId(jwt)));
     }
 
     @PostMapping("/{id}/refund")

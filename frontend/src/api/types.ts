@@ -992,6 +992,49 @@ export interface InvoiceResponse {
   payments: PaymentResponse[];
 }
 
+// ── Section 5: Billing — payload ghi (billing-service) ─────────────────────
+
+/**
+ * Khớp `DiscountUpdateRequest.java`.
+ *
+ * `discountAmount` phải >= 0 và không vượt quá
+ * `subtotalLabor + subtotalParts + taxAmount` (backend trả 71xx nếu vượt).
+ */
+export interface DiscountUpdateRequest {
+  /** Số tiền chiết khấu (> = 0). */
+  discountAmount: number;
+  /** Ghi chú, tối đa 255 ký tự. */
+  note?: string | null;
+}
+
+/** Khớp `InvoiceVoidRequest.java` — body optional. */
+export interface InvoiceVoidRequest {
+  reason?: string | null;
+}
+
+/**
+ * Khớp `PaymentCreateRequest.java`.
+ *
+ * Lưu ý: `idempotencyKey` là **UUID bắt buộc** — backend dùng làm khoá chống
+ * ghi trùng. Gọi lại cùng key sẽ trả về đúng giao dịch cũ.
+ */
+export interface PaymentCreateRequest {
+  invoiceId: string;
+  /** UUID duy nhất cho mỗi lần thanh toán. */
+  idempotencyKey: string;
+  paymentMethod: PaymentMethod;
+  /** Số tiền > 0, không được vượt số dư còn lại của hóa đơn. */
+  amount: number;
+  /** Mã giao dịch / số tài khoản nhận tiền (tối đa 100 ký tự). */
+  transactionRef?: string | null;
+  note?: string | null;
+}
+
+/** Khớp `PaymentRefundRequest.java` — body optional. */
+export interface PaymentRefundRequest {
+  reason?: string | null;
+}
+
 // ── Staff booking (booking-service — màn hình lịch hẹn của xưởng) ─────────────
 /** Khớp StaffBookingResponse.java */
 export interface StaffBookingResponse {

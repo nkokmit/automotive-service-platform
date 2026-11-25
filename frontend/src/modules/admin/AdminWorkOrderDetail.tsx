@@ -30,6 +30,7 @@ import {
   IconActivity,
   IconClock,
   IconUsers,
+  IconCash,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
@@ -41,6 +42,7 @@ import {
   workOrderServiceLineApi,
 } from "../../api/endpoints/workOrder";
 import { inventoryApi } from "../../api/endpoints/inventory";
+import { billingApi } from "../../api/endpoints/billing";
 import { staffApi } from "../../api/endpoints/staff";
 import { hasTokenAuthority } from "../../api/session";
 import type {
@@ -368,6 +370,9 @@ export default function AdminWorkOrderDetail({
   const canCreateEstimate =
     ["DIAGNOSING", "IN_PROGRESS"].includes(order.status) &&
     can("ESTIMATE_CREATE");
+  // Hóa đơn chỉ tạo được khi phiếu đã hoàn thành sửa chữa và chờ thanh toán.
+  const canCreateInvoice =
+    order.status === "PENDING_PAYMENT" && can("INVOICE_WRITE");
 
   return (
     <ModalShell
@@ -504,6 +509,27 @@ export default function AdminWorkOrderDetail({
               {order.status === "DIAGNOSING"
                 ? "Tạo báo giá ban đầu"
                 : "Tạo báo giá bổ sung"}
+            </Button>
+          )}
+          {canCreateInvoice && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    "Tạo hóa đơn từ phiếu sửa chữa này? Hóa đơn sẽ gom các dịch vụ đã hoàn thành và phụ tùng đã cấp.",
+                  )
+                )
+                  return;
+                void runAction(
+                  () => billingApi.createFromWorkOrder(order.id),
+                  "Đã tạo hóa đơn từ phiếu sửa chữa",
+                );
+              }}
+            >
+              <IconCash size={14} /> Tạo hóa đơn
             </Button>
           )}
         </div>
