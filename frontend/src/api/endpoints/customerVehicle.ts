@@ -5,7 +5,7 @@
  * và tự động fallback sang MySQL bridge trên `agent-service` (`/ai/customer-vehicles/*`)
  * khi môi trường dev chỉ chạy cụm AI + MySQL (`scripts/run-all.ps1`).
  */
-import client from "../client";
+import client, { isApiError } from "../client";
 import type {
   CustomerCreateRequest,
   CustomerResponse,
@@ -33,12 +33,21 @@ export interface ListVehiclesParams {
   size?: number;
 }
 
+function isRetryableViaBridge(err: unknown): boolean {
+  if (!isApiError(err)) return false;
+  // Không có status → lỗi mạng (fetch bị reject).
+  if (err.status === undefined) return true;
+  return err.status >= 500;
+}
+
 export const customerVehicleApi = {
   // ── 1. Khách hàng (Customers) ──────────────────────────────────────────────
-  getMyProfile: async (): Promise<CustomerResponse> => {
+  getMyProfile: async (signal?: AbortSignal): Promise<CustomerResponse> => {
     try {
-      return await client.request<CustomerResponse>("/api/customers/me");
-    } catch {
+      return await client.request<CustomerResponse>("/api/customers/me", { signal });
+    } catch (err) {
+      if (!isRetryableViaBridge(err)) throw err;
+
       const page = await client.requestPage<PageResponse<CustomerResponse>>(
         "/ai/customer-vehicles/customers",
         { page: 0, size: 1 },

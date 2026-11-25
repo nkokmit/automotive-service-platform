@@ -27,8 +27,8 @@ export const userApi = {
 };
 
 export const customerApi = {
-  /** Hồ sơ khách hàng của chính người đang đăng nhập (kèm fallback sang MySQL bridge). */
-  me: (): Promise<CustomerResponse> => customerVehicleApi.getMyProfile(),
+  me: (signal?: AbortSignal): Promise<CustomerResponse> =>
+    customerVehicleApi.getMyProfile(signal),
 };
 
 export const adminApi = {

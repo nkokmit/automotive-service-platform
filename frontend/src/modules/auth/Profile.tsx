@@ -174,10 +174,6 @@ export default function Profile() {
               </div>
               <div className="flex flex-wrap items-center gap-4 text-xs text-white/85">
                 <div className="flex items-center gap-1">
-                  <IconCalendar size={14} />
-                  Thành viên từ {user.memberSince}
-                </div>
-                <div className="flex items-center gap-1">
                   <IconStar size={14} className="text-accent" />
                   {user.loyaltyPoints.toLocaleString("vi-VN")} điểm thưởng
                 </div>

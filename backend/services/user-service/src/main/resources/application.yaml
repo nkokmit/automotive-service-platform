@@ -6,6 +6,7 @@ app:
   kafka:
     topics:
       user-registered: ${USER_REGISTERED_TOPIC:user-registered}
+    publish-timeout-ms: ${KAFKA_PUBLISH_TIMEOUT_MS:5000}
 
 spring:
   application:
@@ -19,6 +20,11 @@ spring:
       acks: all
       properties:
         "[spring.json.add.type.headers]": false
+        max.block.ms: ${KAFKA_MAX_BLOCK_MS:3000}
+        delivery.timeout.ms: ${KAFKA_DELIVERY_TIMEOUT_MS:10000}
+        request.timeout.ms: ${KAFKA_REQUEST_TIMEOUT_MS:5000}
+        retries: ${KAFKA_PRODUCER_RETRIES:0}
+        allow.auto.create.topics: false
 
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/user_service}

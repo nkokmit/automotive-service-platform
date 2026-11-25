@@ -55,7 +55,8 @@ export default function Login() {
       navigate(from, { replace: true });
     } catch (err) {
       // message đã là tiếng Việt từ GlobalExceptionHandler phía backend
-      t.error(err instanceof Error ? err.message : "Đăng nhập thất bại");
+      const message = err instanceof Error ? err.message : (mode === "login" ? "Đăng nhập thất bại" : "Đăng ký thất bại");
+      t.error(message);
     } finally {
       setLoading(false);
     }
@@ -203,7 +204,9 @@ export default function Login() {
 
             <Button type="submit" size="lg" fullWidth disabled={loading}>
               {loading
-                ? "Đang xử lý..."
+                ? mode === "login"
+                  ? "Đang đăng nhập..."
+                  : "Đang thiết lập tài khoản..."
                 : mode === "login"
                   ? "Đăng nhập"
                   : "Tạo tài khoản"}

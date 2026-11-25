@@ -70,6 +70,7 @@ export interface UserResponse {
   phone: string | null;
   fullName: string | null;
   isActive: boolean | null;
+  createdAt: string;
   roles: Set<RoleResponse>;
 }
 

@@ -15,13 +15,17 @@ import com.example.user_service.repository.RoleRepository;
 import com.example.user_service.repository.UserRepository;
 import com.example.user_service.security.jwt.JwtService;
 import com.example.user_service.security.service.RefreshTokenService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +33,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,8 +68,25 @@ class UserServiceImplTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
+    @Mock
+    private PlatformTransactionManager transactionManager;
     private UserServiceImpl userService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(new SimpleTransactionStatus());
+
+        userService = new UserServiceImpl(
+                userRepository,
+                roleRepository,
+                entityMapper,
+                passwordEncoder,
+                jwtService,
+                refreshTokenService,
+                eventPublisher,
+                new TransactionTemplate(transactionManager));
+    }
 
     @Test
     void getCurrentUser_returnsProfileOfAuthenticatedUser() {
@@ -152,7 +174,7 @@ class UserServiceImplTest {
         given(passwordEncoder.encode(request.password())).willReturn("encoded-password");
         given(userRepository.save(any(User.class))).willReturn(savedUser);
         given(jwtService.generateToken(savedUser)).willReturn("access-token");
-        given(refreshTokenService.createRefreshToken(savedUser.getId())).willReturn("refresh-token");
+        given(refreshTokenService.createRefreshToken(savedUser)).willReturn("refresh-token");
 
         AuthenticationResponse result = userService.registerUser(request);
 

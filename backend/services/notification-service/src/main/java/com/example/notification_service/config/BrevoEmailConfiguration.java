@@ -10,7 +10,7 @@ import org.springframework.web.client.RestClient;
 public class BrevoEmailConfiguration {
 
     @Bean
-    RestClient brevoRestClient(RestClient.Builder builder) {
-        return builder.build();
+    RestClient brevoRestClient() {
+        return RestClient.builder().build();
     }
 }
