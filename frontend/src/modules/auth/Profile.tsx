@@ -43,6 +43,7 @@ import type {
   InvoiceStatus,
   InvoiceSummaryResponse,
   ServiceHistoryResponse,
+  ServiceRecordType,
 } from "../../api/types";
 import { bookingApi } from "../../api/endpoints/booking";
 import { billingApi } from "../../api/endpoints/billing";
@@ -70,6 +71,22 @@ const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "invoices", label: "Hóa đơn", icon: <IconCash size={18} /> },
   { id: "vehicles", label: "Xe của tôi", icon: <IconCar size={18} /> },
 ];
+
+/**
+ * Nhãn + màu cho loại bản ghi lịch sử bảo dưỡng.
+ *
+ * Khớp `ServiceRecordType.java` ở backend. `GARAGE_SERVICE` là bản ghi do
+ * chính hệ thống ghi (hạng mục bảo dưỡng trong gara), còn hai loại còn lại là
+ * bản ghi bên ngoài — phân biệt để khách hiểu nguồn gốc của thông tin.
+ */
+const RECORD_TYPE_META: Record<
+  ServiceRecordType,
+  { label: string; tone: "primary" | "accent" | "warning" }
+> = {
+  GARAGE_SERVICE: { label: "Hệ thống AutoCare", tone: "accent" },
+  EXTERNAL_SERVICE: { label: "Garage ngoài", tone: "primary" },
+  CUSTOMER_REPORTED: { label: "Khách tự báo", tone: "warning" },
+};
 
 // =========================
 // Main component
@@ -1305,40 +1322,58 @@ function ServiceHistoryTab() {
 
   return (
     <div className="space-y-3">
-      {items.map((h) => (
-        <Card key={h.id}>
-          <div className="p-4 md:p-5">
-            <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
-              <div className="min-w-0">
-                <h3 className="font-semibold text-ink">{h.summary}</h3>
-                <div className="text-xs text-ink-muted mt-1 flex flex-wrap gap-3">
-                  <span className="flex items-center gap-1">
-                    <IconCalendar size={12} />
-                    {new Date(h.serviceDate).toLocaleDateString("vi-VN")}
-                  </span>
-                  {h.odometerKm != null && (
-                    <span>
-                      · ODO:{" "}
-                      <strong className="text-ink">
-                        {h.odometerKm.toLocaleString("vi-VN")} km
-                      </strong>
+      {items.map((h) => {
+        const meta = RECORD_TYPE_META[h.recordType] ?? {
+          label: h.recordType,
+          tone: "default" as const,
+        };
+        return (
+          <Card key={h.id}>
+            <div className="p-4 md:p-5">
+              <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-ink">{h.summary}</h3>
+                  <div className="text-xs text-ink-muted mt-1 flex flex-wrap gap-3">
+                    <span className="flex items-center gap-1">
+                      <IconCalendar size={12} />
+                      {new Date(h.serviceDate).toLocaleDateString("vi-VN")}
+                    </span>
+                    {h.odometerKm != null && (
+                      <span>
+                        · ODO:{" "}
+                        <strong className="text-ink">
+                          {h.odometerKm.toLocaleString("vi-VN")} km
+                        </strong>
+                      </span>
+                    )}
+                    {h.garageName && <span>· {h.garageName}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge tone={meta.tone}>{meta.label}</Badge>
+                  {h.licensePlate && (
+                    <span className="font-mono font-bold text-xs bg-primary/10 text-primary px-2 py-1 rounded-lg">
+                      {h.licensePlate}
                     </span>
                   )}
-                  {h.garageName && <span>· {h.garageName}</span>}
                 </div>
               </div>
-              {h.licensePlate && (
-                <span className="font-mono font-bold text-xs bg-primary/10 text-primary px-2 py-1 rounded-lg shrink-0">
-                  {h.licensePlate}
-                </span>
+
+              {/* Thông tin xe — backend trả kèm (licensePlate/make/model). */}
+              {(h.vehicleMake || h.vehicleModel) && (
+                <p className="text-xs text-ink-light mb-2">
+                  <IconCar size={12} className="inline mr-1 align-[-2px]" />
+                  {[h.vehicleMake, h.vehicleModel].filter(Boolean).join(" ")}
+                </p>
+              )}
+
+              {h.description && (
+                <p className="text-sm text-ink-light">{h.description}</p>
               )}
             </div>
-            {h.description && (
-              <p className="text-sm text-ink-light">{h.description}</p>
-            )}
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 }

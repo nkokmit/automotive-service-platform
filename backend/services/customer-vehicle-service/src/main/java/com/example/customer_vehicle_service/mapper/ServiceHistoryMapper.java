@@ -23,7 +23,16 @@ public interface ServiceHistoryMapper {
      * {@code VehicleServiceHistory.vehicle} nên không có field {@code vehicleId}
      * thuần. {@code customerId} thì map thẳng vì entity lưu UUID thuần (không
      * phải {@code @ManyToOne}) — xem javadoc entity để biết vì sao.
+     *
+     * <p>{@code licensePlate}/{@code vehicleMake}/{@code vehicleModel}/
+     * {@code customerName} là thông tin hiển thị lấy từ entity khác, được gắn
+     * sau bởi {@code ServiceHistoryServiceImpl} (dùng bản đồ tra cứu để tránh
+     * N+1 query) — nên ở đây cố ý bỏ qua.
      */
     @Mapping(source = "vehicle.id", target = "vehicleId")
+    @Mapping(target = "licensePlate", ignore = true)
+    @Mapping(target = "vehicleMake", ignore = true)
+    @Mapping(target = "vehicleModel", ignore = true)
+    @Mapping(target = "customerName", ignore = true)
     ServiceHistoryResponse toServiceHistoryResponse(VehicleServiceHistory history);
 }

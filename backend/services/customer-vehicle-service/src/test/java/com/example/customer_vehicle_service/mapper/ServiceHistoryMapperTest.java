@@ -42,8 +42,18 @@ class ServiceHistoryMapperTest {
         assertThat(result.vehicleId()).isEqualTo(vehicleId);
         assertThat(result.customerId()).isEqualTo(customerId);
         assertThat(result.recordType()).isEqualTo(ServiceRecordType.EXTERNAL_SERVICE);
+        // 4 trường hiển thị (licensePlate/vehicleMake/vehicleModel/customerName)
+        // không map ở đây — chúng được gắn sau bởi ServiceHistoryServiceImpl
+        // bằng bản đồ tra cứu batch (tránh N+1 query). Ở tầng mapper chúng
+        // phải là null.
+        assertThat(result.licensePlate()).isNull();
+        assertThat(result.vehicleMake()).isNull();
+        assertThat(result.vehicleModel()).isNull();
+        assertThat(result.customerName()).isNull();
         assertThat(result).usingRecursiveComparison()
-                .ignoringFields("vehicleId", "customerId").isEqualTo(history);
+                .ignoringFields("vehicleId", "customerId",
+                        "licensePlate", "vehicleMake", "vehicleModel", "customerName")
+                .isEqualTo(history);
     }
 
     /**

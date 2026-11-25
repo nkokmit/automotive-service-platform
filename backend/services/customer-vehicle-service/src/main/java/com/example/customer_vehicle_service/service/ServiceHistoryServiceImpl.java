@@ -24,7 +24,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Triển khai nghiệp vụ lịch sử bảo dưỡng (PLAN.md bước 5).
@@ -75,7 +80,7 @@ public class ServiceHistoryServiceImpl implements ServiceHistoryService {
 
         Page<VehicleServiceHistory> page =
                 historyRepository.findByVehicleId(vehicleId, pageable);
-        return PageResponse.from(page, historyMapper::toServiceHistoryResponse);
+        return toPageResponse(page);
     }
 
     @Override
@@ -86,7 +91,19 @@ public class ServiceHistoryServiceImpl implements ServiceHistoryService {
 
         Page<VehicleServiceHistory> page =
                 historyRepository.findByCustomerIdOrderByServiceDateDesc(customerId, pageable);
-        return PageResponse.from(page, historyMapper::toServiceHistoryResponse);
+        return toPageResponse(page);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ServiceHistoryResponse> getAllServiceHistory(Pageable pageable) {
+        log.debug("Đọc toàn bộ lịch sử bảo dưỡng của gara");
+
+        // Không cần requireCallerIsNotCustomer(): controller đã chặn CUSTOMER
+        // bằng @PreAuthorize, và đây là dữ liệu vận hành của gara.
+        Page<VehicleServiceHistory> page =
+                historyRepository.findAllByOrderByServiceDateDesc(pageable);
+        return toPageResponse(page);
     }
 
     @Override
@@ -128,6 +145,109 @@ public class ServiceHistoryServiceImpl implements ServiceHistoryService {
     // ===== Helpers =====
 
     /**
+     * Trả về giá trị đầu tiên khác null.
+     *
+     * <p>Dùng khi bổ sung thông tin hiển thị: giá trị tra từ DB được ưu tiên,
+     * nhưng nếu tra không ra (xe/khách đã xoá mềm) thì giữ giá trị mapper đã điền
+     * sẵn thay vì ghi đè bằng {@code null}.
+     */
+    private static String firstNonNull(String preferred, String fallback) {
+        return preferred != null ? preferred : fallback;
+    }
+
+    /**
+     * Chuyển trang entity sang DTO, kèm thông tin hiển thị (biển số, hãng, dòng
+     * xe, tên khách hàng).
+     *
+     * <p>Thông tin này nằm ở entity khác nên phải tra cứu thêm. Để tránh N+1
+     * query (mỗi dòng lịch sử một lần truy vấn), ta gom các id trong trang
+     * hiện tại rồi tra một lần cho xe và một lần cho khách hàng, sau đó ghép
+     * vào DTO.
+     *
+     * <p>Xe/khách hàng đã bị xoá mềm vẫn còn lịch sử trong DB (bảng lịch sử cố
+     * ý không có soft delete) — các trường hiển thị tương ứng sẽ null, đúng
+     * như tinh thần "giữ dòng dữ liệu để audit".
+     */
+    private PageResponse<ServiceHistoryResponse> toPageResponse(
+            Page<VehicleServiceHistory> page) {
+
+        List<ServiceHistoryResponse> rows = page.getContent().stream()
+                .map(historyMapper::toServiceHistoryResponse)
+                .toList();
+
+        if (rows.isEmpty()) {
+            return new PageResponse<>(
+                    List.of(),
+                    page.getNumber(),
+                    page.getSize(),
+                    page.getTotalElements(),
+                    page.getTotalPages(),
+                    page.hasNext(),
+                    page.hasPrevious());
+        }
+
+        // Gom id cần tra cứu.
+        Set<UUID> vehicleIds = rows.stream()
+                .map(ServiceHistoryResponse::vehicleId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<UUID> customerIds = rows.stream()
+                .map(ServiceHistoryResponse::customerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, Vehicle> vehicles = vehicleRepository
+                .findAllByIdIn(vehicleIds).stream()
+                .collect(Collectors.toMap(Vehicle::getId, v -> v));
+        Map<UUID, Customer> customers = customerRepository
+                .findAllByIdIn(customerIds).stream()
+                .collect(Collectors.toMap(Customer::getId, c -> c));
+
+        List<ServiceHistoryResponse> enriched = rows.stream()
+                .map(row -> {
+                    Vehicle vehicle = vehicles.get(row.vehicleId());
+                    Customer customer = customers.get(row.customerId());
+                    return new ServiceHistoryResponse(
+                            row.id(),
+                            row.vehicleId(),
+                            row.customerId(),
+                            row.workOrderId(),
+                            row.recordType(),
+                            row.serviceDate(),
+                            row.odometerKm(),
+                            row.summary(),
+                            row.description(),
+                            row.garageName(),
+                            row.createdAt(),
+                            // Tra cứu chỉ BỔ SUNG: nếu không tra được (xe/khách
+                            // đã xoá mềm, hoặc mapper đã điền sẵn) thì giữ
+                            // nguyên giá trị cũ thay vì ghi đè bằng null.
+                            firstNonNull(
+                                    vehicle != null ? vehicle.getLicensePlate() : null,
+                                    row.licensePlate()),
+                            firstNonNull(
+                                    vehicle != null ? vehicle.getMake() : null,
+                                    row.vehicleMake()),
+                            firstNonNull(
+                                    vehicle != null ? vehicle.getModel() : null,
+                                    row.vehicleModel()),
+                            firstNonNull(
+                                    customer != null ? customer.getFullName() : null,
+                                    row.customerName()));
+                })
+                .toList();
+
+        return new PageResponse<>(
+                enriched,
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.hasNext(),
+                page.hasPrevious());
+    }
+
+    /**
      * Xe phải tồn tại và chưa bị xoá mềm. {@code findById} chịu
      * {@code @SQLRestriction} nên xe đã xoá mềm không lấy được — dù xe đó vẫn còn
      * lịch sử trong DB.
@@ -135,8 +255,7 @@ public class ServiceHistoryServiceImpl implements ServiceHistoryService {
      * <p>Áp dụng cả khi đọc: bản ghi lịch sử được giữ nguyên để audit, nhưng API
      * bình thường không nên trả dữ liệu của một hồ sơ đã xoá mềm trừ khi có API
      * audit riêng.
-     */
-    private Vehicle requireVehicle(UUID vehicleId) {
+     */    private Vehicle requireVehicle(UUID vehicleId) {
         return vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> new VehicleNotFoundException(
                         "Không tìm thấy xe với id: " + vehicleId));

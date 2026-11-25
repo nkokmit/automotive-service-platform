@@ -388,6 +388,7 @@ class ServiceHistoryServiceImplTest {
     private ServiceHistoryResponse response(UUID customerId) {
         return new ServiceHistoryResponse(UUID.randomUUID(), VEHICLE_ID, customerId, null,
                 ServiceRecordType.EXTERNAL_SERVICE, SERVICE_DATE, 15000, "Thay dầu",
-                "Thay dầu và lọc gió", "Gara An Phú", SERVICE_DATE);
+                "Thay dầu và lọc gió", "Gara An Phú", SERVICE_DATE,
+                "51H-123.45", "Toyota", "Vios", "Nguyễn Văn An");
     }
 }

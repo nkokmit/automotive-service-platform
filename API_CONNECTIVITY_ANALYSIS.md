@@ -370,15 +370,70 @@ scripts/section5-smoke.mjs --mint` để dùng token tự ký nếu không có `
 
 ---
 
-### 7. **CUSTOMER-VEHICLE SERVICE - LỰC SỬ BẢO DƯỠNG**
-- ❌ `GET /api/customers/{id}/service-history` (Chỉ frontend dùng fallback sang internal)
-- ❌ `GET /api/vehicles/{id}/service-history` (Chỉ frontend dùng fallback sang internal)
-- ❌ `POST /api/vehicles/{id}/service-history` (Chỉ frontend dùng fallback sang internal)
+### 7. **CUSTOMER-VEHICLE SERVICE - LỊCH SỬ BẢO DƯỠNG** — ✅ **Đã kết nối ở Phase 3**
+- ✅ `GET /api/service-history/me` - Lịch sử bảo dưỡng của chính mình (khách hàng)
+- ✅ `GET /api/service-history` - Toàn bộ lịch sử bảo dưỡng của gara (nhân viên) **[MỚI]**
+- ✅ `GET /api/customers/{id}/service-history` - Lịch sử theo khách hàng (nhân viên)
+- ✅ `GET /api/vehicles/{id}/service-history` - Lịch sử theo xe (nhân viên)
+- ✅ `POST /api/vehicles/{id}/service-history` - Ghi nhận lần bảo dưỡng mới
+- ✅ `GET /api/customers` - Danh sách khách hàng
+- ✅ `GET /api/vehicles` - Danh sách phương tiện
 
 **Note:** Frontend có fallback sang `/ai/customer-vehicles/*` nhưng không gọi trực tiếp API này từ Gateway
 
-**Location:** `customer-vehicle-service/VehicleServiceHistoryController`, `customer-vehicle-service/CustomerServiceHistoryController`
-**Độ ưu tiên:** ⭐ Fallback đã tồn tại
+**Location:** `customer-vehicle-service/VehicleServiceHistoryController`, `customer-vehicle-service/CustomerServiceHistoryController`, `customer-vehicle-service/CustomerServiceHistoryByIdController`, `customer-vehicle-service/ServiceHistoryAdminController`
+**Độ ưu tiên:** ⭐ Đã kết nối trực tiếp qua Gateway
+
+**Frontend đã làm:**
+- `frontend/src/api/endpoints/customerVehicle.ts` — 5 endpoint lịch sử + CRUD danh mục
+- `frontend/src/modules/admin/AdminCustomerVehicles.tsx` — 3 tab: Phương tiện / Khách hàng / Nhật ký bảo dưỡng
+- `frontend/src/modules/auth/Profile.tsx` — tab "Bảo dưỡng" cho khách hàng
+
+**Backend đã thêm/sửa:**
+
+1. **Endpoint mới `GET /api/service-history`** (`ServiceHistoryAdminController`).
+   Trước đây màn hình "Nhật ký bảo dưỡng" của quản trị gọi
+   `GET /api/service-history/me` — tức lịch sử của *chính người đang đăng nhập* —
+   nên nhân viên đăng nhập bằng tài khoản không gắn với hồ sơ khách hàng thấy
+   trang rỗng, còn lịch sử của những lần khách mang xe tới lại không hiện ở đâu.
+   Endpoint mới lấp đúng khoảng trống đó, chặn bằng
+   `@PreAuthorize("hasAuthority('SERVICE_HISTORY_READ') and not hasAuthority('ROLE_CUSTOMER')")`.
+
+2. **Route Gateway.** `Path=/api/service-history` **không** khớp
+   `Path=/api/service-history/**` với đúng path gốc — phải khai báo cả hai:
+   `Path=/api/service-history,/api/service-history/**`.
+
+3. **Enrichment trường hiển thị.** `ServiceHistoryResponse` giờ có thêm
+   `licensePlate`, `vehicleMake`, `vehicleModel`, `customerName`. Vì
+   `VehicleServiceHistory.vehicle` là `@ManyToOne(LAZY)` nên phải gom id trong
+   trang rồi tra batch (`findAllByIdIn`) cho xe và khách hàng — nếu không sẽ N+1
+   query mỗi dòng lịch sử.
+
+> 🔒 **Lỗi bảo mật nghiêm trọng đã sửa: fail-open sang bridge không xác thực.**
+>
+> `frontend/src/api/endpoints/customerVehicle.ts` trước đây bọc mọi lời gọi
+> trong `try ... catch` trần. Khi Spring backend từ chối request (HTTP 401/403 —
+> tức người dùng *bị chặn quyền*), `catch` nuốt lỗi và rơi về FastAPI
+> `ai-services/agent-service` (`/ai/customer-vehicles/*`) — service này **không
+> có authentication và không lọc theo vai trò**. Kết quả: khách hàng đọc được
+> lịch sử bảo dưỡng của *mọi* khách khác, và ghi được bản ghi vào xe của người
+> khác — tức leo thang đặc quyền qua chính lớp fallback.
+>
+> **Đã sửa:** thêm `withBridgeFallback` + `isRetryableViaBridge`. Chỉ rơi về
+> bridge khi lỗi mạng (fetch bị reject) hoặc lỗi 5xx; mọi lỗi 4xx (401/403/404/400)
+> được ném thẳng ra ngoài. Riêng `getCustomerServiceHistory` /
+> `getVehicleServiceHistory` / `getAllServiceHistory` **không có fallback bridge**
+> vì bridge không có endpoint tương đương và không kiểm tra vai trò.
+
+**Kiểm thử:** `scripts/section7-smoke.mjs` — 7 nhóm: danh mục khách/xe, lịch sử
+cả gara, lịch sử của chính mình, lịch sử theo khách, lịch sử theo xe, ghi bản
+ghi mới + đọc lại, validation (`recordType` sai / `summary` rỗng → 400), phân
+quyền (token `ROLE_CUSTOMER` bị 403 ở cả 5 endpoint nhân viên), và bảo mật
+(không token → 401, token sai → 401).
+
+**Kết quả: 29/29 pass.** Đã xác minh thêm trên trình duyệt: tab "Nhật ký bảo
+dưỡng" (quản trị) hiện 10 bản ghi kèm biển số/tên khách/loại bản ghi; modal
+lịch sử theo khách; tab "Bảo dưỡng" trong trang cá nhân khách hàng.
 
 ---
 
@@ -434,17 +489,17 @@ scripts/section5-smoke.mjs --mint` để dùng token tự ký nếu không có `
 
 ### Phase 3 (Enhancement - 2 tuần)
 - [x] Notifications (7 endpoints) — **xong** (1 bug backend đã sửa)
-- [ ] Service History APIs (3 endpoints)
+- [x] Service History APIs (7 endpoints) — **xong** (1 endpoint mới + 1 lỗi bảo mật fail-open đã sửa)
 
 ---
 
 ## 📝 Ghi Chú
 
 - **Internal APIs:** Không cần kết nối từ frontend (Service-to-Service communication)
-- **Fallback APIs:** Frontend đã có fallback sang `/ai/customer-vehicles/` cho một số API
+- **Fallback APIs:** Frontend có fallback sang `/ai/customer-vehicles/` cho một số API — **chỉ dùng khi lỗi mạng/5xx**, không dùng khi backend trả 4xx (xem Section 7)
 - **Frontend Gaps:** Hiện tại frontend chỉ cover ~63% tổng API backend
 
 ---
 
-**Last Updated:** 2026-11-25
+**Last Updated:** 2026-11-26
 **Analyzed By:** API Connectivity Analyzer

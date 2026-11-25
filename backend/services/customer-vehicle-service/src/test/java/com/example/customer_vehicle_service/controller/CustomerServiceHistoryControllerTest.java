@@ -136,6 +136,7 @@ class CustomerServiceHistoryControllerTest {
     private ServiceHistoryResponse response() {
         return new ServiceHistoryResponse(UUID.randomUUID(), VEHICLE_ID, CUSTOMER_ID, null,
                 ServiceRecordType.EXTERNAL_SERVICE, SERVICE_DATE, 15000, "Thay dầu",
-                null, "Gara An Phú", SERVICE_DATE);
+                null, "Gara An Phú", SERVICE_DATE,
+                "51H-123.45", "Toyota", "Vios", "Nguyễn Văn An");
     }
 }

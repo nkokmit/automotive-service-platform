@@ -238,7 +238,15 @@ export interface ServiceHistoryResponse {
   description: string | null;
   garageName: string | null;
   createdAt: string;
-  // Các trường mở rộng từ bridge MySQL giúp hiển thị nhanh biển số/tên xe
+  /**
+   * Biển số / hãng / dòng xe / tên khách hàng — thông tin hiển thị.
+   *
+   * Backend Spring trả về 4 trường này (xem `ServiceHistoryResponse.java`).
+   * Còn bridge MySQL (`/ai/customer-vehicles/*`) cũng trả chúng.
+   *
+   * Có thể null: xe hoặc khách hàng đã bị xoá mềm nhưng bản ghi lịch sử vẫn
+   * được giữ để audit.
+   */
   licensePlate?: string | null;
   vehicleMake?: string | null;
   vehicleModel?: string | null;

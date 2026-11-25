@@ -68,19 +68,8 @@ public interface ServiceHistoryService {
     PageResponse<ServiceHistoryResponse> getServiceHistoryByCustomer(UUID customerId,
                                                                       Pageable pageable);
 
-    /**
-     * Nhập bản ghi lịch sử từ gara bên ngoài hoặc thông tin khách hàng cung cấp.
-     *
-     * <p>Xe phải tồn tại và chưa bị xoá mềm. Loại bản ghi
-     * {@code GARAGE_SERVICE} bị từ chối — loại đó dành cho Kafka consumer tạo từ
-     * Work Order hoàn thành, và {@code workOrderId} vốn không có trong request
-     * nên client không thể tự sinh bản ghi hệ thống.
-     *
-     * <p>{@code customerId} trong request là tuỳ chọn: để trống nghĩa là bản ghi
-     * không gắn với ai (xe gửi hộ, nhập hậu kỳ từ hồ sơ giấy). Khi có gửi lên,
-     * khách hàng phải tồn tại — nhưng không cần còn hoạt động, vì trạng thái
-     * {@code isActive = FALSE} chính là "đang gửi xe đi bảo dưỡng".
-     */
+    PageResponse<ServiceHistoryResponse> getAllServiceHistory(Pageable pageable);
+
     ServiceHistoryResponse createServiceHistory(UUID vehicleId,
                                                 ServiceHistoryCreateRequest request);
 }
