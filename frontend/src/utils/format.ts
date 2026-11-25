@@ -25,3 +25,18 @@ export function getPartDiscountPercent(p: CatalogPart): number {
     ((p.originalPriceVND - p.priceVND) / p.originalPriceVND) * 100,
   );
 }
+
+/**
+ * ISO date → "dd/MM/yyyy" theo kiểu Việt Nam.
+ *
+ * Trả về nguyên chuỗi gốc nếu ngày không parse được — hiển thị chuỗi gốc
+ * an toàn hơn việc render "Invalid Date".
+ */
+export function formatDateVN(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}

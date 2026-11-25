@@ -5,6 +5,7 @@ import client from "../client";
 import type {
   CustomerResponse,
   PageResponse,
+  UserCreateRequest,
   UserResponse,
   UserUpdateRequest,
 } from "../types";
@@ -56,6 +57,34 @@ export const adminUserApi = {
       size: params.size ?? 50,
       sortBy: params.sortBy ?? "createdAt",
       sortDirection: params.sortDirection ?? "DESC",
+    });
+  },
+
+  /**
+   * Chi tiết một người dùng — `GET /api/users/{id}`.
+   * Cần authority `USER_READ` (chỉ ADMIN/MANAGER).
+   *
+   * <p>Hữu ích khi cần xem thông tin đầy đủ của một user mà không mở danh
+   * sách (vd: xem chi tiết sau khi tạo, hoặc tra cứu từ log).
+   */
+  getUser: async (id: string): Promise<UserResponse> => {
+    return client.request<UserResponse>(`/api/users/${id}`);
+  },
+
+  /**
+   * Tạo người dùng mới — `POST /api/users`.
+   * Cần authority `USER_CREATE` (chỉ ADMIN).
+   *
+   * <p>Body khớp `UserCreateRequest.java`: `username` / `password` / `email`
+   * bắt buộc. `roleIds` là `Set<UUID>` → gửi dạng array.
+   *
+   * <p>Khác `POST /api/auth/register` (tự đăng ký): endpoint này dành cho
+   * nhân viên tạo tài khoản hộ khách và **gán role ngay lúc tạo**.
+   */
+  createUser: async (data: UserCreateRequest): Promise<UserResponse> => {
+    return client.request<UserResponse>("/api/users", {
+      method: "POST",
+      body: data,
     });
   },
 

@@ -45,6 +45,9 @@ function mintStaffToken() {
     userId: USER_ID,
     authorities: [
       "SERVICE_HISTORY_READ",
+      // `POST /api/vehicles/{id}/service-history` yeu cau `SERVICE_HISTORY_CREATE`.
+      // Thieu quyen nay -> 403 (1403) o buoc [7] cua script.
+      "SERVICE_HISTORY_CREATE",
       "CUSTOMER_READ",
       "CUSTOMER_WRITE",
       "VEHICLE_READ",

@@ -2,17 +2,25 @@
 
 ## Tổng Hợp
 
-| Chỉ Số | Giá Trị |
-|--------|--------|
-| Tổng API Backend | 150+ endpoints |
-| Tổng API Frontend kết nối | ~145 endpoints |
-| API chưa kết nối | **~5 endpoints** |
+| Chỉ Số | Giá Trị | Nguồn |
+|--------|---------|-------|
+| Tổng endpoint backend (unique method+path) | **167** | `scripts/gap-analysis.mjs` (quét annotation trong 37 controller) |
+| ├─ Public (`/api/**`) | **159** | |
+| └─ Internal (`/internal/**`) | **8** | *frontend không được gọi — đúng thiết kế, xem Section 8* |
+| Endpoint public đã có frontend gọi | **159 / 159 (100%)** | ✅ |
+| **Endpoint public chưa có frontend gọi** | **0** | ✅ *đã nối xong — xem Section 9* |
+| Call site frontend đọc được | 162 | |
 
 > **Trạng thái theo section:**
 > - Section 1 (Permissions & Roles) — ✅ Đã xong
 > - Section 2 (Work Order) — ✅ Đã xong
 > - Section 3 (Inventory) — ✅ Đã xong *(xem mục 3 bên dưới)*
-> - Section 4+ (Staff, Billing, Notifications, Reports…) — chưa làm
+> - Section 4 (Staff) — ✅ Đã xong
+> - Section 5 (Billing) — ✅ Đã xong
+> - Section 6 (Notifications) — ✅ Đã xong
+> - Section 7 (Customer-Vehicle / Lịch sử bảo dưỡng) — ✅ Đã xong
+> - Section 8 (Internal endpoints) — ⏭️ **Không phụ trách** *(người khác đảm nhiệm)*
+> - Section 9 (Gap thật) — ✅ **Đã đo + đã nối 7/7** *(xem mục 9)*
 
 ---
 
@@ -445,9 +453,118 @@ lịch sử theo khách; tab "Bảo dưỡng" trong trang cá nhân khách hàng
 - `/internal/parts/release` - Trả phụ tùng (nội bộ)
 - `/internal/customers/{id}` - Lấy khách hàng (nội bộ)
 - `/internal/vehicles/{id}` - Lấy phương tiện (nội bộ)
+- `/internal/schedules?from&to` - Sức chứa lịch trình *(staff-service — bổ sung)*
 
 **Location:** Các controller có `@RequestMapping("/internal")`
 **Độ ưu tiên:** ℹ️ Dùng service-to-service, frontend không cần
+
+> ℹ️ **Không có frontend gọi `/internal`.** Đây là ranh giới perimeter: các
+> endpoint này chỉ dành cho service gọi service, **không** được route qua
+> `api-gateway`, và **không** được frontend gọi trực tiếp.
+
+---
+
+### 9. **GAP THẬT CỦA FRONTEND** — ✅ **Đã đo + đã nối xong 7/7**
+
+> ⚠️ Con số "~5 endpoints chưa kết nối" ở phần *Tổng Hợp* trước đây là
+> **ước lượng bằng tay** và đã **lỗi thời**. Mục này thay bằng kết quả đo
+> bằng máy trên toàn bộ source.
+
+#### 🔧 Cách đo
+
+**`scripts/gap-analysis.mjs`** — quét 2 phía và đối chiếu:
+
+1. **Backend (167 endpoint):** đọc annotation `@RequestMapping` / `@GetMapping` /
+   `@PostMapping` / `@PutMapping` / `@PatchMapping` / `@DeleteMapping` trong
+   **37 controller** thuộc 9 service. Ghép `@RequestMapping` cấp class với
+   mapping cấp method → ra `METHOD + /path` đầy đủ.
+2. **Frontend (155 call site):** quét `frontend/src/**` theo 4 kiểu gọi thực tế:
+   - `client.request<T>(...)` / `client.requestPage<T>(...)` — method nằm trong
+     object options
+   - `client.get/post/put/patch/delete(...)`
+   - `fetch(...)` — dùng cho SSE (`/api/notifications/stream`)
+3. **Khớp:** so từng segment path. Segment **literal** của backend được ưu tiên
+   hơn segment **placeholder** — nếu không, `/api/users/me` sẽ bị "nuốt" mất
+   bởi `/api/users/{id}`.
+
+> 🔧 **3 lỗi scanner đã phát hiện và sửa trong quá trình đo** (đều là lỗi
+> *giảm gap*, tức báo cáo thiếu endpoint):
+> 1. Generic type lồng nhau — `client.requestPage<PageResponse<PermissionResponse>>(`
+>    không match regex `<[^>]*>` → sót 20+ endpoint.
+> 2. Dấu `(` trong chuỗi — `` `/api/staff/availability?${qs.toString()}` `` làm
+>    lệch số ngoặc khi cân bằng → sót 6 endpoint.
+> 3. Interpolation lồng nhau — `` `/api/work-order-service-lines/me${status ? `?status=${status}` : ""}` ``
+>    bị cắt sai → sót 1 endpoint.
+>
+> Tổng: sót **27 endpoint** nếu không sửa. Đây là lý do con số "~5" cũ
+> không đáng tin — cần đo bằng script, không ước lượng tay.
+
+#### 📊 Kết quả
+
+| Chỉ số | Giá trị |
+|---|---|
+| Endpoint backend (unique) | **167** |
+| ├─ Public `/api/**` | 159 |
+| └─ Internal `/internal/**` | 8 *(frontend không gọi — đúng thiết kế)* |
+| Public **đã** có frontend gọi | **152** (95.6%) |
+| Public **chưa** có frontend gọi | **7** |
+
+#### ✅ Kết quả — ĐÃ NỐI XONG 7/7
+
+Tất cả 7 endpoint đã được **nối vào frontend** và **kiểm chứng runtime** bằng
+`scripts/gap-verify.mjs` (**36/36 pass**, chạy lặp lại nhiều lần đều 36/36).
+
+| # | Method + Path | Service | Authority | File frontend đã sửa |
+|---|---|---|---|---|
+| 1 | `GET /api/users/{id}` | user-service | `USER_READ` | `api/endpoints/user.ts` → `adminUserApi.getUser()` |
+| 2 | `POST /api/users` | user-service | `USER_CREATE` | `api/endpoints/user.ts` → `adminUserApi.createUser()` |
+| 3 | `GET /api/customers/{id}` | customer-vehicle-service | `CUSTOMER_READ` | `api/endpoints/customerVehicle.ts` → `getCustomer()` |
+| 4 | `GET /api/part-categories/{categoryId}` | inventory-service | `PART_READ` | `api/endpoints/inventory.ts` → `getPartCategory()` |
+| 5 | `GET /api/service-categories/{categoryId}` | inventory-service | `SERVICE_READ` | `api/endpoints/inventory.ts` → `getServiceCategory()` |
+| 6 | `POST /api/staff/bookings` | booking-service | `BOOKING_CREATE` | `api/endpoints/booking.ts` → `staffBookingApi.createBooking()` |
+| 7 | `PATCH /api/staff/bookings/{bookingId}/reschedule` | booking-service | `BOOKING_RESCHEDULE` | `api/endpoints/booking.ts` → `staffBookingApi.rescheduleBooking()` |
+
+**Type mới:** `UserCreateRequest`, `StaffBookingCreateRequest` (thêm vào
+`api/types.ts`).
+
+**Trạng thái hiện tại:**
+
+| Chỉ số | Giá trị |
+|---|---|
+| Public endpoint đã có frontend gọi | **159 / 159 (100%)** |
+| Public endpoint chưa có frontend gọi | **0** |
+
+#### 🐛 Một bug backend phát hiện khi kiểm chứng
+
+`GET /api/users/khong-phai-uuid` (UUID sai trong path) trả **HTTP 500** thay vì
+**400**. Nguyên nhân: `MethodArgumentTypeMismatchException` không có
+`@ExceptionHandler` riêng nên rơi vào handler `Exception.class` trong
+`GlobalExceptionHandler` → trả `ErrorCode.UNCATEGORIZED_EXCEPTION`.
+
+Đây là lỗi phía **client** (gửi dữ liệu sai) nhưng lại báo lỗi máy chủ —
+client có thể hiểu nhầm là sập hệ thống. **Đã sửa** tại
+`user-service/exception/GlobalExceptionHandler.java` (thêm handler trả 400 +
+`ErrorCode.INVALID_REQUEST`). Đã rebuild & verify lại: **400** ✅
+
+> ⚠️ Cùng lỗi này nhiều khả năng tồn tại ở các service khác — các service
+> dùng chung pattern `GlobalExceptionHandler` với handler `Exception.class`
+> cuối cùng. Nên rà lại khi có task backend.
+
+#### 🔎 Nhận xét quan trọng
+
+**Cả 7 gap đều là endpoint "chi tiết" hoặc "ghi" — không có endpoint "đọc danh
+sách" nào bị thiếu.** Frontend đã phủ 159/159 endpoint, và phần thiếu đều là
+biến thể của CRUD mà đã có 3/4 thao tác còn lại.
+
+**Điểm cần chú ý về #6 và #7:** frontend có **hai bộ API booking song song**:
+- `/api/bookings/*` — dành cho **khách hàng** (`CUSTOMER_BOOKING_*`)
+- `/api/staff/bookings/*` — dành cho **nhân viên** (`BOOKING_*`)
+
+Frontend đã phủ gần hết bộ `/api/staff/bookings/*` (list, get-by-id, status,
+check-in, cancel) nhưng **thiếu `create` và `reschedule`** — tức staff chưa
+tạo được lịch hẹn giúp khách và chưa đổi lịch hẹn được. Hai endpoint này
+gắn với nghiệp vụ *"nhân viên tiếp nhận khách đến xưởng"*, nên khả năng cao
+là **cần nối** nếu có màn hình tiếp nhận tại xưởng. → **Đã nối xong** ✅
 
 ---
 
@@ -461,18 +578,24 @@ lịch sử theo khách; tab "Bảo dưỡng" trong trang cá nhân khách hàng
    - Quản trị quyền hạn hệ thống
 
 ### ⭐⭐ QUAN TRỌNG (Secondary Features)
-1. **Inventory Management** - 25+ endpoints
+1. **Inventory Management** - 25+ endpoints — ✅ **Đã xong** *(Section 3)*
    - Quản lý kho, phụ tùng, dịch vụ, nhà cung cấp, đơn hàng
-   
-2. **Staff Management** - 24 endpoints — ✅ **Đã kết nối ở Phase 1**
+
+2. **Staff Management** - 24 endpoints — ✅ **Đã xong** *(Section 4)*
    - Quản lý nhân viên, ca trực, lịch trình
-   
-3. **Billing** - 5 endpoints — ✅ **Đã kết nối ở Phase 1**
+
+3. **Billing** - 5 endpoints — ✅ **Đã xong** *(Section 5)*
    - Hóa đơn, thanh toán
 
 ### ⭐ NÂNG CAO (Enhancement)
-1. **Notifications** - 7 endpoints — ✅ **Đã kết nối ở Phase 3**
+1. **Notifications** - 7 endpoints — ✅ **Đã xong** *(Section 6)*
    - Real-time notifications (SSE), templates, badge chưa đọc
+
+### 🔧 GAP THẬT (đã xử lý xong)
+1. **7 endpoint public chưa có frontend gọi** — ✅ **Đã nối xong** *(xem Section 9)*
+   - `GET /api/users/{id}`, `POST /api/users`, `GET /api/customers/{id}`,
+     `GET /api/part-categories/{id}`, `GET /api/service-categories/{id}`,
+     `POST /api/staff/bookings`, `PATCH /api/staff/bookings/{id}/reschedule`
 
 ---
 
@@ -483,23 +606,181 @@ lịch sử theo khách; tab "Bảo dưỡng" trong trang cá nhân khách hàng
 - [x] Work Order Management APIs (20 endpoints) — **xong**
 
 ### Phase 2 (Important - 3-4 tuần)
-- [ ] Inventory Management (25+ endpoints)
-- [ ] Staff Management (24 endpoints)
-- [x] Billing APIs (5 endpoints) — **xong** (2 bug backend đã sửa)
+- [x] Inventory Management (25+ endpoints) — **xong** *(Section 3)*
+- [x] Staff Management (24 endpoints) — **xong** *(Section 4)*
+- [x] Billing APIs (5 endpoints) — **xong** *(Section 5; 2 bug backend đã sửa)*
 
 ### Phase 3 (Enhancement - 2 tuần)
-- [x] Notifications (7 endpoints) — **xong** (1 bug backend đã sửa)
-- [x] Service History APIs (7 endpoints) — **xong** (1 endpoint mới + 1 lỗi bảo mật fail-open đã sửa)
+- [x] Notifications (7 endpoints) — **xong** *(Section 6; 1 bug backend đã sửa)*
+- [x] Service History APIs (7 endpoints) — **xong** *(Section 7; 1 endpoint mới + 1 lỗi bảo mật fail-open đã sửa)*
+
+### Phase 4 (Đo & đóng gap thật — xong)
+- [x] Đo lại gap frontend bằng script — **xong** *(Section 9)*
+- [x] Nối 7 endpoint còn thiếu — **xong** *(verify 36/36 bằng `scripts/gap-verify.mjs`)*
+- [x] Sửa bug backend `MethodArgumentTypeMismatchException` → 500 — **xong** *(user-service)*
+
+---
+
+## 🔍 Section 10 — Kiểm chứng thực tế màn "Hồ sơ" (`/profile`) — "Xe của tôi"
+
+> Ngày 2026-11-26. Điều tra sâu vì người dùng nghi ngờ tab "Xe của tôi"
+> **không có dữ liệu thật** (chỉ là mock để dựng UI).
+
+### 10.1 Kết luận ngắn
+
+| Tiêu chí | Thực tế |
+|---|---|
+| Tab "Xe của tôi" **có tồn tại** | ✅ Có (`Profile.tsx:72`, component `VehiclesTab` tại `:1634`) |
+| Dữ liệu xe lấy từ **API thật** | ❌ **KHÔNG** — từ `localStorage` + mock |
+| Khách hàng **được phép** đọc/ghi xe | ❌ **KHÔNG** — 1403/403 (thiếu `VEHICLE_READ`/`VEHICLE_CREATE`) |
+| Backend **có** endpoint "xe của tôi" | ❌ **KHÔNG** — không tồn tại, không thể tồn tại |
+| `vehicles` table có `customer_id`? | ❌ **KHÔNG** — cột bị `DROP` ở migration V3 |
+
+### 10.2 Bằng chứng
+
+**(a) Nguồn dữ liệu là localStorage/mock** — `frontend/src/data/authStore.ts:294-326`:
+
+```typescript
+// ── Xe của tôi ────────────────────────────────────────────────────────────────
+// Backend KHÔNG có endpoint "xe của tôi" (xem comment trong VehicleController.java)
+// nên danh sách xe của khách được giữ ở localStorage. ...
+export function getUserVehicles(userId: string): Vehicle[] {
+  const stored = readVehicleStore(userId);
+  if (stored) return stored;
+  return mockUsers.find((x) => x.id === userId)?.vehicles ?? [];
+}
+```
+
+Fallback `mockUsers` chỉ có **một** user với `id: "u1"` (`frontend/src/data/mock.ts:473`).
+User thật từ backend có id là **UUID** → `mockUsers.find(...)` luôn trả `undefined`
+→ **tab luôn rỗng với tài khoản thật**, trừ khi localStorage đã có dữ liệu.
+
+**(b) Kiểm chứng runtime** (đăng ký user mới → login → gọi API bằng token thật):
+
+```
+[1] register -> 0 Đăng ký thành công
+[2] login    -> 0 | token? true
+[3] GET /api/customers/me              -> 0 Success
+[4] GET /api/service-history/me        -> 0 | items: 0
+[5] GET /api/vehicles  (token khách)   -> 1403 Bạn không có quyền
+[6] GET /api/vehicles/{id}/service-history (token khách) -> 403
+[7] POST /api/vehicles (token khách)   -> 1403 Bạn không có quyền
+[8] PUT  /api/customers/me (token khách)-> 1000 Tham số 'id' phải là UUID
+```
+
+**(c) Backend không thể có "xe của tôi"** —
+`V3__decouple_customer_from_vehicle.sql` đã **xoá cột quan hệ sở hữu**:
+
+```sql
+ALTER TABLE `vehicles`
+    DROP FOREIGN KEY `fk_vehicles_customer`,
+    DROP INDEX `idx_vehicles_customer_id`,
+    DROP COLUMN `customer_id`;
+```
+
+Quyết định nghiệp vụ ghi rõ trong file đó: *"Customer là hồ sơ người liên hệ
+/ người mang xe đến gara, KHÔNG phải chủ sở hữu pháp lý"*. Liên kết
+Customer–Vehicle được ghi **theo từng lần tiếp nhận** qua bảng
+`vehicle_service_histories.customer_id` — một chiều, theo lịch sử, không phải
+sở hữu.
+
+Xác nhận trực tiếp trên DB (`DESCRIBE customer_vehicle_service.vehicles`) —
+**không có `customer_id`**:
+
+```
+id | license_plate | vin | make | model | model_year | trim | color
+fuel_type | transmission | odometer_km | notes | is_active | created_at
+updated_at | deleted_at
+```
+
+**(d) Quyền của role CUSTOMER** — `V5__seed_customer_vehicle_permissions.sql`:
+`VEHICLE_READ/CREATE/UPDATE/DELETE` chỉ cấp cho `ADMIN`, `MANAGER`, `MECHANIC`.
+`CUSTOMER` **không có** các quyền này. `V7` còn **thu hồi**
+`SERVICE_HISTORY_READ` của CUSTOMER và thay bằng `SERVICE_HISTORY_READ_SELF`
+(chỉ đọc lịch sử của chính mình, qua `GET /api/service-history/me`).
+
+**(e) `PUT /api/customers/me` không tồn tại** — `CustomerController` chỉ có
+`GET /me` (đọc). Ghi hồ sơ khách hàng là `PUT /api/customers/{id}` cần
+`CUSTOMER_UPDATE` — chỉ ADMIN có → khách sẽ luôn nhận 403.
+
+### 10.3 Hệ quả với UI hiện tại
+
+| Vị trí | Vấn đề |
+|---|---|
+| `Profile.tsx:109` (`useMemo`) | Nguồn xe = localStorage/mock → **tab rỗng với user thật** |
+| `Profile.tsx:1716-1762` (`VehiclesTab`) | Thêm/sửa xe gọi API → **luôn 1403**, rơi về `persistLocal()` → dữ liệu chỉ nằm trên máy khách, **mất khi đổi thiết bị** |
+| `Profile.tsx:341-380` (`InfoTab.handleSave`) | `PUT /api/users/{id}` cần `USER_UPDATE` → 403 → chỉ lưu local |
+| `Profile.tsx:616-653` (`CustomerCard.handleSave`) | `PUT /api/customers/{id}` cần `CUSTOMER_UPDATE` → 403 → chỉ lưu local |
+| Toàn bộ form "Thông tin" | **Không có đường ghi nào lên server thật** cho khách hàng |
+
+Tóm lại: màn `/profile` hiện tại hiển thị đúng nhưng **không ghi được gì xuống
+hệ thống** với tài khoản CUSTOMER — mọi thao tác sửa đều rơi về localStorage.
+
+### 10.4 Đề xuất (Option B — refactor `/profile`)
+
+Vì backend **cố ý** bỏ khái niệm "xe của tôi", frontend **không nên** giữ
+tab mang tên "Xe của tôi" với dữ liệu giả. Hướng phù hợp với mô hình nghiệp
+vụ hiện tại:
+
+#### Phần A — Frontend (làm được ngay, không cần backend)
+
+1. **Đổi tab "Xe của tôi"** → thành danh sách **xe đã từng mang đến xưởng**
+   (dữ liệu thật từ `GET /api/service-history/me`, đã có sẵn và hoạt động).
+   Bỏ luôn luồng thêm/sửa xe từ phía khách (vì `POST /api/vehicles` bị chặn
+   có chủ đích) — hoặc giữ nút nhưng ghi rõ "xe được xưởng ghi nhận khi bạn
+   mang đến, vui lòng liên hệ xưởng để thêm".
+2. **Gộp "Thông tin tài khoản" + "Hồ sơ khách hàng"** thành **một form duy
+   nhất**. Hiện tại có 2 form chồng lặp cùng trường (tên/email/SĐT) và cả 2
+   đều không ghi được lên server.
+3. **Bỏ hiệu ứng "giả"**: xoá `getUserVehicles`/`saveUserVehicles`
+   (localStorage) và fallback `mockUsers` khi đã có nguồn thật.
+4. **Sửa thông điệp**: khi ghi thất bại vì thiếu quyền, UI phải nói rõ
+   *"đã lưu tạm trên thiết bị này — liên hệ xưởng để đồng bộ"*, không
+   giả vờ đã lưu vào hệ thống.
+
+#### Phần B — Backend (cần team backend thực hiện)
+
+Để khách hàng **tự sửa được** hồ sơ của chính mình. Đây là **task backend**,
+cần được duyệt trước khi triển khai:
+
+| Hạng mục | Nội dung |
+|---|---|
+| Permission mới | `CUSTOMER_UPDATE_SELF` — quyền hẹp, chỉ dùng cho endpoint tự phục vụ |
+| Migration (user-service) | Seed permission + cấp cho role `CUSTOMER`. **Không** cấp `CUSTOMER_UPDATE` (quyền toàn hệ thống) cho CUSTOMER — nếu cấp thì mở đường sửa hồ sơ người khác (IDOR) |
+| Endpoint mới (customer-vehicle-service) | `PUT /api/customers/me` — **không nhận id trong path**, server tự ánh xạ caller → hồ sơ qua claim `userId` trong JWT. Đối xứng với `GET /api/customers/me` đã có |
+| DTO mới | `CustomerSelfUpdateRequest` — chỉ nhận `fullName`, `phone`, `email`, `address`, `notes`. **Không** có `userId` / `isActive` (nếu có, khách tự dánh được hồ sơ người khác hoặc tự mở lại quyền sau khi bị vô hiệu hoá) |
+| `@PreAuthorize` | `hasAuthority('CUSTOMER_UPDATE_SELF')` |
+| Kiểm thử | Khách sửa được hồ sơ của mình → 200; khách đọc/sửa hồ sơ người khác → 403; gửi `userId`/`isActive` trong body → bị bỏ qua (DTO không có field) |
+
+**Tiêu chí nghiệm thu:** sau khi Phần B có, `PUT /api/customers/me` trả 200 và
+ghi xuống `customers`; `GET /api/customers/me` trả về giá trị vừa sửa.
+
+> **Ghi chú phạm vi:** nếu Phần B chưa được duyệt, frontend vẫn ship được
+> Phần A. Khi Phần B xong, frontend chỉ cần đổi 1 hàm gọi
+> (`updateCustomer(id, ...)` → `updateCurrentCustomer(...)`).
 
 ---
 
 ## 📝 Ghi Chú
 
-- **Internal APIs:** Không cần kết nối từ frontend (Service-to-Service communication)
+- **Internal APIs:** Không cần kết nối từ frontend (Service-to-Service communication).
+  8 endpoint `/internal/**` — frontend **không được** gọi, gateway cũng **không
+  route** tới (trả 404). ⏭️ Section 8 thuộc phạm vi người khác.
 - **Fallback APIs:** Frontend có fallback sang `/ai/customer-vehicles/` cho một số API — **chỉ dùng khi lỗi mạng/5xx**, không dùng khi backend trả 4xx (xem Section 7)
-- **Frontend Gaps:** Hiện tại frontend chỉ cover ~63% tổng API backend
+- **Frontend Gaps:** Đo thật bằng `scripts/gap-analysis.mjs` → **159/159 endpoint
+  public đã có frontend gọi (100%)**, **0** endpoint thiếu (xem Section 9).
+  *Con số "~63%" trong các bản cũ của tài liệu này là ước lượng bằng tay và
+  không còn đúng.*
+- **Script kiểm chứng:**
+  - `scripts/gap-analysis.mjs` — đo gap (static, đọc source)
+  - `scripts/gap-verify.mjs` — kiểm chứng runtime 7 endpoint mới (36/36)
 
 ---
 
 **Last Updated:** 2026-11-26
 **Analyzed By:** API Connectivity Analyzer
+
+> **Ghi chú 2026-11-26:** Section 10 bổ sung kiểm chứng runtime màn `/profile`:
+> tab "Xe của tôi" **tồn tại trong UI nhưng không có dữ liệu thật** (localStorage
+> + mock), vì backend cố ý bỏ quan hệ sở hữu xe (`vehicles.customer_id` đã bị
+> DROP ở V3) và role CUSTOMER không có `VEHICLE_*`/`CUSTOMER_UPDATE`.

@@ -113,6 +113,18 @@ export const customerVehicleApi = {
     );
   },
 
+  /**
+   * Chi tiết một khách hàng — `GET /api/customers/{id}`.
+   * Cần authority `CUSTOMER_READ` (khách hàng **không** có quyền này).
+   *
+   * <p>Không dùng fallback `/ai/customer-vehicles/` cho endpoint này: bridge AI
+   * không bảo đảm có đủ trường, và lỗi 4xx (403/404) thì không được phép
+   * fallback theo quy ước (xem `withBridgeFallback`).
+   */
+  getCustomer: async (id: string): Promise<CustomerResponse> => {
+    return client.request<CustomerResponse>(`/api/customers/${id}`);
+  },
+
   updateCustomer: async (
     id: string,
     data: CustomerUpdateRequest,

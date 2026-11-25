@@ -334,6 +334,14 @@ export const inventoryApi = {
     );
   },
 
+  /**
+   * Chi tiết một nhóm phụ tùng — `GET /api/part-categories/{id}`.
+   * Cần authority `PART_READ`.
+   */
+  getPartCategory: async (id: string): Promise<CategoryResponse> => {
+    return client.request<CategoryResponse>(`/api/part-categories/${id}`);
+  },
+
   /** Tạo nhóm phụ tùng. Cần authority `PART_WRITE`. */
   createPartCategory: async (
     data: CategoryWriteRequest,
@@ -578,6 +586,14 @@ export const inventoryApi = {
   },
 
   // ── Nhóm dịch vụ (ghi) ────────────────────────────────────────────────────
+  /**
+   * Chi tiết một nhóm dịch vụ — `GET /api/service-categories/{id}`.
+   * Cần authority `SERVICE_READ`.
+   */
+  getServiceCategory: async (id: string): Promise<CategoryResponse> => {
+    return client.request<CategoryResponse>(`/api/service-categories/${id}`);
+  },
+
   createServiceCategory: async (
     data: CategoryWriteRequest,
   ): Promise<CategoryResponse> => {

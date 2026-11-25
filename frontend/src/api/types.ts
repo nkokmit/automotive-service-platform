@@ -122,6 +122,24 @@ export interface UserUpdateRequest {
   roleIds?: string[];
 }
 
+/**
+ * Khớp UserCreateRequest.java — `username`, `password`, `email` là bắt buộc
+ * (@NotBlank/@Size/@Email). `roleIds` là `Set<UUID>` → JSON là array.
+ */
+export interface UserCreateRequest {
+  /** 3–50 ký tự. */
+  username: string;
+  /** 6–100 ký tự. */
+  password: string;
+  email: string;
+  /** Tối đa 20 ký tự. */
+  phone?: string;
+  /** Tối đa 100 ký tự. */
+  fullName?: string;
+  isActive?: boolean;
+  roleIds?: string[];
+}
+
 /** Khớp AuthenticationResponse.java — KHÔNG có field expiresIn. */
 export interface AuthenticationResponse {
   accessToken: string;
@@ -1158,6 +1176,28 @@ export interface NotificationSsePayload {
 }
 
 // ── Staff booking (booking-service — màn hình lịch hẹn của xưởng) ─────────────
+/**
+ * Khớp StaffBookingCreateRequest.java — lịch hẹn do **nhân viên** tạo hộ khách.
+ *
+ * Khác `BookingCreateRequest` (khách tự tạo) ở 2 điểm:
+ *  - Bắt buộc có `customerId` + `source` (khách tự đặt thì không cần).
+ *  - `licensePlate` là bắt buộc và tối đa 20 ký tự — nhân viên nhập tay biển số.
+ */
+export interface StaffBookingCreateRequest {
+  /** ONLINE | PHONE | WALK_IN — nguồn lịch hẹn do nhân viên nhập. */
+  source: BookingSource;
+  /** ISO-8601 instant, ví dụ "2026-11-20T02:00:00Z". */
+  startAt: string;
+  /** Danh sách id dịch vụ — không được rỗng. */
+  serviceIds: string[];
+  /** Biển số xe, tối đa 20 ký tự. */
+  licensePlate: string;
+  /** Khách hàng phải đã tồn tại trong customer-vehicle-service. */
+  customerId: string;
+  /** Ghi chú của khách, tối đa 1000 ký tự. */
+  customerNote?: string;
+}
+
 /** Khớp StaffBookingResponse.java */
 export interface StaffBookingResponse {
   id: string;

@@ -17,6 +17,7 @@ import type {
   BookingRescheduleRequest,
   BookingSource,
   BookingStatus,
+  StaffBookingCreateRequest,
   StaffBookingPageResponse,
   StaffBookingResponse,
   StaffBookingVehicleRequest,
@@ -130,6 +131,53 @@ export const staffBookingApi = {
   getBooking: async (bookingId: string): Promise<StaffBookingResponse> => {
     return client.request<StaffBookingResponse>(
       `/api/staff/bookings/${bookingId}`,
+    );
+  },
+
+  /**
+   * Tạo lịch hẹn hộ khách — `POST /api/staff/bookings`.
+   * Cần authority `BOOKING_CREATE`.
+   *
+   * <p>Dùng khi khách đến xưởng mà không đặt qua web (source `WALK_IN`), hoặc
+   * nhân viên tạo hộ khi khách gọi điện (`PHONE`).
+   *
+   * <p>Khác `bookingApi.createBooking` (khách tự đặt): endpoint này **bắt
+   * buộc** có `customerId` và `licensePlate` — nhân viên nhập tay biển số và
+   * chọn khách đã có trong hệ thống. Khách phải **đã tồn tại** trong
+   * customer-vehicle-service, nếu không sẽ nhận lỗi 404/400.
+   */
+  createBooking: async (
+    payload: StaffBookingCreateRequest,
+  ): Promise<StaffBookingResponse> => {
+    return client.request<StaffBookingResponse>("/api/staff/bookings", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
+  /**
+   * Đổi lịch hẹn — `PATCH /api/staff/bookings/{id}/reschedule`.
+   * Cần authority `BOOKING_RESCHEDULE`.
+   *
+   * <p>`startAt` phải nằm trong **tương lai** (backend `@Future`) và là ISO
+   * instant. Backend sẽ kiểm tra lại sức chứa kỹ thuật viên cho khung giờ
+   * mới — nếu đầy sẽ trả lỗi 409.
+   *
+   * <p>Khác `bookingApi.rescheduleBooking` (khách tự đổi lịch): endpoint này
+   * dành cho nhân viên, và quyền là `BOOKING_RESCHEDULE` chứ không phải
+   * `CUSTOMER_BOOKING_RESCHEDULE`.
+   */
+  rescheduleBooking: async (
+    bookingId: string,
+    startAt: string,
+  ): Promise<StaffBookingResponse> => {
+    const body: BookingRescheduleRequest = { startAt };
+    return client.request<StaffBookingResponse>(
+      `/api/staff/bookings/${bookingId}/reschedule`,
+      {
+        method: "PATCH",
+        body,
+      },
     );
   },
 
