@@ -36,14 +36,23 @@ export const bookingApi = {
   /**
    * Các khung giờ còn trống trong khoảng from..to cho các dịch vụ đã chọn.
    * Backend bỏ qua slot đã qua và slot vượt sức chứa kỹ thuật viên.
+   *
+   * <p>Backend nhận `@RequestParam("serviceIds") List<UUID>`. Nếu danh sách
+   * rỗng, Spring không bind được và trả 400 "Tham số 'serviceIds' phải là List"
+   * — thông báo lỗi kỹ thuật không giúp người dùng. Vì vậy ta chặn ngay từ
+   * frontend và ném lỗi có thông điệp rõ ràng.
    */
   getAvailability: async (
     params: AvailabilityParams,
   ): Promise<AvailabilitySlotResponse[]> => {
+    const serviceIds = (params.serviceIds ?? []).filter(Boolean);
+    if (serviceIds.length === 0) {
+      throw new Error("Chưa chọn dịch vụ nào để xem lịch trống");
+    }
     const qs = new URLSearchParams();
     qs.append("from", params.from);
     qs.append("to", params.to);
-    for (const id of params.serviceIds) qs.append("serviceIds", id);
+    for (const id of serviceIds) qs.append("serviceIds", id);
     return client.request<AvailabilitySlotResponse[]>(
       `/api/bookings/availability?${qs.toString()}`,
     );

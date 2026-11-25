@@ -71,6 +71,23 @@ type TabId = "description" | "includes" | "policy" | "reviews";
 /** Khoảng ngày mà backend booking-service cho phép tra cứu (≤ 14 ngày). */
 const AVAILABILITY_WINDOW_DAYS = 7;
 
+/**
+ * Kiểm tra chuỗi có phải UUID hợp lệ hay không.
+ *
+ * Backend `booking-service` nhận `@RequestParam("serviceIds") List<UUID>` —
+ * nếu gửi chuỗi không phải UUID (như `id` của dữ liệu mẫu: `"sv1"`), Spring
+ * không bind được và trả 400 "Tham số 'serviceIds' phải là List".
+ *
+ * Kiểm tra ở frontend để không gửi request chắc chắn thất bại, thay vì để
+ * người dùng thấy thông báo lỗi kỹ thuật.
+ */
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string | null | undefined): boolean {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
 /** Sinh danh sách N ngày tới (bắt đầu từ hôm nay). */
 function getNextDays(count: number) {
   const days: { iso: string; label: string; weekday: string }[] = [];
@@ -153,6 +170,19 @@ export default function ServiceDetail() {
   const loadSlots = useCallback(
     async (date: string) => {
       if (!service || !date) return;
+      // `service.id` phải là UUID mới gọi được API: backend nhận
+      // `@RequestParam("serviceIds") List<UUID>`, và khi catalog rơi về dữ liệu
+      // mẫu thì `service.id` là chuỗi kiểu "sv1" — Spring không bind được và
+      // trả 400 "Tham số 'serviceIds' phải là List" (lỗi kỹ thuật lộ ra
+      // nguyên văn cho người dùng). Kiểm tra `isUuid` chính xác hơn cờ
+      // `usingFallback` — cờ đó còn bật khi chỉ phụ tùng rơi về dữ liệu mẫu,
+      // trong khi dịch vụ vẫn thật và đặt lịch vẫn hợp lệ.
+      if (!isUuid(service.id)) {
+        setSlots([]);
+        setSlotsError(null);
+        setSlotsLoading(false);
+        return;
+      }
       setSlotsLoading(true);
       setSlotsError(null);
       try {
@@ -173,7 +203,7 @@ export default function ServiceDetail() {
         setSlotsLoading(false);
       }
     },
-    [service],
+    [service, usingFallback],
   );
 
   useEffect(() => {
@@ -258,6 +288,15 @@ export default function ServiceDetail() {
       navigate("/login", { state: { from: `/services/${slug}` } });
       return;
     }
+    // `service.id` phải là UUID mới đặt lịch được (backend nhận
+    // `List<UUID>`). Khi catalog rơi về dữ liệu mẫu thì id là "sv1" — chặn
+    // ở đây để không gửi request chắc chắn thất bại.
+    if (!isUuid(service.id)) {
+      t.error(
+        "Chưa tải được thông tin dịch vụ từ máy chủ, không thể đặt lịch. Vui lòng tải lại trang.",
+      );
+      return;
+    }
     if (!selectedSlot) {
       t.info("Vui lòng chọn khung giờ");
       return;
@@ -306,8 +345,9 @@ export default function ServiceDetail() {
 
       {usingFallback && (
         <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Đang hiển thị dịch vụ mẫu. Đặt lịch sẽ được ghi nhận khi hệ thống kết
-          nối được máy chủ.
+          {isUuid(service.id)
+            ? "Máy chủ chưa có dữ liệu phụ tùng — đang hiển thị dữ liệu mẫu."
+            : "Đang hiển thị dịch vụ mẫu. Đặt lịch sẽ được ghi nhận khi hệ thống kết nối được máy chủ."}
         </div>
       )}
 
@@ -659,6 +699,11 @@ export default function ServiceDetail() {
                       </button>
                     </span>
                   </div>
+                ) : !isUuid(service.id) ? (
+                  <p className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg">
+                    Chưa tải được danh mục dịch vụ từ máy chủ nên chưa hiển thị
+                    lịch trống. Vui lòng tải lại trang.
+                  </p>
                 ) : slots.length === 0 ? (
                   <p className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg">
                     Ngày này đã kín lịch. Vui lòng chọn ngày khác.

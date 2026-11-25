@@ -782,6 +782,16 @@ function ReschedulePanel({
 
   useEffect(() => {
     let cancelled = false;
+    // Lịch hẹn cũ có thể không còn dịch vụ nào (dịch vụ đã bị xoá ở
+    // inventory-service). `serviceIds` rỗng → `serviceIds=` rỗng trong query
+    // → Spring trả 400 "Tham số 'serviceIds' phải là List". Bỏ qua và báo
+    // riêng cho người dùng.
+    if (!serviceIds || serviceIds.length === 0) {
+      setSlots([]);
+      setError("Lịch hẹn này không còn dịch vụ nào để đổi lịch.");
+      setLoading(false);
+      return;
+    }
     const today = new Date();
     const from = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     const toDate = new Date(today);

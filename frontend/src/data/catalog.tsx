@@ -195,16 +195,29 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         // mà không có cảnh báo nào — người dùng tưởng đang xem dữ liệu thật.
         const isEmpty = mappedServices.length === 0 && mappedParts.length === 0;
 
-        setServices(mappedServices.length > 0 ? mappedServices : mockServices);
-        setParts(mappedParts.length > 0 ? mappedParts : mockParts);
+        // `usingFallback` phải phản ánh đúng việc "dịch vụ đang hiển thị là dữ
+        // liệu mẫu hay dữ liệu thật" — vì `service.id` của dữ liệu mẫu
+        // ("sv1") không phải UUID nên booking-service không nhận được.
+        // Trước đây cờ này chỉ bật khi CẢ service lẫn part đều rỗng, nên
+        // trường hợp "service rỗng nhưng part có" vẫn hiển thị dịch vụ mẫu mà
+        // không có cảnh báo → người dùng bấm đặt lịch rồi gặp lỗi kỹ thuật.
+        const servicesFallback = mappedServices.length === 0;
+        const partsFallback = mappedParts.length === 0;
+
+        setServices(servicesFallback ? mockServices : mappedServices);
+        setParts(partsFallback ? mockParts : mappedParts);
         setServiceCategories(svcCatRes.items ?? []);
         setPartCategories(partCatRes.items ?? []);
         setError(
           isEmpty
             ? "Máy chủ chưa có dữ liệu catalog (dịch vụ / phụ tùng)."
-            : null,
+            : servicesFallback
+              ? "Máy chủ chưa có dữ liệu dịch vụ — đang hiển thị dữ liệu mẫu."
+              : partsFallback
+                ? "Máy chủ chưa có dữ liệu phụ tùng — đang hiển thị dữ liệu mẫu."
+                : null,
         );
-        setUsingFallback(isEmpty);
+        setUsingFallback(isEmpty || servicesFallback || partsFallback);
       } catch (err) {
         if (cancelled) return;
         // Rơi về dữ liệu mẫu — web vẫn hiển thị được, chỉ mất dữ liệu thật.
