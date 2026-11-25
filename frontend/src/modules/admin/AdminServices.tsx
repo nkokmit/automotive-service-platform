@@ -5,6 +5,7 @@ import {
   IconStar,
   IconClock,
   IconRefresh,
+  IconPackage,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
@@ -86,6 +87,22 @@ const columns: AdminTableColumn<CatalogService>[] = [
           </div>
         )}
       </div>
+    ),
+  },
+  {
+    key: "bom",
+    label: "Định mức",
+    align: "center",
+    hideOnMobile: true,
+    render: (s) => (
+      <Link
+        to={`/admin/services/bom/${s.id}`}
+        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        title="Quản lý định mức phụ tùng (BOM) của dịch vụ này"
+      >
+        <IconPackage size={12} />
+        Phụ tùng
+      </Link>
     ),
   },
   {

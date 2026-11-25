@@ -331,6 +331,117 @@ export interface PartCompatibilityResponse {
   createdAt: string;
 }
 
+// ── Inventory: nhà cung cấp, đơn nhập hàng, sổ kho ────────────────────────────
+/** Khớp SupplierResponse.java. */
+export interface SupplierResponse {
+  id: string;
+  code: string;
+  name: string;
+  taxCode: string | null;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp PurchaseOrderStatus.java. */
+export type PurchaseOrderStatus =
+  | "DRAFT"
+  | "APPROVED"
+  | "RECEIVED"
+  | "CANCELED";
+
+/** Khớp PurchaseOrderItemResponse.java — một dòng hàng của đơn nhập hàng. */
+export interface PurchaseOrderItemResponse {
+  id: string;
+  partId: string;
+  partSku: string;
+  partName: string;
+  quantity: number;
+  importPrice: number;
+  totalPrice: number;
+}
+
+/** Khớp PurchaseOrderResponse.java. */
+export interface PurchaseOrderResponse {
+  id: string;
+  code: string;
+  supplierId: string;
+  supplierName: string;
+  status: PurchaseOrderStatus;
+  totalAmount: number;
+  createdBy: string | null;
+  receivedAt: string | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PurchaseOrderItemResponse[];
+}
+
+/** Khớp TransactionType.java — loại biến động tồn kho. */
+export type InventoryTransactionType =
+  | "IMPORT"
+  | "EXPORT"
+  | "RESERVE"
+  | "RELEASE"
+  | "RETURN"
+  | "ADJUSTMENT";
+
+/** Khớp ReferenceType.java — nguồn phát sinh giao dịch kho. */
+export type InventoryReferenceType =
+  | "PURCHASE_ORDER"
+  | "WORK_ORDER"
+  | "STOCK_TAKE";
+
+/** Khớp InventoryTransactionResponse.java — một dòng sổ kho. */
+export interface InventoryTransactionResponse {
+  id: string;
+  partId: string;
+  partSku: string;
+  partName: string;
+  type: InventoryTransactionType;
+  quantity: number;
+  /**
+   * Với IMPORT/EXPORT/RETURN/ADJUSTMENT là tồn thực (on_hand);
+   * với RESERVE/RELEASE là tồn giữ chỗ (reserved).
+   */
+  stockBefore: number;
+  stockAfter: number;
+  referenceType: InventoryReferenceType;
+  referenceId: string | null;
+  createdBy: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** Khớp StockAvailabilityResponse.java — kết quả kiểm tra tồn tức thời. */
+export interface StockAvailabilityResponse {
+  partId: string;
+  sku: string;
+  name: string;
+  requestedQuantity: number;
+  onHandStock: number;
+  reservedStock: number;
+  availableStock: number;
+  sufficient: boolean;
+  isActive: boolean;
+}
+
+/** Khớp PartPricingResponse.java — kết quả định giá phụ tùng. */
+export interface PartPricingResponse {
+  partId: string;
+  sku: string;
+  name: string;
+  unit: string;
+  sellingPrice: number;
+  quantity: number;
+  lineTotal: number;
+  availableStock: number;
+  isActive: boolean;
+}
+
 // ── Booking service (booking-service) ─────────────────────────────────────────
 /** Khớp BookingStatus.java. */
 export type BookingStatus =

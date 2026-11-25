@@ -1,9 +1,13 @@
 /**
- * Endpoint client cho `inventory-service` — catalog dịch vụ + phụ tùng.
+ * Endpoint client cho `inventory-service` — catalog dịch vụ + phụ tùng + kho.
  *
  * Yêu cầu authority:
- *  - `SERVICE_READ` cho /api/services, /api/service-categories
- *  - `PART_READ`   cho /api/parts, /api/part-categories
+ *  - `SERVICE_READ` / `SERVICE_WRITE`  cho /api/services, /api/service-categories
+ *  - `PART_READ` / `PART_WRITE`        cho /api/parts, /api/part-categories
+ *  - `STOCK_WRITE`                    cho /api/parts/issue
+ *  - `SUPPLIER_READ` / `SUPPLIER_WRITE` cho /api/suppliers
+ *  - `PURCHASE_ORDER_READ` / `PURCHASE_ORDER_WRITE` cho /api/purchase-orders
+ *  - `INVENTORY_TRANSACTION_READ`      cho /api/inventory-transactions
  *
  * Lưu ý: role CUSTOMER ban đầu KHÔNG có 2 quyền trên (V10 migration ghi rõ
  * "CUSTOMER receives none"). Migration `V17__grant_customer_catalog_read.sql`
@@ -12,11 +16,19 @@
 import client from "../client";
 import type {
   CategoryResponse,
+  InventoryTransactionResponse,
+  InventoryTransactionType,
+  InventoryReferenceType,
   PageResponse,
   PartCompatibilityResponse,
+  PartPricingResponse,
   PartResponse,
+  PurchaseOrderResponse,
+  PurchaseOrderStatus,
   ServiceBomResponse,
   ServiceResponse,
+  StockAvailabilityResponse,
+  SupplierResponse,
 } from "../types";
 
 /** Payload tạo/sửa dịch vụ — khớp `ServiceRequest.java`. */
@@ -44,12 +56,12 @@ export interface PartWriteRequest {
   isActive?: boolean;
 }
 
-/** Payload tạo/sửa nhóm — khớp `CategoryRequest.java`. */
-export interface CategoryWriteRequest {
+/** Payload tạo/sửa nhóm dịch vụ hoặc nhóm phụ tùng — khớp `CategoryRequest.java`. */
+export type CategoryWriteRequest = {
   code: string;
   name: string;
   description?: string | null;
-}
+};
 
 export interface ListServicesParams {
   keyword?: string;
@@ -71,6 +83,93 @@ export interface ListPartsParams {
   lowStockOnly?: boolean;
   vehicleBrand?: string;
   vehicleModel?: string;
+  page?: number;
+  size?: number;
+  sortBy?: string;
+  sortDirection?: "ASC" | "DESC";
+}
+
+/** Payload tạo/sửa nhà cung cấp — khớp `SupplierRequest.java`. */
+export interface SupplierWriteRequest {
+  /** Mã nhà cung cấp — bắt buộc, tối đa 30 ký tự. */
+  code: string;
+  name: string;
+  taxCode?: string | null;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+}
+
+/** Payload thêm/sửa dòng định mức — khớp `ServiceBomRequest.java`. */
+export interface ServiceBomWriteRequest {
+  partId: string;
+  default_quantity: number;
+  note?: string | null;
+}
+
+/** Payload cập nhật dòng định mức — khớp `ServiceBomUpdateRequest.java`. */
+export interface ServiceBomUpdateRequest {
+  default_quantity: number;
+  note?: string | null;
+}
+
+/** Payload thêm phụ tùng vào đơn nhập hàng — khớp `PurchaseOrderItemRequest.java`. */
+export interface PurchaseOrderItemWriteRequest {
+  partId: string;
+  quantity: number;
+  importPrice: number;
+}
+
+/** Payload tạo/sửa đơn nhập hàng — khớp `PurchaseOrderRequest.java`. */
+export interface PurchaseOrderWriteRequest {
+  /** Mã đơn — tuỳ chọn, tối đa 50 ký tự (backend tự sinh nếu bỏ trống). */
+  code?: string | null;
+  supplierId: string;
+  note?: string | null;
+  items: PurchaseOrderItemWriteRequest[];
+}
+
+/** Payload kiểm tra tồn / lấy giá — khớp `StockItemRequest.java`. */
+export interface StockItemWriteRequest {
+  partId: string;
+  quantity: number;
+}
+
+/** Payload xuất kho — khớp `StockOperationRequest.java`. */
+export interface StockOperationWriteRequest {
+  /** Work Order id làm tham chiếu. */
+  referenceId: string;
+  items: StockItemWriteRequest[];
+  note?: string | null;
+}
+
+export interface ListSuppliersParams {
+  keyword?: string;
+  isActive?: boolean;
+  page?: number;
+  size?: number;
+  sortBy?: string;
+  sortDirection?: "ASC" | "DESC";
+}
+
+export interface ListPurchaseOrdersParams {
+  keyword?: string;
+  status?: PurchaseOrderStatus;
+  supplierId?: string;
+  page?: number;
+  size?: number;
+  sortBy?: string;
+  sortDirection?: "ASC" | "DESC";
+}
+
+export interface ListInventoryTransactionsParams {
+  partId?: string;
+  type?: InventoryTransactionType;
+  referenceType?: InventoryReferenceType;
+  referenceId?: string;
+  /** ISO-8601 instant, VD: `2026-11-01T00:00:00Z`. */
+  fromDate?: string;
+  toDate?: string;
   page?: number;
   size?: number;
   sortBy?: string;
@@ -233,5 +332,274 @@ export const inventoryApi = {
       "/api/part-categories",
       { keyword: params.keyword, page: params.page ?? 0, size: params.size ?? 50 },
     );
+  },
+
+  /** Tạo nhóm phụ tùng. Cần authority `PART_WRITE`. */
+  createPartCategory: async (
+    data: CategoryWriteRequest,
+  ): Promise<CategoryResponse> => {
+    return client.request<CategoryResponse>("/api/part-categories", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  /** Cập nhật nhóm phụ tùng. Cần authority `PART_WRITE`. */
+  updatePartCategory: async (
+    id: string,
+    data: CategoryWriteRequest,
+  ): Promise<CategoryResponse> => {
+    return client.request<CategoryResponse>(`/api/part-categories/${id}`, {
+      method: "PUT",
+      body: data,
+    });
+  },
+
+  /** Xoá nhóm phụ tùng (không xoá được nếu nhóm còn phụ tùng). */
+  deletePartCategory: async (id: string): Promise<void> => {
+    await client.request<void>(`/api/part-categories/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  // ── Kho: kiểm tra tồn & định giá ─────────────────────────────────────────
+  /**
+   * Kiểm tra tồn kho tức thời cho một danh sách dòng báo giá.
+   * Cần authority `PART_READ`. Không ghi sổ kho.
+   */
+  checkAvailability: async (
+    items: StockItemWriteRequest[],
+  ): Promise<StockAvailabilityResponse[]> => {
+    return client.request<StockAvailabilityResponse[]>(
+      "/api/parts/check-availability",
+      { method: "POST", body: { items } },
+    );
+  },
+
+  /**
+   * Lấy đơn giá bán và tổng tiền theo từng dòng báo giá.
+   * Cần authority `PART_READ`. Không ghi sổ kho.
+   */
+  getPricing: async (
+    items: StockItemWriteRequest[],
+  ): Promise<PartPricingResponse[]> => {
+    return client.request<PartPricingResponse[]>("/api/parts/pricing", {
+      method: "POST",
+      body: { items },
+    });
+  },
+
+  /**
+   * Xuất kho cho một Work Order (giảm onHand và reserved).
+   * Cần authority `STOCK_WRITE`.
+   */
+  issueParts: async (
+    data: StockOperationWriteRequest,
+  ): Promise<InventoryTransactionResponse[]> => {
+    return client.request<InventoryTransactionResponse[]>("/api/parts/issue", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  // ── Nhà cung cấp ──────────────────────────────────────────────────────────
+  listSuppliers: async (
+    params: ListSuppliersParams = {},
+  ): Promise<PageResponse<SupplierResponse>> => {
+    return client.requestPage<PageResponse<SupplierResponse>>("/api/suppliers", {
+      keyword: params.keyword,
+      isActive: params.isActive,
+      page: params.page ?? 0,
+      size: params.size ?? 50,
+      sortBy: params.sortBy ?? "name",
+      sortDirection: params.sortDirection ?? "ASC",
+    });
+  },
+
+  getSupplier: async (id: string): Promise<SupplierResponse> => {
+    return client.request<SupplierResponse>(`/api/suppliers/${id}`);
+  },
+
+  /** Tạo nhà cung cấp. Cần authority `SUPPLIER_WRITE`. */
+  createSupplier: async (
+    data: SupplierWriteRequest,
+  ): Promise<SupplierResponse> => {
+    return client.request<SupplierResponse>("/api/suppliers", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  /** Cập nhật nhà cung cấp. Cần authority `SUPPLIER_WRITE`. */
+  updateSupplier: async (
+    id: string,
+    data: SupplierWriteRequest,
+  ): Promise<SupplierResponse> => {
+    return client.request<SupplierResponse>(`/api/suppliers/${id}`, {
+      method: "PUT",
+      body: data,
+    });
+  },
+
+  /** Xoá nhà cung cấp (không xoá được nếu đang có đơn nhập hàng). */
+  deleteSupplier: async (id: string): Promise<void> => {
+    await client.request<void>(`/api/suppliers/${id}`, { method: "DELETE" });
+  },
+
+  // ── Đơn nhập hàng (Purchase Order) ────────────────────────────────────────
+  listPurchaseOrders: async (
+    params: ListPurchaseOrdersParams = {},
+  ): Promise<PageResponse<PurchaseOrderResponse>> => {
+    return client.requestPage<PageResponse<PurchaseOrderResponse>>(
+      "/api/purchase-orders",
+      {
+        keyword: params.keyword,
+        status: params.status,
+        supplierId: params.supplierId,
+        page: params.page ?? 0,
+        size: params.size ?? 50,
+        sortBy: params.sortBy ?? "createdAt",
+        sortDirection: params.sortDirection ?? "DESC",
+      },
+    );
+  },
+
+  getPurchaseOrder: async (id: string): Promise<PurchaseOrderResponse> => {
+    return client.request<PurchaseOrderResponse>(`/api/purchase-orders/${id}`);
+  },
+
+  /** Tạo đơn nhập hàng (trạng thái DRAFT). Cần `PURCHASE_ORDER_WRITE`. */
+  createPurchaseOrder: async (
+    data: PurchaseOrderWriteRequest,
+  ): Promise<PurchaseOrderResponse> => {
+    return client.request<PurchaseOrderResponse>("/api/purchase-orders", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  /** Cập nhật đơn nhập hàng (chỉ khi DRAFT). Cần `PURCHASE_ORDER_WRITE`. */
+  updatePurchaseOrder: async (
+    id: string,
+    data: PurchaseOrderWriteRequest,
+  ): Promise<PurchaseOrderResponse> => {
+    return client.request<PurchaseOrderResponse>(`/api/purchase-orders/${id}`, {
+      method: "PUT",
+      body: data,
+    });
+  },
+
+  /** Duyệt đơn: DRAFT → APPROVED. Cần `PURCHASE_ORDER_WRITE`. */
+  approvePurchaseOrder: async (
+    id: string,
+  ): Promise<PurchaseOrderResponse> => {
+    return client.request<PurchaseOrderResponse>(
+      `/api/purchase-orders/${id}/approve`,
+      { method: "POST" },
+    );
+  },
+
+  /**
+   * Nhập kho: APPROVED → RECEIVED (tăng tồn thực, tính lại giá vốn bình
+   * quân, ghi sổ kho IMPORT). Cần `PURCHASE_ORDER_WRITE`.
+   */
+  completePurchaseOrder: async (
+    id: string,
+  ): Promise<PurchaseOrderResponse> => {
+    return client.request<PurchaseOrderResponse>(
+      `/api/purchase-orders/${id}/complete`,
+      { method: "POST" },
+    );
+  },
+
+  /** Hủy đơn (DRAFT hoặc APPROVED). Cần `PURCHASE_ORDER_WRITE`. */
+  cancelPurchaseOrder: async (
+    id: string,
+  ): Promise<PurchaseOrderResponse> => {
+    return client.request<PurchaseOrderResponse>(
+      `/api/purchase-orders/${id}/cancel`,
+      { method: "POST" },
+    );
+  },
+
+  // ── Sổ nhật ký kho ────────────────────────────────────────────────────────
+  listInventoryTransactions: async (
+    params: ListInventoryTransactionsParams = {},
+  ): Promise<PageResponse<InventoryTransactionResponse>> => {
+    return client.requestPage<PageResponse<InventoryTransactionResponse>>(
+      "/api/inventory-transactions",
+      {
+        partId: params.partId,
+        type: params.type,
+        referenceType: params.referenceType,
+        referenceId: params.referenceId,
+        fromDate: params.fromDate,
+        toDate: params.toDate,
+        page: params.page ?? 0,
+        size: params.size ?? 50,
+        sortBy: params.sortBy ?? "createdAt",
+        sortDirection: params.sortDirection ?? "DESC",
+      },
+    );
+  },
+
+  // ── BOM dịch vụ ──────────────────────────────────────────────────────────
+  /** Thêm phụ tùng vào định mức của dịch vụ. Cần `SERVICE_WRITE`. */
+  addServiceBomItem: async (
+    serviceId: string,
+    data: ServiceBomWriteRequest,
+  ): Promise<ServiceBomResponse> => {
+    return client.request<ServiceBomResponse>(`/api/services/${serviceId}/bom`, {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  /** Cập nhật dòng định mức. Cần `SERVICE_WRITE`. */
+  updateServiceBomItem: async (
+    serviceId: string,
+    bomId: string,
+    data: ServiceBomUpdateRequest,
+  ): Promise<ServiceBomResponse> => {
+    return client.request<ServiceBomResponse>(
+      `/api/services/${serviceId}/bom/${bomId}`,
+      { method: "PUT", body: data },
+    );
+  },
+
+  /** Xoá dòng định mức. Cần `SERVICE_WRITE`. */
+  deleteServiceBomItem: async (
+    serviceId: string,
+    bomId: string,
+  ): Promise<void> => {
+    await client.request<void>(`/api/services/${serviceId}/bom/${bomId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // ── Nhóm dịch vụ (ghi) ────────────────────────────────────────────────────
+  createServiceCategory: async (
+    data: CategoryWriteRequest,
+  ): Promise<CategoryResponse> => {
+    return client.request<CategoryResponse>("/api/service-categories", {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  updateServiceCategory: async (
+    id: string,
+    data: CategoryWriteRequest,
+  ): Promise<CategoryResponse> => {
+    return client.request<CategoryResponse>(`/api/service-categories/${id}`, {
+      method: "PUT",
+      body: data,
+    });
+  },
+
+  deleteServiceCategory: async (id: string): Promise<void> => {
+    await client.request<void>(`/api/service-categories/${id}`, {
+      method: "DELETE",
+    });
   },
 };

@@ -41,6 +41,11 @@ import AdminDashboard from "./modules/admin/AdminDashboard";
 import AdminGarageProfile from "./modules/admin/AdminGarageProfile";
 import AdminServices from "./modules/admin/AdminServices";
 import AdminParts from "./modules/admin/AdminParts";
+import AdminSuppliers from "./modules/admin/AdminSuppliers";
+import AdminPurchaseOrders from "./modules/admin/AdminPurchaseOrders";
+import AdminInventoryTransactions from "./modules/admin/AdminInventoryTransactions";
+import AdminCategories from "./modules/admin/AdminCategories";
+import AdminServiceBom from "./modules/admin/AdminServiceBom";
 import AdminUsers from "./modules/admin/AdminUsers";
 import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
 import AdminBookings from "./modules/admin/AdminBookings";
@@ -112,7 +117,15 @@ hydrateUser().finally(() => {
               <Route index element={<AdminDashboard />} />
               <Route path="garage" element={<AdminGarageProfile />} />
               <Route path="services" element={<AdminServices />} />
+              <Route path="services/bom/:serviceId" element={<AdminServiceBom />} />
+              <Route path="categories" element={<AdminCategories />} />
               <Route path="parts" element={<AdminParts />} />
+              <Route path="suppliers" element={<AdminSuppliers />} />
+              <Route path="purchase-orders" element={<AdminPurchaseOrders />} />
+              <Route
+                path="inventory-transactions"
+                element={<AdminInventoryTransactions />}
+              />
               <Route path="bookings" element={<AdminBookings />} />
               <Route path="invoices" element={<AdminInvoices />} />
               <Route path="staff" element={<AdminStaff />} />

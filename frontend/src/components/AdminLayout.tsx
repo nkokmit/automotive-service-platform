@@ -21,6 +21,8 @@ import {
   IconCalendar,
   IconCash,
   IconShield,
+  IconTruck,
+  IconList,
 } from "./icons";
 import { useAuth } from "../data/authStore";
 import { roleLabel } from "../api/types";
@@ -65,7 +67,19 @@ const navGroups: NavGroup[] = [
       { to: "/admin/staff", label: "Kỹ thuật viên", icon: IconUsers },
       { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
       { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
+      { to: "/admin/suppliers", label: "Nhà cung cấp", icon: IconBuilding },
+      {
+        to: "/admin/purchase-orders",
+        label: "Đơn nhập hàng",
+        icon: IconTruck,
+      },
+      {
+        to: "/admin/inventory-transactions",
+        label: "Sổ kho",
+        icon: IconActivity,
+      },
       { to: "/admin/services", label: "Dịch vụ", icon: IconWrench },
+      { to: "/admin/categories", label: "Nhóm danh mục", icon: IconList },
       { to: "/admin/garage", label: "Hồ sơ xưởng", icon: IconBuilding },
       { to: "/admin/users", label: "Người dùng", icon: IconUsers },
     ],
@@ -142,9 +156,52 @@ export default function AdminLayout() {
       routeWords: ["xe", "xe của khách", "vehicle", "khách", "khách hàng", "customer"],
     },
     {
-      match: /phụ tùng|phụ kiện|part|kho|stock/,
+      // "kho" chỉ dùng khi đi kèm "tồn"/"số lượng" — nếu để đứng độc lập
+      // thì cụm "sổ kho" sẽ bị kéo về trang phụ tùng.
+      match: /phụ tùng|phụ kiện|part|tồn kho|số lượng tồn/,
       to: "/admin/parts",
-      routeWords: ["phụ tùng", "phụ kiện", "part", "parts", "kho"],
+      routeWords: [
+        "phụ tùng",
+        "phụ kiện",
+        "part",
+        "parts",
+        "tồn kho",
+        "số lượng tồn",
+      ],
+    },
+    {
+      match: /nhà cung cấp|ncc|supplier|nguồn hàng/,
+      to: "/admin/suppliers",
+      routeWords: [
+        "nhà cung cấp",
+        "ncc",
+        "supplier",
+        "suppliers",
+        "nguồn hàng",
+      ],
+    },
+    {
+      match: /đơn nhập hàng|đơn hàng|nhập hàng|purchase/,
+      to: "/admin/purchase-orders",
+      routeWords: [
+        "đơn nhập hàng",
+        "đơn hàng",
+        "nhập hàng",
+        "purchase",
+        "purchase-orders",
+      ],
+    },
+    {
+      match: /sổ kho|nhật ký|giao dịch kho|transaction/,
+      to: "/admin/inventory-transactions",
+      routeWords: [
+        "sổ kho",
+        "sổ",
+        "nhật ký",
+        "giao dịch kho",
+        "transaction",
+        "transactions",
+      ],
     },
     {
       match: /dịch vụ|service/,

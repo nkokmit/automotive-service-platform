@@ -5,14 +5,20 @@
 | Chỉ Số | Giá Trị |
 |--------|--------|
 | Tổng API Backend | 150+ endpoints |
-| Tổng API Frontend kết nối | ~115 endpoints |
-| API chưa kết nối | **35+ endpoints** |
+| Tổng API Frontend kết nối | ~145 endpoints |
+| API chưa kết nối | **~5 endpoints** |
+
+> **Trạng thái theo section:**
+> - Section 1 (Permissions & Roles) — ✅ Đã xong
+> - Section 2 (Work Order) — ✅ Đã xong
+> - Section 3 (Inventory) — ✅ Đã xong *(xem mục 3 bên dưới)*
+> - Section 4+ (Staff, Billing, Notifications, Reports…) — chưa làm
 
 ---
 
-## 🔴 API Backend Chưa Có Kết Nối Frontend
+## API Backend vs Frontend — trạng thái kết nối
 
-### 1. **PERMISSIONS & ROLES MANAGEMENT**
+### 1. **PERMISSIONS & ROLES MANAGEMENT** — ✅ **Đã kết nối ở Phase 1**
 - ✅ `GET /api/permissions` - Liệt kê quyền *(đã kết nối)*
 - ✅ `GET /api/permissions/{id}` - Chi tiết quyền *(đã kết nối)*
 - ✅ `POST /api/permissions` - Tạo quyền *(đã kết nối)*
@@ -92,47 +98,107 @@
 
 ---
 
-### 3. **INVENTORY - QUẢN LÝ KHO & NGUYÊN VẬT LIỆU**
+### 3. **INVENTORY - QUẢN LÝ KHO & NGUYÊN VẬT LIỆU** — ✅ **Đã kết nối ở Phase 1**
 
 #### 3.1 Phụ Tùng (Parts)
-- ❌ `POST /api/parts/issue` - Lấy phụ tùng từ kho
-- ❌ `POST /api/parts/check-availability` - Kiểm tra tồn kho
-- ❌ `POST /api/parts/pricing` - Tính giá phụ tùng
+- ✅ `GET /api/parts` - Tìm kiếm / lọc / phân trang phụ tùng *(đã kết nối)*
+- ✅ `GET /api/parts/{id}` - Chi tiết phụ tùng *(đã kết nối)*
+- ✅ `POST /api/parts` - Tạo phụ tùng *(đã kết nối)*
+- ✅ `PUT /api/parts/{id}` - Cập nhật phụ tùng *(đã kết nối)*
+- ✅ `DELETE /api/parts/{id}` - Vô hiệu hoá phụ tùng (soft delete) *(đã kết nối)*
+- ✅ `GET /api/parts/low-stock` - Cảnh báo sắp hết hàng *(dùng `?lowStockOnly=true` trên `GET /api/parts`)*
+- ✅ `GET /api/parts/categories` - Danh mục phụ tùng *(thực tế là `GET /api/part-categories`)*
+- ✅ `GET /api/parts/{id}/compatibilities` - Dòng xe tương thích *(đã kết nối)*
+- ✅ `POST /api/parts/{id}/compatibilities` - Thêm dòng xe tương thích *(đã kết nối)*
+- ✅ `DELETE /api/parts/{id}/compatibilities/{compatibilityId}` - Xoá dòng xe tương thích *(đã kết nối)*
+- ✅ `POST /api/parts/issue` - Lấy phụ tùng từ kho *(đã kết nối)*
+- ✅ `POST /api/parts/check-availability` - Kiểm tra tồn kho *(đã kết nối)*
+- ✅ `POST /api/parts/pricing` - Tính giá phụ tùng *(đã kết nối)*
 
 #### 3.2 Dịch Vụ (Services) - BOM Management
-- ❌ `POST /api/services/{id}/bom` - Tạo BOM (Bill of Materials)
-- ❌ `PUT /api/services/{id}/bom/{bomId}` - Cập nhật BOM
-- ❌ `DELETE /api/services/{id}/bom/{bomId}` - Xóa BOM
+- ✅ `GET /api/services/{id}/bom` - Lấy định mức phụ tùng *(đã kết nối)*
+- ✅ `POST /api/services/{id}/bom` - Tạo BOM (Bill of Materials) *(đã kết nối)*
+- ✅ `PUT /api/services/{id}/bom/{bomId}` - Cập nhật BOM *(đã kết nối)*
+- ✅ `DELETE /api/services/{id}/bom/{bomId}` - Xóa BOM *(đã kết nối)*
 
 #### 3.3 Danh Mục (Categories)
-- ❌ `POST /api/service-categories` - Tạo nhóm dịch vụ
-- ❌ `PUT /api/service-categories/{id}` - Cập nhật nhóm dịch vụ
-- ❌ `DELETE /api/service-categories/{id}` - Xóa nhóm dịch vụ
-- ❌ `POST /api/part-categories` - Tạo nhóm phụ tùng
-- ❌ `PUT /api/part-categories/{id}` - Cập nhật nhóm phụ tùng
-- ❌ `DELETE /api/part-categories/{id}` - Xóa nhóm phụ tùng
+- ✅ `GET /api/service-categories` - Liệt kê nhóm dịch vụ *(đã kết nối)*
+- ✅ `GET /api/part-categories` - Liệt kê nhóm phụ tùng *(đã kết nối)*
+- ✅ `POST /api/service-categories` - Tạo nhóm dịch vụ *(đã kết nối)*
+- ✅ `PUT /api/service-categories/{id}` - Cập nhật nhóm dịch vụ *(đã kết nối)*
+- ✅ `DELETE /api/service-categories/{id}` - Xóa nhóm dịch vụ *(đã kết nối)*
+- ✅ `POST /api/part-categories` - Tạo nhóm phụ tùng *(đã kết nối)*
+- ✅ `PUT /api/part-categories/{id}` - Cập nhật nhóm phụ tùng *(đã kết nối)*
+- ✅ `DELETE /api/part-categories/{id}` - Xóa nhóm phụ tùng *(đã kết nối)*
 
 #### 3.4 Nhà Cung Cấp (Suppliers)
-- ❌ `GET /api/suppliers` - Liệt kê nhà cung cấp
-- ❌ `GET /api/suppliers/{id}` - Chi tiết nhà cung cấp
-- ❌ `POST /api/suppliers` - Tạo nhà cung cấp
-- ❌ `PUT /api/suppliers/{id}` - Cập nhật nhà cung cấp
-- ❌ `DELETE /api/suppliers/{id}` - Xóa nhà cung cấp
+- ✅ `GET /api/suppliers` - Liệt kê nhà cung cấp *(đã kết nối)*
+- ✅ `GET /api/suppliers/{id}` - Chi tiết nhà cung cấp *(đã kết nối)*
+- ✅ `POST /api/suppliers` - Tạo nhà cung cấp *(đã kết nối)*
+- ✅ `PUT /api/suppliers/{id}` - Cập nhật nhà cung cấp *(đã kết nối)*
+- ✅ `DELETE /api/suppliers/{id}` - Xóa nhà cung cấp *(đã kết nối)*
 
 #### 3.5 Đơn Hàng (Purchase Orders)
-- ❌ `GET /api/purchase-orders` - Liệt kê đơn hàng
-- ❌ `GET /api/purchase-orders/{id}` - Chi tiết đơn hàng
-- ❌ `POST /api/purchase-orders` - Tạo đơn hàng
-- ❌ `PUT /api/purchase-orders/{id}` - Cập nhật đơn hàng
-- ❌ `POST /api/purchase-orders/{id}/approve` - Phê duyệt đơn hàng
-- ❌ `POST /api/purchase-orders/{id}/complete` - Hoàn thành đơn hàng
-- ❌ `POST /api/purchase-orders/{id}/cancel` - Hủy đơn hàng
+- ✅ `GET /api/purchase-orders` - Liệt kê đơn hàng *(đã kết nối)*
+- ✅ `GET /api/purchase-orders/{id}` - Chi tiết đơn hàng *(đã kết nối)*
+- ✅ `POST /api/purchase-orders` - Tạo đơn hàng *(đã kết nối)*
+- ✅ `PUT /api/purchase-orders/{id}` - Cập nhật đơn hàng *(đã kết nối)*
+- ✅ `POST /api/purchase-orders/{id}/approve` - Phê duyệt đơn hàng *(đã kết nối)*
+- ✅ `POST /api/purchase-orders/{id}/complete` - Hoàn thành đơn hàng / nhập kho *(đã kết nối)*
+- ✅ `POST /api/purchase-orders/{id}/cancel` - Hủy đơn hàng *(đã kết nối)*
 
 #### 3.6 Giao Dịch Kho (Inventory Transactions)
-- ❌ `GET /api/inventory-transactions` - Lịch sử giao dịch kho
+- ✅ `GET /api/inventory-transactions` - Lịch sử giao dịch kho *(đã kết nối)*
 
 **Location:** `inventory-service/PartController`, `inventory-service/ServiceController`, `inventory-service/SupplierController`, `inventory-service/PurchaseOrderController`, `inventory-service/InventoryTransactionController`, `inventory-service/PartCategoryController`, `inventory-service/ServiceCategoryController`
-**Độ ưu tiên:** ⭐⭐ QUAN TRỌNG - Quản lý kho, tồn kho
+**Frontend:**
+- `frontend/src/api/endpoints/inventory.ts` — endpoint client cho toàn bộ inventory-service (thêm mới: `checkAvailability`, `getPricing`, `issueParts`, CRUD suppliers, CRUD purchase-orders, `listInventoryTransactions`, CRUD BOM, CRUD categories)
+- `frontend/src/api/types.ts` — `SupplierResponse`, `PurchaseOrderResponse`, `PurchaseOrderItemResponse`, `PurchaseOrderStatus`, `InventoryTransactionResponse`, `InventoryTransactionType`, `InventoryReferenceType`, `StockAvailabilityResponse`, `PartPricingResponse`
+- `frontend/src/modules/admin/AdminParts.tsx` — danh sách + CRUD phụ tùng, hiển thị `onHand` / `reserved` / `available`, lọc "sắp hết hàng" *(route `/admin/parts`)*
+- `frontend/src/modules/admin/AdminSuppliers.tsx` — CRUD nhà cung cấp *(route `/admin/suppliers`)*
+- `frontend/src/modules/admin/AdminPurchaseOrders.tsx` + `AdminPurchaseOrderForms.tsx` — danh sách + modal soạn thảo + modal chi tiết, vòng đời `DRAFT → APPROVED → RECEIVED` *(route `/admin/purchase-orders`)*
+- `frontend/src/modules/admin/AdminInventoryTransactions.tsx` — sổ nhật ký kho + bộ lọc (phụ tùng / loại giao dịch / loại tham chiếu / khoảng thời gian) *(route `/admin/inventory-transactions`)*
+- `frontend/src/modules/admin/AdminServiceBom.tsx` — quản lý định mức phụ tùng của một dịch vụ *(route `/admin/services/bom/:serviceId`)*
+- `frontend/src/modules/admin/AdminCategories.tsx` — quản lý nhóm dịch vụ & nhóm phụ tùng *(route `/admin/categories`)*
+- `frontend/src/components/AdminTable.tsx` — thêm prop `readOnly` để ẩn nút ghi khi user chỉ có authority đọc
+
+**Độ ưu tiên:** ⭐⭐ QUAN TRỌNG - Quản lý kho, tồn kho — **✅ ĐÃ XONG**
+
+> **Lưu ý hợp đồng đã đối chiếu với source backend (2026-11-25):**
+> 1. **Không có** `GET /api/parts/low-stock` và `GET /api/parts/categories` — backend dùng
+>    `GET /api/parts?lowStockOnly=true` và `GET /api/part-categories`.
+> 2. **Không có** endpoint sửa tồn kho trực tiếp. `PartController.updatePart` ghi rõ
+>    *"Không đổi tồn kho qua API này"*. Tồn chỉ đổi qua đơn nhập hàng (nhập kho) và các
+>    thao tác kho của Work Order. Form sửa phụ tùng vì vậy chỉ cho chỉnh `minStockLevel`.
+> 3. `POST /api/parts/issue` nhận `{ referenceId, items[], note? }` — `referenceId` là **Work Order id**,
+>    `items[]` là `{ partId, quantity }` (mọi endpoint stock dùng chung `StockItemRequest`).
+> 4. `POST /api/parts/check-availability` và `POST /api/parts/pricing` nhận `{ items: [{ partId, quantity }] }`.
+> 5. Vòng đời đơn nhập hàng: `DRAFT → APPROVED → RECEIVED`, huỷ được ở `DRAFT`/`APPROVED`
+>    (đơn `RECEIVED` huỷ không được — lỗi 4503). Chỉ `DRAFT` mới sửa được.
+> 6. `GET /api/purchase-orders` trả DTO **rút gọn** với `items = []` (backend `toSummary`).
+>    Phải gọi thêm `GET /api/purchase-orders/{id}` mới lấy được dòng hàng — frontend gọi
+>    endpoint chi tiết trước khi mở modal sửa, nếu không sẽ ghi đè mất dòng cũ.
+> 7. `POST /api/purchase-orders/{id}/complete` là **nhập kho**: tăng `onHand`, tính lại
+>    `costPrice` theo bình quân và ghi sổ kho `IMPORT` — tất cả trong một transaction.
+> 8. `ServiceBomResponse` serialize `default_quantity` (snake_case, có `@JsonProperty`).
+> 9. Xoá nhóm phụ tùng / nhóm dịch vụ là **xoá cứng** (không soft-delete) và không xoá được
+>    nếu nhóm đang có phụ tùng / dịch vụ — backend trả 400 kèm message tiếng Việt.
+> 10. `InventoryTransactionResponse.stockBefore/stockAfter` mang **hai nghĩa** khác nhau:
+>     với `IMPORT`/`EXPORT`/`RETURN`/`ADJUSTMENT` là tồn thực, với `RESERVE`/`RELEASE` là
+>     tồn giữ chỗ. UI ghi chú rõ dưới bảng.
+> 11. Authority: `PART_READ`/`PART_WRITE`/`STOCK_WRITE`, `SUPPLIER_READ`/`SUPPLIER_WRITE`,
+>     `PURCHASE_ORDER_READ`/`PURCHASE_ORDER_WRITE`, `INVENTORY_TRANSACTION_READ`,
+>     `SERVICE_READ`/`SERVICE_WRITE`.
+>
+> **Ghi chú UI (2026-11-25):**
+> - Mọi màn hình Section 3 đều kiểm tra authority từ claim `authorities` của JWT
+>   (`hasTokenAuthority()` trong `api/session.ts`) để ẩn nút ghi — không chỉ ẩn nút mà còn
+>   ẩn cả cột "Hành động" qua prop `readOnly` của `AdminTable`.
+> - Sổ kho hiển thị `+/-` theo nghĩa giao dịch (nhập/giữ chỗ là tăng, xuất/giải phóng là giảm)
+>   và chú thích phân biệt tồn thực vs tồn giữ chỗ.
+> - Kiểm thử: `scripts/section3-smoke.mjs` (CRUD nhà cung cấp / phụ tùng / đơn nhập hàng /
+>   nhập kho / sổ kho) và `scripts/section3-bom-cat-smoke.mjs` (BOM + nhóm danh mục).
+
 
 ---
 

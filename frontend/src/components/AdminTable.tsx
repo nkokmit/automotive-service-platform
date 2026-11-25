@@ -71,6 +71,15 @@ export interface AdminTableProps<T extends { id: string }> {
   onDuplicate?: (row: T) => void | T | Promise<void | T>;
   /** Empty state message */
   emptyMessage?: string;
+  /**
+   * Chỉ đọc — ẩn toàn bộ nút thao tác ghi (Thêm / Sửa / Xoá / Nhân bản).
+   *
+   * <p>Dùng khi người dùng chỉ có authority đọc (VD: `PART_READ` mà không
+   * có `PART_WRITE`). Không dựa vào việc `form = null` vì nút "Thêm mới" và
+   * nút "Sửa" trong cột hành động vẫn hiện — người dùng bấm vào sẽ không có
+   * gì xảy ra.
+   */
+  readOnly?: boolean;
   /** Được gọi mỗi khi danh sách rows nội bộ thay đổi (thêm/sửa/xoá). */
   onRowsChange?: (rows: T[]) => void;
 }
@@ -97,6 +106,7 @@ export function AdminTable<T extends { id: string }>({
   onView,
   onDuplicate,
   emptyMessage = "Không có dữ liệu phù hợp.",
+  readOnly = false,
   onRowsChange,
 }: AdminTableProps<T>) {
   const [search, setSearch] = useState("");
@@ -270,10 +280,12 @@ export function AdminTable<T extends { id: string }>({
             <p className="text-sm text-ink-muted mt-1">{subtitle}</p>
           )}
         </div>
-        <Button onClick={handleAddClick}>
-          <IconPlus size={16} />
-          {addLabel}
-        </Button>
+        {!readOnly && (
+          <Button onClick={handleAddClick}>
+            <IconPlus size={16} />
+            {addLabel}
+          </Button>
+        )}
       </div>
 
       {/* Search + Filters bar */}
@@ -338,7 +350,9 @@ export function AdminTable<T extends { id: string }>({
                       {col.label}
                     </th>
                   ))}
-                  <th className="font-medium px-4 py-3 text-right">Hành động</th>
+                  {!readOnly && (
+                    <th className="font-medium px-4 py-3 text-right">Hành động</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -362,14 +376,16 @@ export function AdminTable<T extends { id: string }>({
                         {col.render(row)}
                       </td>
                     ))}
-                    <td className="px-4 py-3 text-right">
-                      <RowActions
-                        onView={onView ? () => onView(row) : undefined}
-                        onEdit={() => handleEditClick(row)}
-                        onDelete={() => handleDeleteClick(row)}
-                        onDuplicate={() => void duplicateRow(row)}
-                      />
-                    </td>
+                    {!readOnly && (
+                      <td className="px-4 py-3 text-right">
+                        <RowActions
+                          onView={onView ? () => onView(row) : undefined}
+                          onEdit={() => handleEditClick(row)}
+                          onDelete={() => handleDeleteClick(row)}
+                          onDuplicate={() => void duplicateRow(row)}
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
