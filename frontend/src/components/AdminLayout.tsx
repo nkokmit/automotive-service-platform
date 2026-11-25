@@ -23,6 +23,7 @@ import {
   IconShield,
   IconTruck,
   IconList,
+  IconClock,
 } from "./icons";
 import { useAuth } from "../data/authStore";
 import { roleLabel } from "../api/types";
@@ -65,6 +66,8 @@ const navGroups: NavGroup[] = [
         icon: IconCheck,
       },
       { to: "/admin/staff", label: "Kỹ thuật viên", icon: IconUsers },
+      { to: "/admin/work-shifts", label: "Ca làm việc", icon: IconClock },
+      { to: "/admin/schedule", label: "Lịch trình xưởng", icon: IconCalendar },
       { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
       { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
       { to: "/admin/suppliers", label: "Nhà cung cấp", icon: IconBuilding },
@@ -149,6 +152,32 @@ export default function AdminLayout() {
       match: /phiếu|work.?order/,
       to: "/admin/work-orders",
       routeWords: ["phiếu", "work order", "work-orders"],
+    },
+    {
+      // "ca làm việc" / "ca trực" → trang ca làm việc. Phải đứng trước rule
+      // "nhân viên" vì "ca làm việc" không chứa từ khoá nhân viên, nhưng để
+      // trước cho an toàn khi người dùng gõ "ca làm việc nhân viên".
+      match: /ca làm việc|ca trực|ca làm|lịch ca|work.?shift/,
+      to: "/admin/work-shifts",
+      routeWords: [
+        "ca làm việc",
+        "ca trực",
+        "ca làm",
+        "lịch ca",
+        "work shift",
+        "work-shifts",
+      ],
+    },
+    {
+      match: /nhân viên|kỹ thuật viên|nhân sự|staff|thợ/,
+      to: "/admin/staff",
+      routeWords: [
+        "nhân viên",
+        "kỹ thuật viên",
+        "nhân sự",
+        "staff",
+        "thợ",
+      ],
     },
     {
       match: /xe|vehicle|khách|customer/,

@@ -203,33 +203,61 @@
 ---
 
 ### 4. **STAFF - QUẢN LÝ NHÂN VIÊN & LỊCH TRÌNH**
-- ❌ `POST /api/staff` - Tạo nhân viên
-- ❌ `PUT /api/staff/{id}` - Cập nhật nhân viên
-- ❌ `PATCH /api/staff/{id}/is-active` - Bật/tắt trạng thái nhân viên
-- ❌ `DELETE /api/staff/{id}` - Xóa nhân viên
-- ❌ `GET /api/work-shifts` - Liệt kê ca làm việc
-- ❌ `GET /api/work-shifts/{id}` - Chi tiết ca làm việc
-- ❌ `POST /api/work-shifts` - Tạo ca làm việc
-- ❌ `PUT /api/work-shifts/{id}` - Cập nhật ca làm việc
-- ❌ `PATCH /api/work-shifts/{id}/is-active` - Bật/tắt ca làm việc
-- ❌ `DELETE /api/work-shifts/{id}` - Xóa ca làm việc
-- ❌ `GET /api/staff/{id}/absences` - Liệt kê ngày nghỉ
-- ❌ `POST /api/staff/{id}/absences` - Tạo ngày nghỉ
-- ❌ `PUT /api/staff/{id}/absences/{absenceId}` - Cập nhật ngày nghỉ
-- ❌ `DELETE /api/staff/{id}/absences/{absenceId}` - Xóa ngày nghỉ
-- ❌ `GET /api/staff/{id}/schedule-exceptions` - Ngoại lệ lịch trình
-- ❌ `POST /api/staff/{id}/schedule-exceptions` - Tạo ngoại lệ
-- ❌ `PUT /api/staff/{id}/schedule-exceptions/{id}` - Cập nhật ngoại lệ
-- ❌ `DELETE /api/staff/{id}/schedule-exceptions/{id}` - Xóa ngoại lệ
-- ❌ `GET /api/staff/{id}/recurring-schedules` - Lịch trình lặp lại
-- ❌ `PUT /api/staff/{id}/recurring-schedules` - Cập nhật lịch trình lặp lại
-- ❌ `GET /api/staff/{id}/schedules` - Chi tiết lịch trình nhân viên
-- ❌ `GET /api/schedules` - Toàn bộ lịch trình
-- ❌ `GET /api/staff/availability` - Kiểm tra khả dụng nhân viên
-- ❌ `/internal/schedules` - Lấy sức chứa nhân viên (internal)
+- ✅ `POST /api/staff` - Tạo nhân viên
+- ✅ `PUT /api/staff/{id}` - Cập nhật nhân viên
+- ✅ `PATCH /api/staff/{id}/is-active` - Bật/tắt trạng thái nhân viên
+- ✅ `DELETE /api/staff/{id}` - Xóa nhân viên
+- ✅ `GET /api/work-shifts` - Liệt kê ca làm việc
+- ✅ `GET /api/work-shifts/{id}` - Chi tiết ca làm việc
+- ✅ `POST /api/work-shifts` - Tạo ca làm việc
+- ✅ `PUT /api/work-shifts/{id}` - Cập nhật ca làm việc
+- ✅ `PATCH /api/work-shifts/{id}/is-active` - Bật/tắt ca làm việc
+- ✅ `DELETE /api/work-shifts/{id}` - Xóa ca làm việc
+- ✅ `GET /api/staff/{id}/absences` - Liệt kê ngày nghỉ
+- ✅ `POST /api/staff/{id}/absences` - Tạo ngày nghỉ
+- ✅ `PUT /api/staff/{id}/absences/{absenceId}` - Cập nhật ngày nghỉ
+- ✅ `DELETE /api/staff/{id}/absences/{absenceId}` - Xóa ngày nghỉ
+- ✅ `GET /api/staff/{id}/schedule-exceptions` - Ngoại lệ lịch trình
+- ✅ `POST /api/staff/{id}/schedule-exceptions` - Tạo ngoại lệ
+- ✅ `PUT /api/staff/{id}/schedule-exceptions/{id}` - Cập nhật ngoại lệ
+- ✅ `DELETE /api/staff/{id}/schedule-exceptions/{id}` - Xóa ngoại lệ
+- ✅ `GET /api/staff/{id}/recurring-schedules` - Lịch trình lặp lại
+- ✅ `PUT /api/staff/{id}/recurring-schedules` - Cập nhật lịch trình lặp lại
+- ✅ `GET /api/staff/{id}/schedules` - Chi tiết lịch trình nhân viên
+- ✅ `GET /api/schedules` - Toàn bộ lịch trình
+- ✅ `GET /api/staff/availability` - Kiểm tra khả dụng nhân viên
+- ⏭️ `/internal/schedules` - Lấy sức chứa nhân viên (internal)
 
 **Location:** `staff-service/StaffController`, `staff-service/WorkShiftController`, `staff-service/StaffAbsenceController`, `staff-service/StaffScheduleExceptionController`, `staff-service/StaffRecurringScheduleController`, `staff-service/StaffScheduleAggregationController`, `staff-service/InternalStaffCapacityController`
 **Độ ưu tiên:** ⭐⭐ QUAN TRỌNG - Quản lý nhân sự, ca trực
+
+**Trang frontend:**
+- `/admin/staff` — danh sách + CRUD hồ sơ nhân viên (`AdminStaff.tsx`)
+- `/admin/work-shifts` — CRUD ca làm việc (`AdminWorkShifts.tsx`)
+- `/admin/staff/:staffId/schedule` — lịch định kỳ, ngày nghỉ, ngoại lệ, lịch tổng hợp
+  của một nhân viên (`AdminStaffSchedule.tsx`)
+- `/admin/schedule` — lưới lịch trình toàn xưởng + tra cứu nhân viên rảnh
+  (`AdminScheduleBoard.tsx`)
+
+**Client API:** `frontend/src/api/endpoints/staff.ts` (`staffApi`, `workShiftApi`,
+`staffAbsenceApi`, `staffScheduleExceptionApi`, `staffScheduleApi`)
+
+**Quy tắc nghiệp vụ của backend đã được xử lý ở UI:**
+- `CANCEL_SHIFT` chỉ hợp lệ với ca **đã có** trong lịch định kỳ của ngày đó;
+  `ADD_SHIFT` ngược lại (ca **không có** trong lịch định kỳ + ca phải đang hoạt
+  động). Form ngoại lệ chỉ cho chọn ca hợp lệ theo loại ngoại lệ.
+- `PUT /recurring-schedules` là **thay thế toàn bộ** → modal hiển thị cảnh báo và
+  có nút "Xoá lịch định kỳ" (PUT với `weeklySchedules: []`).
+- Ca đã dùng trong lịch thì backend **không cho xoá cứng** (lỗi `3103`) → phải
+  tắt bằng `isActive=false`. Tương tự, xoá nhân viên là **soft delete**
+  (`isActive=false` + `deletedAt`), mã nhân viên vẫn bị coi là trùng.
+- `GET /absences` và `GET /schedule-exceptions` **bắt buộc** có `from`/`to`
+  (`absences` dùng ISO instant, `schedule-exceptions` dùng `yyyy-MM-dd`).
+- Thời gian trả về là `Instant` theo UTC → hiển thị quy đổi sang giờ địa phương.
+
+**Kiểm thử:** `scripts/section4-smoke.mjs` (CRUD ca làm việc / hồ sơ nhân viên /
+lịch định kỳ / ngày nghỉ / ngoại lệ / lịch tổng hợp / khả dụng — kèm các
+case kỳ vọng backend từ chối).
 
 ---
 
@@ -298,7 +326,7 @@
 1. **Inventory Management** - 25+ endpoints
    - Quản lý kho, phụ tùng, dịch vụ, nhà cung cấp, đơn hàng
    
-2. **Staff Management** - 24 endpoints
+2. **Staff Management** - 24 endpoints — ✅ **Đã kết nối ở Phase 1**
    - Quản lý nhân viên, ca trực, lịch trình
    
 3. **Billing** - 5 endpoints

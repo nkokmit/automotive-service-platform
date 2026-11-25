@@ -51,6 +51,9 @@ import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
 import AdminBookings from "./modules/admin/AdminBookings";
 import AdminInvoices from "./modules/admin/AdminInvoices";
 import AdminStaff from "./modules/admin/AdminStaff";
+import AdminStaffSchedule from "./modules/admin/AdminStaffSchedule";
+import AdminWorkShifts from "./modules/admin/AdminWorkShifts";
+import AdminScheduleBoard from "./modules/admin/AdminScheduleBoard";
 import AdminWorkOrders from "./modules/admin/AdminWorkOrders";
 import TechnicianWorkOrders from "./modules/admin/TechnicianWorkOrders";
 import AdminPermissions from "./modules/admin/AdminPermissions";
@@ -129,6 +132,12 @@ hydrateUser().finally(() => {
               <Route path="bookings" element={<AdminBookings />} />
               <Route path="invoices" element={<AdminInvoices />} />
               <Route path="staff" element={<AdminStaff />} />
+              <Route
+                path="staff/:staffId/schedule"
+                element={<AdminStaffSchedule />}
+              />
+              <Route path="work-shifts" element={<AdminWorkShifts />} />
+              <Route path="schedule" element={<AdminScheduleBoard />} />
               <Route path="work-orders" element={<AdminWorkOrders />} />
               <Route path="work-orders/mine" element={<TechnicianWorkOrders />} />
               <Route path="vehicles" element={<AdminCustomerVehicles />} />

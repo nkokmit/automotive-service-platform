@@ -519,6 +519,101 @@ export interface StaffResponse {
   updatedAt: string;
 }
 
+/** Khớp WorkShiftResponse.java */
+export interface WorkShiftResponse {
+  id: string;
+  code: string;
+  name: string;
+  /** Định dạng `HH:mm:ss` (Java `LocalTime`). */
+  startTime: string;
+  /** Định dạng `HH:mm:ss` (Java `LocalTime`). */
+  endTime: string;
+  isActive: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp StaffAbsenceResponse.java */
+export interface StaffAbsenceResponse {
+  absenceId: string;
+  staffId: string;
+  /** ISO instant. */
+  startAt: string;
+  /** ISO instant. */
+  endAt: string;
+  /** Loại nghỉ: ANNUAL_LEAVE, SICK_LEAVE, UNPAID_LEAVE… */
+  absenceType: string;
+  reason: string | null;
+  recordedBy: string | null;
+  createdAt: string;
+}
+
+/** Khớp ScheduleExceptionType.java */
+export type ScheduleExceptionType = "CANCEL_SHIFT" | "ADD_SHIFT";
+
+/** Khớp StaffScheduleExceptionResponse.java */
+export interface StaffScheduleExceptionResponse {
+  exceptionId: string;
+  staffId: string;
+  shiftId: string;
+  /** Định dạng `yyyy-MM-dd` (Java `LocalDate`). */
+  exceptionDate: string;
+  exceptionType: ScheduleExceptionType;
+  reason: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp StaffRecurringScheduleResponse.java */
+export interface StaffRecurringScheduleResponse {
+  scheduleId: string;
+  shiftId: string;
+  /** `MONDAY` … `SUNDAY` (Java `DayOfWeek`). */
+  dayOfWeek: string;
+  /** Định dạng `yyyy-MM-dd`. */
+  effectiveFrom: string;
+  /** Định dạng `yyyy-MM-dd` — `null` nghĩa là hiệu lực vô thời hạn. */
+  effectiveTo: string | null;
+}
+
+/** Khớp ScheduleIntervalResponse.java */
+export interface ScheduleIntervalResponse {
+  shiftId: string;
+  shiftCode: string;
+  shiftName: string;
+  /** ISO instant — mốc bắt đầu thực tế của ca (đã gộp ngày). */
+  startAt: string;
+  /** ISO instant — mốc kết thúc thực tế của ca. */
+  endAt: string;
+}
+
+/** Khớp ScheduleDayResponse.java */
+export interface ScheduleDayResponse {
+  /** Định dạng `yyyy-MM-dd`. */
+  date: string;
+  intervals: ScheduleIntervalResponse[];
+}
+
+/** Khớp StaffScheduleResponse.java */
+export interface StaffScheduleResponse {
+  staffId: string;
+  employeeCode: string | null;
+  fullName: string | null;
+  days: ScheduleDayResponse[];
+}
+
+/** Khớp StaffAvailabilityResponse.java */
+export interface StaffAvailabilityResponse {
+  staffId: string;
+  employeeCode: string | null;
+  fullName: string | null;
+  /** ISO instant. */
+  startAt: string;
+  /** ISO instant. */
+  endAt: string;
+}
+
 // ── Work Order service (work-order-service) ───────────────────────────────────
 /** Khớp WorkOrderStatus.java */
 export type WorkOrderStatus =
