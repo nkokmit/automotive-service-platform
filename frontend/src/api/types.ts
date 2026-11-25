@@ -1035,6 +1035,120 @@ export interface PaymentRefundRequest {
   reason?: string | null;
 }
 
+// ── Section 6: Notification service (notification-service) ────────────────────
+
+/** Khớp `NotificationCategory.java` */
+export type NotificationCategory =
+  | "BOOKING"
+  | "WORK_ORDER"
+  | "BILLING"
+  | "INVENTORY"
+  | "SYSTEM";
+
+/** Khớp `RecipientType.java` */
+export type RecipientType = "CUSTOMER" | "STAFF";
+
+/** Khớp `NotificationChannel.java` */
+export type NotificationChannel = "IN_APP" | "EMAIL" | "SMS" | "ZNS";
+
+/**
+ * Khớp `NotificationResponse.java`.
+ *
+ * Lưu ý: `referenceType`/`referenceId` trỏ tới entity liên quan (BOOKING,
+ * WORK_ORDER, INVOICE, PART…) — dùng để điều hướng tới màn hình chi tiết.
+ */
+export interface NotificationResponse {
+  id: string;
+  category: NotificationCategory;
+  title: string;
+  content: string;
+  referenceType: string | null;
+  referenceId: string | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+/** Khớp `UnreadCountResponse.java` */
+export interface UnreadCountResponse {
+  unreadCount: number;
+}
+
+/**
+ * Khớp `PageResponse.java` của notification-service.
+ *
+ * Khác `PageResponse` chung trong file này: dùng `content` (không phải `items`)
+ * và có `first`/`last` (không phải `hasNext`/`hasPrevious`).
+ */
+export interface NotificationPageResponse {
+  content: NotificationResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+/** Khớp `NotificationTemplateResponse.java` */
+export interface NotificationTemplateResponse {
+  id: string;
+  code: string;
+  channel: NotificationChannel;
+  subjectTemplate: string | null;
+  bodyTemplate: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp `NotificationTemplatePageResponse.java` (PageResponse<NotificationTemplateResponse>) */
+export interface NotificationTemplatePageResponse {
+  content: NotificationTemplateResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+/** Khớp `SendNotificationRequest.java` */
+export interface SendNotificationRequest {
+  recipientType: RecipientType;
+  recipientId: string;
+  category: NotificationCategory;
+  title: string;
+  content: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  /** Gửi kèm email — khi true thì `emailAddress` bắt buộc. */
+  sendEmail?: boolean;
+  emailAddress?: string | null;
+}
+
+/** Khớp `UpdateNotificationTemplateRequest.java` */
+export interface UpdateNotificationTemplateRequest {
+  /** Chỉ dùng cho kênh EMAIL — có thể null. */
+  subjectTemplate?: string | null;
+  bodyTemplate: string;
+  isActive: boolean;
+}
+
+/**
+ * Payload của 1 event SSE từ `GET /api/notifications/stream`.
+ *
+ * Khớp `NotificationSsePayload.java` — khác `NotificationResponse` (thiếu
+ * `referenceType`/`referenceId`/`isRead`/`readAt`).
+ */
+export interface NotificationSsePayload {
+  id: string;
+  title: string;
+  content: string;
+  category: NotificationCategory;
+  createdAt: string;
+}
+
 // ── Staff booking (booking-service — màn hình lịch hẹn của xưởng) ─────────────
 /** Khớp StaffBookingResponse.java */
 export interface StaffBookingResponse {

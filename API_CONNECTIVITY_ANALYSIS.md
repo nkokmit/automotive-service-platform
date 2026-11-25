@@ -342,17 +342,31 @@ scripts/section5-smoke.mjs --mint` để dùng token tự ký nếu không có `
 
 ---
 
-### 6. **NOTIFICATIONS - THÔNG BÁO**
-- ❌ `GET /api/notifications/me/unread-count` - Số thông báo chưa đọc
-- ❌ `GET /api/notifications/stream` - SSE Stream thông báo
-- ❌ `PATCH /api/notifications/{id}/read` - Đánh dấu đã đọc
-- ❌ `PATCH /api/notifications/me/read-all` - Đánh dấu tất cả đã đọc
-- ❌ `POST /api/notifications/send` - Gửi thông báo
-- ❌ `GET /api/notification-templates` - Liệt kê template
-- ❌ `PUT /api/notification-templates/{id}` - Cập nhật template
+### 6. **NOTIFICATIONS - THÔNG BÁO** — ✅ **Đã kết nối ở Phase 3**
+- ✅ `GET /api/notifications/me/unread-count` - Số thông báo chưa đọc
+- ✅ `GET /api/notifications/stream` - SSE Stream thông báo
+- ✅ `PATCH /api/notifications/{id}/read` - Đánh dấu đã đọc
+- ✅ `PATCH /api/notifications/me/read-all` - Đánh dấu tất cả đã đọc
+- ✅ `POST /api/notifications/send` - Gửi thông báo
+- ✅ `GET /api/notification-templates` - Liệt kê template
+- ✅ `PUT /api/notification-templates/{id}` - Cập nhật template
+- ✅ `GET /api/notifications/me` - Danh sách thông báo (bonus, có phân trang + lọc)
 
 **Location:** `notification-service/NotificationController`, `notification-service/NotificationTemplateController`
 **Độ ưu tiên:** ⭐ Nâng cao UX - Thông báo real-time
+
+**Frontend đã làm:**
+- `frontend/src/api/endpoints/notification.ts` — API client (7 endpoint + `/me`)
+- `frontend/src/api/endpoints/notificationStream.ts` — SSE client (fetch + ReadableStream)
+- `frontend/src/data/notifications.ts` — hook `useNotifications` (badge + SSE + polling fallback)
+- `frontend/src/components/NotificationBell.tsx` — chuông thông báo dùng chung (Header + AdminLayout)
+- `frontend/src/modules/admin/AdminNotificationTemplates.tsx` — trang `/admin/notification-templates`
+
+**Backend đã sửa (1 bug):**
+- `NotificationController` khai báo tham số `Jwt jwt` **thiếu `@AuthenticationPrincipal`** →
+  Spring Framework 7 cố construct bean `Jwt` từ request binding → `IllegalArgumentException:
+  tokenValue cannot be empty` → **HTTP 500 cho cả 5 endpoint** (`/me`, `/me/unread-count`,
+  `/me/read-all`, `/{id}/read`, `/stream`). Đã sửa giống cách sửa Bug 1 của billing-service.
 
 ---
 
@@ -402,8 +416,8 @@ scripts/section5-smoke.mjs --mint` để dùng token tự ký nếu không có `
    - Hóa đơn, thanh toán
 
 ### ⭐ NÂNG CAO (Enhancement)
-1. **Notifications** - 7 endpoints
-   - Real-time notifications, templates
+1. **Notifications** - 7 endpoints — ✅ **Đã kết nối ở Phase 3**
+   - Real-time notifications (SSE), templates, badge chưa đọc
 
 ---
 
@@ -419,7 +433,7 @@ scripts/section5-smoke.mjs --mint` để dùng token tự ký nếu không có `
 - [x] Billing APIs (5 endpoints) — **xong** (2 bug backend đã sửa)
 
 ### Phase 3 (Enhancement - 2 tuần)
-- [ ] Notifications (7 endpoints)
+- [x] Notifications (7 endpoints) — **xong** (1 bug backend đã sửa)
 - [ ] Service History APIs (3 endpoints)
 
 ---

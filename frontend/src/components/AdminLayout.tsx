@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   IconDashboard,
@@ -16,7 +16,6 @@ import {
   IconCar,
   IconLogout,
   IconCheck,
-  IconWarning,
   IconActivity,
   IconCalendar,
   IconCash,
@@ -29,7 +28,7 @@ import { useAuth } from "../data/authStore";
 import { roleLabel } from "../api/types";
 import { useToast } from "./Toast";
 import SearchBox from "./SearchBox";
-import { recentActivities } from "../data/adminMock";
+import NotificationBell from "./NotificationBell";
 
 // =========================
 // AdminLayout — shell chung cho /admin/*
@@ -92,6 +91,11 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/admin/permissions", label: "Quyền", icon: IconShield },
       { to: "/admin/roles", label: "Vai trò", icon: IconShield },
+      {
+        to: "/admin/notification-templates",
+        label: "Template thông báo",
+        icon: IconBell,
+      },
       { to: "/admin/reports", label: "Báo cáo", icon: IconChart },
       { to: "/admin/settings", label: "Cài đặt", icon: IconSettings },
     ],
@@ -104,28 +108,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const t = useToast();
 
-  // Panel thông báo
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [readIds, setReadIds] = useState<string[]>([]);
-  const notifRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!showNotifications) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        notifRef.current &&
-        !notifRef.current.contains(e.target as Node)
-      ) {
-        setShowNotifications(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showNotifications]);
-
-  const unreadCount = recentActivities.filter(
-    (a) => !readIds.includes(a.id),
-  ).length;
+  // Panel thông báo — dùng chung component NotificationBell.
 
   // Ô tìm kiếm admin: điều hướng tới trang phù hợp dựa trên từ khoá.
   //
@@ -345,103 +328,9 @@ export default function AdminLayout() {
               <span className="hidden md:inline">Trang khách hàng</span>
             </Link>
 
-            {/* Notifications */}
-            <div ref={notifRef} className="relative">
-              <button
-                onClick={() => setShowNotifications((v) => !v)}
-                className="relative p-2 rounded-lg hover:bg-bgsoft text-ink-muted hover:text-ink"
-                aria-label="Thông báo"
-                aria-expanded={showNotifications}
-                aria-haspopup="menu"
-              >
-                <IconBell size={18} />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {showNotifications && (
-                <div
-                  role="menu"
-                  className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-cardHover border border-ink/10 z-40 overflow-hidden"
-                >
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-ink/8">
-                    <span className="font-semibold text-sm">Thông báo</span>
-                    <button
-                      onClick={() => setReadIds(recentActivities.map((a) => a.id))}
-                      className="text-xs text-primary hover:underline font-medium"
-                    >
-                      Đánh dấu đã đọc
-                    </button>
-                  </div>
-
-                  <ul className="max-h-80 overflow-y-auto divide-y divide-ink/5">
-                    {recentActivities.map((a) => {
-                      const unread = !readIds.includes(a.id);
-                      return (
-                        <li key={a.id}>
-                          <button
-                            onClick={() =>
-                              setReadIds((prev) =>
-                                prev.includes(a.id) ? prev : [...prev, a.id],
-                              )
-                            }
-                            className={[
-                              "w-full text-left px-4 py-3 hover:bg-bgsoft transition-colors",
-                              unread ? "bg-primary/5" : "",
-                            ].join(" ")}
-                          >
-                            <div className="flex items-start gap-2.5">
-                              <span
-                                className={[
-                                  "mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-                                  a.tone === "warning"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : a.tone === "success"
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-primary/10 text-primary",
-                                ].join(" ")}
-                              >
-                                {a.kind === "low_stock" ? (
-                                  <IconWarning size={13} />
-                                ) : a.kind === "new_user" ? (
-                                  <IconUsers size={13} />
-                                ) : (
-                                  <IconActivity size={13} />
-                                )}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <div className="text-sm font-medium text-ink line-clamp-1">
-                                  {a.title}
-                                </div>
-                                <div className="text-xs text-ink-muted line-clamp-1">
-                                  {a.description}
-                                </div>
-                              </div>
-                              {unread && (
-                                <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />
-                              )}
-                            </div>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-
-                  <div className="px-4 py-2 border-t border-ink/8">
-                    <Link
-                      to="/admin"
-                      onClick={() => setShowNotifications(false)}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Xem tất cả hoạt động
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Notifications — dùng chung component với Header (khách hàng).
+                Nguồn dữ liệu thật: notification-service (SSE + unread-count). */}
+            <NotificationBell />
 
             {/* User avatar */}
             <div className="flex items-center gap-2 pl-2 border-l border-ink/10">

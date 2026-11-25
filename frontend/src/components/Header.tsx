@@ -12,6 +12,7 @@ import {
 } from "./icons";
 import Button from "./Button";
 import SearchBox from "./SearchBox";
+import NotificationBell from "./NotificationBell";
 import { useToast } from "./Toast";
 import { useAuth } from "../data/authStore";
 import { GARAGE } from "../config/garage";
@@ -204,7 +205,10 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-2 ml-auto lg:ml-2">
           {/* Auth: đã login → avatar + dropdown, chưa → login/register buttons */}
           {user ? (
-            <div className="relative">
+            <>
+              {/* Chuông thông báo — nguồn dữ liệu thật từ notification-service. */}
+              <NotificationBell />
+              <div className="relative">
               <button
                 onClick={() => setUserMenu((v) => !v)}
                 className="flex items-center gap-2 p-1 pr-2 rounded-lg hover:bg-bgsoft transition-colors"
@@ -301,7 +305,8 @@ export default function Header() {
                   </div>
                 </>
               )}
-            </div>
+              </div>
+            </>
           ) : (
             <Link to="/login">
               <Button variant="ghost" size="sm">

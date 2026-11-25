@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -43,7 +44,7 @@ public class NotificationController {
             @RequestParam(required = false) NotificationCategory category,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            Jwt jwt
+            @AuthenticationPrincipal Jwt jwt
     ) {
         UUID recipientId = currentUserId(jwt);
         Pageable pageable = PageRequest.of(
@@ -56,24 +57,24 @@ public class NotificationController {
     }
 
     @GetMapping("/me/unread-count")
-    public ApiResponse<UnreadCountResponse> unreadCount(Jwt jwt) {
+    public ApiResponse<UnreadCountResponse> unreadCount(@AuthenticationPrincipal Jwt jwt) {
         return ApiResponse.success(queryService.unreadCount(currentUserId(jwt)));
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(Jwt jwt) {
+    public SseEmitter stream(@AuthenticationPrincipal Jwt jwt) {
         return queryService.subscribe(currentUserId(jwt));
     }
 
     @PatchMapping("/{id}/read")
     public ApiResponse<NotificationResponse> markRead(
-            @PathVariable UUID id, Jwt jwt) {
+            @PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return ApiResponse.success(
                 queryService.markRead(id, currentUserId(jwt)));
     }
 
     @PatchMapping("/me/read-all")
-    public ApiResponse<Integer> markAllRead(Jwt jwt) {
+    public ApiResponse<Integer> markAllRead(@AuthenticationPrincipal Jwt jwt) {
         return ApiResponse.success(queryService.markAllRead(currentUserId(jwt)));
     }
 

@@ -58,6 +58,7 @@ import AdminWorkOrders from "./modules/admin/AdminWorkOrders";
 import TechnicianWorkOrders from "./modules/admin/TechnicianWorkOrders";
 import AdminPermissions from "./modules/admin/AdminPermissions";
 import AdminRoles from "./modules/admin/AdminRoles";
+import AdminNotificationTemplates from "./modules/admin/AdminNotificationTemplates";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
@@ -144,6 +145,10 @@ hydrateUser().finally(() => {
               <Route path="users" element={<AdminUsers />} />
               <Route path="permissions" element={<AdminPermissions />} />
               <Route path="roles" element={<AdminRoles />} />
+              <Route
+                path="notification-templates"
+                element={<AdminNotificationTemplates />}
+              />
               <Route
                 path="reports"
                 element={
