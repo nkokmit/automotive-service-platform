@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   IconShoppingBag,
-  IconBuilding,
   IconWrench,
   IconPackage,
   IconUsers,
@@ -305,13 +304,6 @@ export default function AdminDashboard() {
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <QuickLink
-                  to="/admin/garage"
-                  icon={<IconBuilding size={18} />}
-                  label="Xưởng"
-                  desc="AutoCare Workshop"
-                  tone="primary"
-                />
-                <QuickLink
                   to="/admin/services"
                   icon={<IconWrench size={18} />}
                   label="Dịch vụ"
@@ -324,6 +316,13 @@ export default function AdminDashboard() {
                   label="Phụ tùng"
                   desc="Quản lý kho"
                   tone="success"
+                />
+                <QuickLink
+                  to="/admin/work-orders"
+                  icon={<IconShoppingBag size={18} />}
+                  label="Sửa chữa"
+                  desc="Phiếu sửa chữa"
+                  tone="primary"
                 />
                 <QuickLink
                   to="/admin/users"

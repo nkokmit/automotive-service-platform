@@ -38,7 +38,6 @@ import { IconArrowLeft, IconSparkles, IconSettings } from "./components/icons";
 import "./styles/globals.css";
 
 import AdminDashboard from "./modules/admin/AdminDashboard";
-import AdminGarageProfile from "./modules/admin/AdminGarageProfile";
 import AdminServices from "./modules/admin/AdminServices";
 import AdminParts from "./modules/admin/AdminParts";
 import AdminSuppliers from "./modules/admin/AdminSuppliers";
@@ -119,7 +118,6 @@ hydrateUser().finally(() => {
               }
             >
               <Route index element={<AdminDashboard />} />
-              <Route path="garage" element={<AdminGarageProfile />} />
               <Route path="services" element={<AdminServices />} />
               <Route path="services/bom/:serviceId" element={<AdminServiceBom />} />
               <Route path="categories" element={<AdminCategories />} />
