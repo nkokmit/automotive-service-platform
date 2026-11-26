@@ -1,5 +1,6 @@
 package com.example.work_order_service.repository;
 
+import com.example.work_order_service.enums.WorkOrderStatus;
 import com.example.work_order_service.entity.WorkOrder;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -16,6 +17,22 @@ import java.util.UUID;
 public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID> {
 
     Optional<WorkOrder> findByBookingId(UUID bookingId);
+
+    @Query("""
+            select workOrder from WorkOrder workOrder
+            where workOrder.customerId = :customerId
+              and workOrder.status = :status
+              and not exists (
+                  select feedback.id from WorkOrderFeedback feedback
+                  where feedback.workOrder.id = workOrder.id
+              )
+            order by workOrder.updatedAt desc, workOrder.id desc
+            """)
+    Page<WorkOrder> findFeedbackEligible(
+            @Param("customerId") UUID customerId,
+            @Param("status") WorkOrderStatus status,
+            Pageable pageable
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select workOrder from WorkOrder workOrder where workOrder.id = :id")

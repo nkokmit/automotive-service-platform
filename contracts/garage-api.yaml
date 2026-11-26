@@ -2,4 +2,255 @@ openapi: 3.0.3
 info:
   title: Garage API
   version: 0.1.0
-paths: {}
+paths:
+  /api/work-orders/me/feedback-eligible:
+    get:
+      operationId: getFeedbackEligibleWorkOrders
+      summary: Liệt kê Work Order tôi có thể đánh giá
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Work Order đã đóng của khách hiện tại chưa được đánh giá
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackEligibleWorkOrdersEnvelope"
+        "401":
+          description: Thiếu hoặc sai access token
+        "403":
+          description: Không xác định được hồ sơ khách hàng hiện tại
+        "503":
+          description: Không thể xác định hồ sơ khách hàng
+  /api/work-orders/{workOrderId}/feedback:
+    post:
+      operationId: submitWorkOrderFeedback
+      summary: Gửi đánh giá cho Work Order đã đóng
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workOrderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkOrderFeedbackRequest"
+      responses:
+        "201":
+          description: Đã lưu đánh giá
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrderFeedbackEnvelope"
+        "400":
+          description: Điểm hoặc nhận xét không hợp lệ
+        "401":
+          description: Thiếu hoặc sai access token
+        "403":
+          description: Work Order không thuộc khách hàng hiện tại
+        "404":
+          description: Không tìm thấy Work Order
+        "409":
+          description: Work Order chưa đóng hoặc đã được đánh giá
+        "503":
+          description: Không thể xác định hồ sơ khách hàng
+  /api/work-orders/reviews/summary:
+    get:
+      operationId: getHomepageReviewSummary
+      summary: Tổng hợp đánh giá công khai cho trang chủ
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 5
+      responses:
+        "200":
+          description: Điểm trung bình, số lượt và đánh giá mới nhất cùng service line đã thực hiện
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomepageReviewSummaryEnvelope"
+        "400":
+          description: Giới hạn số review không hợp lệ
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CreateWorkOrderFeedbackRequest:
+      type: object
+      required:
+        - rating
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          maxLength: 1000
+          description: Nhận xét văn bản thuần, không bắt buộc.
+    FeedbackEligibleWorkOrder:
+      type: object
+      required:
+        - workOrderId
+        - workOrderCode
+      properties:
+        workOrderId:
+          type: string
+          format: uuid
+        workOrderCode:
+          type: string
+    FeedbackEligiblePage:
+      type: object
+      required:
+        - items
+        - page
+        - size
+        - totalElements
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackEligibleWorkOrder"
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+    WorkOrderFeedback:
+      type: object
+      required:
+        - id
+        - workOrderId
+        - rating
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        workOrderId:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    HomepageReview:
+      type: object
+      required:
+        - rating
+        - createdAt
+        - completedServices
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        completedServices:
+          type: array
+          items:
+            type: string
+          description: Tên snapshot của service line COMPLETED; không kèm giá hoặc định danh.
+    HomepageReviewSummary:
+      type: object
+      required:
+        - averageRating
+        - reviewCount
+        - recentReviews
+      properties:
+        averageRating:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 5
+        reviewCount:
+          type: integer
+          format: int64
+        recentReviews:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/HomepageReview"
+    FeedbackEligibleWorkOrdersEnvelope:
+      type: object
+      required:
+        - code
+        - message
+        - result
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        result:
+          $ref: "#/components/schemas/FeedbackEligiblePage"
+    WorkOrderFeedbackEnvelope:
+      type: object
+      required:
+        - code
+        - message
+        - result
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        result:
+          $ref: "#/components/schemas/WorkOrderFeedback"
+    HomepageReviewSummaryEnvelope:
+      type: object
+      required:
+        - code
+        - message
+        - result
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        result:
+          $ref: "#/components/schemas/HomepageReviewSummary"

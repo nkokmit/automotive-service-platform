@@ -1,6 +1,7 @@
 package com.example.work_order_service.integration.client;
 
 import com.example.work_order_service.integration.contract.CustomerContract;
+import com.example.work_order_service.integration.contract.CustomerIdentityContract;
 import com.example.work_order_service.integration.contract.ServiceApiResponse;
 import com.example.work_order_service.integration.contract.VehicleContract;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -18,6 +19,9 @@ public interface CustomerVehicleClient {
 
     @GetMapping("/internal/customers/{id}")
     ServiceApiResponse<CustomerContract> getCustomer(@PathVariable UUID id);
+
+    @GetMapping("/internal/customers/by-user/{userId}")
+    ServiceApiResponse<CustomerIdentityContract> getCustomerByUserId(@PathVariable UUID userId);
 
     @GetMapping("/internal/vehicles/{id}")
     ServiceApiResponse<VehicleContract> getVehicle(@PathVariable UUID id);

@@ -132,6 +132,25 @@ class CustomerServiceImplTest {
     }
 
     @Test
+    void getCustomerIdentityByUserId_returnsLinkedCustomerId() {
+        UUID userId = UUID.randomUUID();
+        Customer customer = customer();
+        customer.setUserId(userId);
+        given(customerRepository.findByUserId(userId)).willReturn(Optional.of(customer));
+
+        assertThat(customerService.getCustomerIdentityByUserId(userId).customerId()).isEqualTo(CUSTOMER_ID);
+    }
+
+    @Test
+    void getCustomerIdentityByUserId_throwsWhenNoLinkedProfileExists() {
+        UUID userId = UUID.randomUUID();
+        given(customerRepository.findByUserId(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> customerService.getCustomerIdentityByUserId(userId))
+                .isInstanceOf(CustomerNotFoundException.class);
+    }
+
+    @Test
     void getCustomers_mapsPageAndTrimsKeyword() {
         Pageable pageable = PageRequest.of(0, 20);
         Customer customer = customer();

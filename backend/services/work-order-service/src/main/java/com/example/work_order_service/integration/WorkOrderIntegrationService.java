@@ -8,6 +8,7 @@ import com.example.work_order_service.integration.client.CustomerVehicleClient;
 import com.example.work_order_service.integration.client.InventoryServiceClient;
 import com.example.work_order_service.integration.contract.BookingContract;
 import com.example.work_order_service.integration.contract.CustomerContract;
+import com.example.work_order_service.integration.contract.CustomerIdentityContract;
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
 import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
@@ -28,6 +29,27 @@ public class WorkOrderIntegrationService {
     private final BookingClient bookingClient;
     private final CustomerVehicleClient customerVehicleClient;
     private final InventoryServiceClient inventoryServiceClient;
+
+    public CustomerIdentityContract getCustomerByUserId(UUID userId) {
+        ServiceApiResponse<CustomerIdentityContract> response;
+        try {
+            response = customerVehicleClient.getCustomerByUserId(userId);
+        } catch (FeignException.NotFound exception) {
+            throw new ApiException(ErrorCode.CUSTOMER_NOT_FOUND);
+        } catch (FeignException exception) {
+            throw new ApiException(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE,
+                    "Không thể xác định hồ sơ khách hàng từ tài khoản hiện tại");
+        }
+        CustomerIdentityContract customer = response == null ? null : response.result();
+        if (response == null || response.code() != 0 || customer == null
+                || customer.customerId() == null || customer.isActive() == null) {
+            throw invalidIntegrationResponse("Customer-Vehicle Service trả về hồ sơ khách hàng không hợp lệ");
+        }
+        if (!customer.isActive()) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED, "Hồ sơ khách hàng hiện không hoạt động");
+        }
+        return customer;
+    }
 
     public ServiceEstimateCatalog getServiceEstimateCatalog(UUID serviceId) {
         ServiceApiResponse<InternalServiceCatalogContract> serviceResponse;

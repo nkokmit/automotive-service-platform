@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 import java.util.UUID;
 
 public interface WorkOrderServiceLineRepository extends JpaRepository<WorkOrderServiceLine, UUID> {
@@ -17,6 +18,17 @@ public interface WorkOrderServiceLineRepository extends JpaRepository<WorkOrderS
     List<WorkOrderServiceLine> findByEstimate_IdOrderByCreatedAtAsc(UUID estimateId);
 
     List<WorkOrderServiceLine> findByEstimate_WorkOrder_IdOrderByCreatedAtAsc(UUID workOrderId);
+
+    @Query("""
+            select estimate.workOrder.id as workOrderId, serviceLine.snapshotName as snapshotName
+            from WorkOrderServiceLine serviceLine
+            join serviceLine.estimate estimate
+            where estimate.workOrder.id in :workOrderIds
+              and serviceLine.status = com.example.work_order_service.enums.WorkOrderServiceStatus.COMPLETED
+            order by serviceLine.createdAt asc, serviceLine.id asc
+            """)
+    List<CompletedServiceLineProjection> findCompletedSnapshotsByWorkOrderIds(
+            @Param("workOrderIds") Collection<UUID> workOrderIds);
 
     Optional<WorkOrderServiceLine> findByIdAndEstimate_Id(UUID id, UUID estimateId);
 

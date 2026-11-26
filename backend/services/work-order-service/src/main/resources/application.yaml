@@ -22,6 +22,7 @@ app:
       work-order-canceled: ${WORK_ORDER_CANCELED_TOPIC:work-order-canceled}
       estimate-pending-approval: ${ESTIMATE_PENDING_APPROVAL_TOPIC:work-order.estimate-pending-approval}
       estimate-approved: ${ESTIMATE_APPROVED_TOPIC:work-order.estimate-approved}
+      payment-completed: ${PAYMENT_COMPLETED_TOPIC:billing.payment-completed}
 
 spring:
   application:
