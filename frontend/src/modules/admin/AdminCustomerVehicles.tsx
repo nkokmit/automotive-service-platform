@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   IconCar,
   IconUsers,
@@ -56,6 +56,16 @@ export default function AdminCustomerVehicles() {
   const [customers, setCustomers] = useState<CustomerResponse[]>([]);
   const [histories, setHistories] = useState<ServiceHistoryResponse[]>([]);
 
+  /**
+   * Lọc client-side cho tab "Nhật ký bảo dưỡng".
+   *
+   * Backend `GET /api/service-history` không có tham số lọc theo từ khoá (giống
+   * `/me` và `/customers/{id}` — thứ tự `serviceDate` giảm dần là ý nghĩa của
+   * màn hình). Số bản ghi lịch sử trong một gara là nhỏ, nên lọc ở client vừa
+   * đủ và giữ được thứ tự đúng.
+   */
+  const [historyKeyword, setHistoryKeyword] = useState("");
+
   // Modal states
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleResponse | null>(null);
   const [vehicleHistories, setVehicleHistories] = useState<ServiceHistoryResponse[]>([]);
@@ -76,6 +86,17 @@ export default function AdminCustomerVehicles() {
     notes: "",
   });
 
+  /**
+   * Modal lịch sử bảo dưỡng theo KHÁCH HÀNG.
+   *
+   * Tách khỏi modal theo XE: lịch sử theo khách gom mọi lần khách đó mang
+   * BẤT KỲ xe nào tới, nên đây là góc nhìn khác với lịch sử kỹ thuật của
+   * một chiếc xe.
+   */
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerResponse | null>(null);
+  const [customerHistories, setCustomerHistories] = useState<ServiceHistoryResponse[]>([]);
+  const [loadingCustomerHistory, setLoadingCustomerHistory] = useState(false);
+
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     fullName: "",
@@ -93,13 +114,40 @@ export default function AdminCustomerVehicles() {
     garageName: "AutoCare Workshop",
   });
 
+  /**
+   * Lịch sử đã lọc theo từ khoá — khớp biển số, tên khách hàng, hạng mục,
+   * tên garage hoặc loại bản ghi.
+   */
+  const filteredHistories = useMemo(() => {
+    const kw = historyKeyword.trim().toLowerCase();
+    if (!kw) return histories;
+    return histories.filter((h) =>
+      [
+        h.licensePlate,
+        h.customerName,
+        h.summary,
+        h.garageName,
+        h.vehicleMake,
+        h.vehicleModel,
+        h.recordType,
+      ].some((v) => v?.toLowerCase().includes(kw)),
+    );
+  }, [histories, historyKeyword]);
+
   const loadAll = async (kw = search) => {
     setLoading(true);
     try {
       const [vPage, cPage, hPage] = await Promise.all([
         customerVehicleApi.listVehicles({ keyword: kw || undefined, size: 50 }),
         customerVehicleApi.listCustomers({ keyword: kw || undefined, size: 50 }),
-        customerVehicleApi.getMyServiceHistory(0, 50),
+        // Góc nhìn quản trị: TOÀN BỘ lịch sử bảo dưỡng của gara.
+        //
+        // Trước đây dùng `getMyServiceHistory` (lịch sử của chính người đang
+        // đăng nhập) — nên nhân viên đăng nhập bằng tài khoản không gắn với hồ
+        // sơ khách hàng nào sẽ thấy trang rỗng, còn những lần khách hàng mang
+        // xe tới lại không hiện ở đâu cả. `GET /api/service-history` trả về đúng
+        // "nhật ký bảo dưỡng của gara" mà màn hình này cần.
+        customerVehicleApi.getAllServiceHistory(0, 50),
       ]);
       setVehicles(vPage.items || []);
       setCustomers(cPage.items || []);
@@ -129,6 +177,22 @@ export default function AdminCustomerVehicles() {
       setVehicleHistories([]);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const openCustomerHistory = async (c: CustomerResponse) => {
+    setSelectedCustomer(c);
+    setLoadingCustomerHistory(true);
+    try {
+      const res = await customerVehicleApi.getCustomerServiceHistory(c.id, 0, 50);
+      setCustomerHistories(res.items || []);
+    } catch (err) {
+      setCustomerHistories([]);
+      t.error(
+        (err as Error).message || "Không tải được lịch sử bảo dưỡng của khách hàng",
+      );
+    } finally {
+      setLoadingCustomerHistory(false);
     }
   };
 
@@ -302,7 +366,7 @@ export default function AdminCustomerVehicles() {
             ].join(" ")}
           >
             <IconWrench size={16} />
-            Nhật ký bảo dưỡng ({histories.length})
+            Nhật ký bảo dưỡng ({historyKeyword ? filteredHistories.length : histories.length})
           </button>
         </div>
 
@@ -413,6 +477,7 @@ export default function AdminCustomerVehicles() {
                   <th className="px-4 py-3 font-medium">Địa chỉ</th>
                   <th className="px-4 py-3 font-medium">Ghi chú</th>
                   <th className="px-4 py-3 font-medium text-center">Trạng thái</th>
+                  <th className="px-4 py-3 font-medium text-right">Lịch sử bảo dưỡng</th>
                 </tr>
               </thead>
               <tbody>
@@ -444,6 +509,15 @@ export default function AdminCustomerVehicles() {
                         <Badge tone="warning">Tạm ngưng</Badge>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void openCustomerHistory(c)}
+                      >
+                        <IconWrench size={14} /> Xem lịch sử
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -455,7 +529,35 @@ export default function AdminCustomerVehicles() {
       {/* Tab 3: Service History Timeline */}
       {subTab === "history" && (
         <div className="space-y-3">
-          {histories.map((h) => {
+          {/* Ô lọc: biển số / tên khách / hạng mục / garage */}
+          <div className="flex items-center gap-2 bg-white border border-ink/15 rounded-xl px-3 h-10 max-w-md w-full">
+            <IconSearch size={16} className="text-ink-muted shrink-0" />
+            <input
+              type="text"
+              value={historyKeyword}
+              onChange={(e) => setHistoryKeyword(e.target.value)}
+              placeholder="Lọc theo biển số, tên khách, hạng mục..."
+              className="flex-1 bg-transparent outline-none text-sm"
+            />
+            {historyKeyword && (
+              <button
+                onClick={() => setHistoryKeyword("")}
+                className="text-ink-muted hover:text-ink shrink-0"
+                aria-label="Xoá bộ lọc"
+              >
+                <IconClose size={14} />
+              </button>
+            )}
+          </div>
+
+          {filteredHistories.length === 0 ? (
+            <div className="bg-white border border-ink/8 rounded-2xl p-10 text-center text-sm text-ink-muted">
+              {historyKeyword
+                ? "Không có bản ghi bảo dưỡng nào khớp từ khoá."
+                : "Chưa có bản ghi bảo dưỡng nào."}
+            </div>
+          ) : (
+            filteredHistories.map((h) => {
             const meta = RECORD_TYPE_META[h.recordType] || {
               label: h.recordType,
               tone: "default" as const,
@@ -497,7 +599,8 @@ export default function AdminCustomerVehicles() {
                 </div>
               </Card>
             );
-          })}
+            })
+          )}
         </div>
       )}
 
@@ -657,6 +760,94 @@ export default function AdminCustomerVehicles() {
                 })
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Customer Service History (GET /api/customers/{id}/service-history) */}
+      {selectedCustomer && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/50 flex items-center justify-center p-4"
+          onClick={() => setSelectedCustomer(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-ink/10 pb-4">
+              <div>
+                <h3 className="text-lg font-bold">
+                  Lịch sử bảo dưỡng — {selectedCustomer.fullName}
+                </h3>
+                <p className="text-xs text-ink-muted mt-1">
+                  Mọi lần khách hàng mang xe đến, mới nhất trước
+                  {selectedCustomer.phone ? ` · ${selectedCustomer.phone}` : ""}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCustomer(null)}
+                className="p-1.5 rounded-lg hover:bg-bgsoft"
+                aria-label="Đóng"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            {loadingCustomerHistory ? (
+              <div className="text-sm text-ink-muted py-6 text-center">
+                Đang tải lịch sử...
+              </div>
+            ) : customerHistories.length === 0 ? (
+              <div className="text-sm text-ink-muted py-6 text-center">
+                Khách hàng này chưa có bản ghi bảo dưỡng nào.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customerHistories.map((h) => {
+                  const meta = RECORD_TYPE_META[h.recordType] || {
+                    label: h.recordType,
+                    tone: "default" as const,
+                  };
+                  return (
+                    <div
+                      key={h.id}
+                      className="p-3.5 rounded-xl border border-ink/10 space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-ink">
+                          {h.summary}
+                        </span>
+                        <Badge tone={meta.tone}>{meta.label}</Badge>
+                      </div>
+                      {h.description && (
+                        <p className="text-xs text-ink-light">{h.description}</p>
+                      )}
+                      <div className="text-[11px] text-ink-muted flex flex-wrap gap-3 pt-1">
+                        <span>Ngày: {fmtDate(h.serviceDate)}</span>
+                        {h.odometerKm != null && (
+                          <span>
+                            ODO: {h.odometerKm.toLocaleString("vi-VN")} km
+                          </span>
+                        )}
+                        {h.garageName && <span>Garage: {h.garageName}</span>}
+                        {h.licensePlate && (
+                          <span className="font-mono font-bold text-primary">
+                            {h.licensePlate}
+                          </span>
+                        )}
+                        {(h.vehicleMake || h.vehicleModel) && (
+                          <span>
+                            {[h.vehicleMake, h.vehicleModel]
+                              .filter(Boolean)
+                              .join(" ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

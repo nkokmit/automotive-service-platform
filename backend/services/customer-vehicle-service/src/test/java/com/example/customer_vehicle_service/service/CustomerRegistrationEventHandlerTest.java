@@ -40,7 +40,7 @@ class CustomerRegistrationEventHandlerTest {
                 .phone(null)
                 .isActive(Boolean.TRUE)
                 .build();
-        given(customerRepository.countByUserIdIncludingDeleted(userId)).willReturn(0L);
+        given(customerRepository.countByUserIdIncludingDeleted(userId.toString())).willReturn(0L);
         given(customerRepository.findUnlinkedByEmailOrPhone(event.email(), event.phone()))
                 .willReturn(List.of(manualProfile));
         given(customerRepository.save(any(Customer.class))).willAnswer(invocation -> invocation.getArgument(0));
@@ -64,7 +64,7 @@ class CustomerRegistrationEventHandlerTest {
         UUID userId = UUID.randomUUID();
         UserRegisteredEvent event = new UserRegisteredEvent(
                 userId, "new-user", null, "new@example.com", "0901234567");
-        given(customerRepository.countByUserIdIncludingDeleted(userId)).willReturn(0L);
+        given(customerRepository.countByUserIdIncludingDeleted(userId.toString())).willReturn(0L);
         given(customerRepository.findUnlinkedByEmailOrPhone(event.email(), event.phone())).willReturn(List.of());
         given(customerRepository.save(any(Customer.class))).willAnswer(invocation -> invocation.getArgument(0));
 
@@ -80,7 +80,7 @@ class CustomerRegistrationEventHandlerTest {
         UUID userId = UUID.randomUUID();
         UserRegisteredEvent event = new UserRegisteredEvent(
                 userId, "new-user", "New User", "new@example.com", null);
-        given(customerRepository.countByUserIdIncludingDeleted(userId)).willReturn(1L);
+        given(customerRepository.countByUserIdIncludingDeleted(userId.toString())).willReturn(1L);
 
         eventHandler.handle(event);
 

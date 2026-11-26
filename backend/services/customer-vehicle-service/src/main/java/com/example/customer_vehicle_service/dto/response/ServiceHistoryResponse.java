@@ -33,6 +33,10 @@ public record ServiceHistoryResponse(
         String summary,
         String description,
         String garageName,
-        Instant createdAt
+        Instant createdAt,
+        String licensePlate,
+        String vehicleMake,
+        String vehicleModel,
+        String customerName
 ) {
 }

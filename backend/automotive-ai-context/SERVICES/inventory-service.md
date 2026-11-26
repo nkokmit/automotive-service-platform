@@ -16,6 +16,27 @@ Owns the service catalog, the parts catalog and stock.
 
 `inventory_service`
 
+## Public catalog
+
+The storefront pages `/services` and `/parts` are public — a visitor who has
+not signed in must be able to browse the catalog and see real prices.
+
+Therefore these read endpoints are **anonymous-accessible**:
+
+- `GET /api/services`, `GET /api/services/{id}`, `GET /api/services/{id}/bom`
+- `GET /api/service-categories`, `GET /api/service-categories/{id}`
+- `GET /api/parts`, `GET /api/parts/{id}`, `GET /api/parts/{id}/compatibilities`
+- `GET /api/part-categories`, `GET /api/part-categories/{id}`
+
+This is enforced at two layers:
+
+1. `SecurityConfig` permits `GET` on those paths without authentication.
+2. The matching controller methods use `@PreAuthorize("permitAll()")`.
+
+Every write operation (`*_WRITE`) still requires the corresponding authority,
+so only staff can change the catalog. The API Gateway applies the same
+`GET`-only whitelist.
+
 ## Source of truth
 
 Inventory Service is the only owner of stock quantities.

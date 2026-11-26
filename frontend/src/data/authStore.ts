@@ -16,7 +16,7 @@ import { isAuthError } from "../api/client";
 import { TOKEN_EVENT, getAccessToken } from "../api/session";
 import { primaryRole } from "../api/types";
 import type { CustomerResponse, UserResponse } from "../api/types";
-import { mockUsers, type Order, type Address, type Vehicle } from "./mock";
+import { mockUsers } from "./mock";
 
 export const AUTH_KEY = "autocare:auth";
 export const AUTH_EVENT = "autocare:auth:changed";
@@ -35,8 +35,11 @@ export type AuthUser = {
   name: string;
   email: string;
   phone?: string;
-  /** Backend chưa có avatar → dùng avatar mặc định của mock cho tới khi bổ sung. */
-  avatar: string;
+  /**
+   * Backend chưa có trường avatar → `null`, giao diện tự sinh avatar chữ cái
+   * đầu từ tên (xem `components/Avatar.tsx`).
+   */
+  avatar?: string | null;
   /** Backend chưa có các field loyalty → giữ mặc định để UI không vỡ. */
   memberSince: string;
   totalOrders: number;
@@ -59,22 +62,42 @@ export type Session = {
 /** Map DTO của backend sang shape mà giao diện đang dùng. */
 export function mapUserFromApi(dto: UserResponse): AuthUser {
   const fallback = mockUsers[0];
+  
+  // Format createdAt to Vietnamese date (DD/MM/YYYY)
+  let memberSince = fallback.memberSince;
+  if (dto.createdAt) {
+    try {
+      const date = new Date(dto.createdAt);
+      memberSince = date.toLocaleDateString("vi-VN");
+    } catch {
+      memberSince = fallback.memberSince;
+    }
+  }
+  
   return {
     id: dto.id,
     // Ưu tiên fullName; fallback sang username để không hiện ô trống.
     name: dto.fullName?.trim() || dto.username,
     email: dto.email,
     phone: dto.phone ?? undefined,
-    avatar: fallback.avatar,
-    memberSince: fallback.memberSince,
+    avatar: null,
+    memberSince,
     totalOrders: 0,
     totalSpentVND: 0,
     loyaltyPoints: 0,
     tier: "Thành viên",
     username: dto.username,
-    roles: dto.roles ? Array.from(dto.roles).map((r) => r.name) : [],
+    roles: dto.roles ? dto.roles.map((r) => r.name) : [],
   };
 }
+
+/**
+ * Thời gian tối đa chờ hồ sơ khách hàng trong luồng đăng ký.
+ *
+ * <p>Hồ sơ khách hàng do Kafka consumer tạo nên có độ trễ. Chờ vô hạn thì
+ * người dùng phải đứng nhìn màn hình loading dù tài khoản đã tạo xong.
+ */
+const CUSTOMER_PROFILE_TIMEOUT_MS = 3000;
 
 /**
  * Thử load hồ sơ khách hàng đi kèm tài khoản.
@@ -83,14 +106,32 @@ export function mapUserFromApi(dto: UserResponse): AuthUser {
  *      (CustomerProfileUnresolvedException — tài khoản chưa liên kết hồ sơ)
  * - Lỗi khác (mạng/5xx) → `{ status: "unknown", customer: null }`,
  *      KHÔNG xoá phiên đăng nhập vì không liên quan tới auth user.
+ *
+ * @param options.timeoutMs nếu có, hết thời gian thì trả `unknown` thay vì chờ tiếp.
  */
-export async function loadCustomerProfile(): Promise<{
+export async function loadCustomerProfile(options?: {
+  timeoutMs?: number;
+}): Promise<{
   status: CustomerStatus;
   customer: CustomerResponse | null;
 }> {
+  const timeoutMs = options?.timeoutMs;
   try {
-    const customer = await customerApi.me();
-    return { status: "linked", customer };
+    if (!timeoutMs) {
+      const customer = await customerApi.me();
+      return { status: "linked", customer };
+    }
+
+    // Timeout bằng AbortController: hết giờ thì huỷ request, không để người
+    // dùng phải chờ mạng treo.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const customer = await customerApi.me(controller.signal);
+      return { status: "linked", customer };
+    } finally {
+      clearTimeout(timer);
+    }
   } catch (err) {
     if (isAuthError(err)) {
       return { status: "unlinked", customer: null };
@@ -103,15 +144,17 @@ export async function loadCustomerProfile(): Promise<{
 export async function hydrateUser(): Promise<Session | null> {
   if (!getAccessToken()) return null;
   try {
-    const dto = await userApi.me();
+    // Hai lệnh gọi không phụ thuộc nhau → chạy song song.
+    const [dto, profile] = await Promise.all([
+      userApi.me(),
+      loadCustomerProfile({ timeoutMs: CUSTOMER_PROFILE_TIMEOUT_MS }),
+    ]);
     const session: Session = {
       user: mapUserFromApi(dto),
       loggedInAt: new Date().toISOString(),
-      customerStatus: "unknown",
+      customerStatus: profile.status,
+      customer: profile.customer,
     };
-    const { status, customer } = await loadCustomerProfile();
-    session.customerStatus = status;
-    session.customer = customer;
     writeSession(session);
     return session;
   } catch {
@@ -123,6 +166,11 @@ export async function hydrateUser(): Promise<Session | null> {
 
 export function readSession(): Session | null {
   try {
+    // Không có access token → không phải phiên đăng nhập hợp lệ.
+    // Session trong localStorage có thể là dữ liệu mock từ lúc dev trước
+    // (chưa có token) — nếu trả về, Header sẽ hiển thị user giả.
+    if (!getAccessToken()) return null;
+
     const raw = localStorage.getItem(AUTH_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Session;
@@ -152,24 +200,42 @@ export function writeSession(session: Session | null) {
 
 /**
  * Đăng nhập thật qua `POST /api/auth/login`.
- * Lưu ý: backend xác thực bằng **username**, không phải email.
+ * `username` nhận **username hoặc email** — backend tự tra cứu cả hai.
+ *
+ * `/api/users/me` và `/api/customers/me` chạy song song thay vì nối tiếp, để
+ * tổng độ trễ là max của hai thay vì tổng của hai.
  */
 export async function login(username: string, password: string): Promise<Session> {
   await authApi.login({ username, password });
-  const dto = await userApi.me();
+
+  const [dto, profile] = await Promise.all([
+    userApi.me(),
+    loadCustomerProfile({ timeoutMs: CUSTOMER_PROFILE_TIMEOUT_MS }),
+  ]);
+
   const session: Session = {
     user: mapUserFromApi(dto),
     loggedInAt: new Date().toISOString(),
-    customerStatus: "unknown",
+    customerStatus: profile.status,
+    customer: profile.customer,
   };
-  const { status, customer } = await loadCustomerProfile();
-  session.customerStatus = status;
-  session.customer = customer;
   writeSession(session);
   return session;
 }
 
-/** Đăng ký thật qua `POST /api/auth/register`. Backend trả token luôn nên vào thẳng phiên. */
+/**
+ * Đăng ký thật qua `POST /api/auth/register`.
+ *
+ * Sau khi đăng ký, hồ sơ khách hàng được tạo bởi Kafka consumer
+ * (`customer-vehicle-service`) — tức là có độ trễ vài trăm ms và *có thể* chưa
+ * kịp. Vì vậy:
+ *  - `/api/users/me` (bắt buộc, cần để dựng session) được chờ;
+ *  - `/api/customers/me` chạy SONG SONG với nó và có timeout ngắn, hết hạn thì
+ *    coi như "chưa liên kết" (`unlinked`) — người dùng vẫn vào được app ngay.
+ *
+ * Trước đây 2 call này nối tiếp nhau nên tổng độ trễ là tổng của cả hai, cộng
+ * thêm một lượt gọi thừa sang MySQL bridge khi gặp 403.
+ */
 export async function register(payload: {
   username: string;
   password: string;
@@ -178,15 +244,19 @@ export async function register(payload: {
   fullName?: string;
 }): Promise<Session> {
   await authApi.register(payload);
-  const dto = await userApi.me();
+
+  // Chạy song song: hồ sơ user và hồ sơ khách hàng không phụ thuộc nhau.
+  const [dto, profile] = await Promise.all([
+    userApi.me(),
+    loadCustomerProfile({ timeoutMs: CUSTOMER_PROFILE_TIMEOUT_MS }),
+  ]);
+
   const session: Session = {
     user: mapUserFromApi(dto),
     loggedInAt: new Date().toISOString(),
-    customerStatus: "unknown",
+    customerStatus: profile.status,
+    customer: profile.customer,
   };
-  const { status, customer } = await loadCustomerProfile();
-  session.customerStatus = status;
-  session.customer = customer;
   writeSession(session);
   return session;
 }
@@ -222,26 +292,6 @@ export function updateProfile(patch: Partial<AuthUser>): Session | null {
   const next: Session = { ...current, user: { ...current.user, ...patch } };
   writeSession(next);
   return next;
-}
-
-// ── Per-user data ─────────────────────────────────────────────────────────────
-// Ba hàm dưới đây vẫn dùng mock vì backend **chưa có** endpoint tương ứng:
-//   - orders/addresses → thuộc commerce-service, chưa tồn tại.
-//   - vehicles → VehicleController cố ý không có route "xe của tôi" (xem
-//     comment trong VehicleController.java); lịch sử bảo dưỡng nằm ở
-//     `GET /api/service-history/me`.
-// Khi các service tương ứng được implement, thay phần thân của hàm bằng call API.
-
-export function getUserOrders(userId: string): Order[] {
-  return mockUsers.find((x) => x.id === userId)?.orders ?? [];
-}
-
-export function getUserAddresses(userId: string): Address[] {
-  return mockUsers.find((x) => x.id === userId)?.addresses ?? [];
-}
-
-export function getUserVehicles(userId: string): Vehicle[] {
-  return mockUsers.find((x) => x.id === userId)?.vehicles ?? [];
 }
 
 // ── React hooks ───────────────────────────────────────────────────────────────

@@ -78,3 +78,38 @@ export function isAccessTokenValid(): boolean {
   if (expiry === null) return true; // không đọc được exp thì để backend tư quyết
   return Date.now() < expiry - 30_000;
 }
+
+/**
+ * Đọc danh sách authority của phiên hiện tại từ claim `authorities` của JWT.
+ *
+ * Vì sao không lấy từ `GET /api/users/me`? Backend trả `roles[].permissions = null`
+ * khi đọc user (xem `UserResponse.java`), nên giao diện **không biết** user có
+ * `WORK_ORDER_CREATE` hay không. Claim `authorities` trong access token là nơi
+ * duy nhất gateway/service đọc để gắn quyền → đây cũng là nguồn đúng nhất để
+ * ẩn/hiện nút.
+ *
+ * @returns mảng authority (VD: `["WORK_ORDER_CREATE", "ESTIMATE_READ"]`), rỗng
+ *          nếu không có token hoặc token không đọc được.
+ */
+export function getTokenAuthorities(): string[] {
+  const token = getAccessToken();
+  if (!token) return [];
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return [];
+    const json = JSON.parse(
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    const authorities = json.authorities;
+    return Array.isArray(authorities)
+      ? authorities.filter((a): a is string => typeof a === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Phiên hiện tại có authority này không. */
+export function hasTokenAuthority(authority: string): boolean {
+  return getTokenAuthorities().includes(authority);
+}

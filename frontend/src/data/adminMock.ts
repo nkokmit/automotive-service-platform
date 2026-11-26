@@ -1,21 +1,12 @@
 /**
  * Mock data dành riêng cho Admin module.
- * Bao gồm: stats tổng quan, doanh thu theo tháng, top sản phẩm,
- * recent orders, recent activity, danh sách orders của admin view,
- * danh sách users (admin perspective).
+ * Bao gồm: stats tổng quan, doanh thu theo tháng, top dịch vụ,
+ * recent activity, danh sách users (admin perspective).
  *
  * Pattern: giống mock.ts — tách riêng để dễ refactor khi có backend thật.
  */
 
-import {
-  cars,
-  parts,
-  services,
-  featuredGarages,
-  mockUsers,
-  type Order,
-  type OrderStatus,
-} from "./mock";
+import { mockParts, mockServices, mockUsers } from "./mock";
 
 // =========================
 // Stats tổng quan (KPI cards)
@@ -28,7 +19,7 @@ export interface AdminKpi {
   /** % tăng/giảm so với kỳ trước (vd: 12.5 = +12.5%) */
   delta: number;
   /** Icon key để UI chọn icon phù hợp */
-  icon: "revenue" | "orders" | "users" | "conversion";
+  icon: "revenue" | "bookings" | "users" | "conversion";
   /** Màu accent */
   tone: "primary" | "accent" | "success" | "warning";
 }
@@ -44,10 +35,10 @@ export const adminKpis: AdminKpi[] = [
   },
   {
     id: "k2",
-    label: "Đơn hàng mới",
+    label: "Lịch hẹn mới",
     value: "1.247",
     delta: 8.2,
-    icon: "orders",
+    icon: "bookings",
     tone: "success",
   },
   {
@@ -94,62 +85,6 @@ export const revenueData: RevenuePoint[] = [
 ];
 
 // =========================
-// Top products (parts) theo doanh thu
-// =========================
-
-export interface TopProduct {
-  id: string;
-  name: string;
-  image: string;
-  sold: number;
-  revenue: number;
-  growth: number; // % so với tháng trước
-}
-
-export const topParts: TopProduct[] = [
-  {
-    id: parts[0].id,
-    name: parts[0].name,
-    image: parts[0].image,
-    sold: 487,
-    revenue: parts[0].priceVND * 487,
-    growth: 14.2,
-  },
-  {
-    id: parts[2].id,
-    name: parts[2].name,
-    image: parts[2].image,
-    sold: 612,
-    revenue: parts[2].priceVND * 612,
-    growth: 8.7,
-  },
-  {
-    id: parts[7].id,
-    name: parts[7].name,
-    image: parts[7].image,
-    sold: 198,
-    revenue: parts[7].priceVND * 198,
-    growth: 22.1,
-  },
-  {
-    id: parts[1].id,
-    name: parts[1].name,
-    image: parts[1].image,
-    sold: 342,
-    revenue: parts[1].priceVND * 342,
-    growth: -3.4,
-  },
-  {
-    id: parts[4].id,
-    name: parts[4].name,
-    image: parts[4].image,
-    sold: 156,
-    revenue: parts[4].priceVND * 156,
-    growth: 5.9,
-  },
-];
-
-// =========================
 // Top services theo số lượt booking
 // =========================
 
@@ -162,7 +97,7 @@ export interface TopService {
   rating: number;
 }
 
-export const topServices: TopService[] = services
+export const topServices: TopService[] = mockServices
   .slice()
   .sort((a, b) => b.bookingsCount - a.bookingsCount)
   .slice(0, 5)
@@ -180,8 +115,8 @@ export const topServices: TopService[] = services
 // =========================
 
 export type ActivityKind =
-  | "order_created"
-  | "order_completed"
+  | "service_booked"
+  | "service_completed"
   | "new_user"
   | "new_garage"
   | "service_booked"
@@ -203,9 +138,9 @@ export interface Activity {
 export const recentActivities: Activity[] = [
   {
     id: "a1",
-    kind: "order_created",
-    title: "Đơn hàng mới #ORD-2026-0247",
-    description: "Lốp Michelin Primacy 4 × 4 — 9,8tr",
+    kind: "service_booked",
+    title: "Lịch hẹn mới #BK-2026-0247",
+    description: "Thay dấu động cơ — 03/10 10:30",
     actor: "Nguyễn Văn A",
     timestamp: "2026-10-03T10:32:00Z",
     tone: "primary",
@@ -214,7 +149,7 @@ export const recentActivities: Activity[] = [
     id: "a2",
     kind: "service_booked",
     title: "Đặt lịch thay dầu",
-    description: "Garage Minh Anh — 03/10 09:00",
+    description: "AutoCare Workshop — 03/10 09:00",
     actor: "Trần Thị B",
     timestamp: "2026-10-03T09:45:00Z",
     tone: "accent",
@@ -230,18 +165,18 @@ export const recentActivities: Activity[] = [
   },
   {
     id: "a4",
-    kind: "new_garage",
-    title: "Garage mới đăng ký",
-    description: "Garage Hoàng Long — Hà Nội — chờ duyệt",
+    kind: "new_user",
+    title: "Khách hàng đăng ký tại xưởng",
+    description: "Lê Văn C — Hà Nội — chờ duyệt hồ sơ",
     actor: "Lê Văn C",
     timestamp: "2026-10-02T22:18:00Z",
     tone: "neutral",
   },
   {
     id: "a5",
-    kind: "order_completed",
-    title: "Hoàn tất đơn #ORD-2026-0239",
-    description: "Bộ má phanh Brembo × 1 — 2,89tr",
+    kind: "service_completed",
+    title: "Hoàn tất phiếu sửa chửa #WO-2026-0239",
+    description: "Thay má phanh trước — 2,89tr",
     actor: "Phạm Văn Sỹ",
     timestamp: "2026-10-02T18:42:00Z",
     tone: "success",
@@ -250,7 +185,7 @@ export const recentActivities: Activity[] = [
     id: "a6",
     kind: "review_posted",
     title: "Đánh giá 5★ mới",
-    description: "Bảo dưỡng định kỳ tại Garage Minh Anh",
+    description: "Bảo dưỡng định kỳ tại AutoCare Workshop",
     actor: "Hoàng Thị D",
     timestamp: "2026-10-02T16:30:00Z",
     tone: "accent",
@@ -267,22 +202,29 @@ export const recentActivities: Activity[] = [
 ];
 
 // =========================
-// Recent orders (admin view)
+// Admin Users (extend từ mockUsers)
 // =========================
 
-export interface AdminOrderRow {
+export type AdminUserRole = "customer" | "garage_owner" | "admin";
+
+export interface AdminUser {
   id: string;
-  date: string; // DD/MM/YYYY
-  customer: string;
-  customerEmail: string;
-  itemsCount: number;
-  totalVND: number;
-  status: OrderStatus;
-  paymentMethod: "COD" | "Thẻ tín dụng" | "Chuyển khoản" | "Ví điện tử";
+  name: string;
+  email: string;
+  phone: string;
+  role: AdminUserRole;
+  /** Tên role thật từ backend (VD: ["ADMIN", "MECHANIC"]). */
+  roleNames: string[];
   city: string;
+  joinedAt: string;
+  totalOrders: number;
+  totalSpentVND: number;
+  status: "active" | "suspended";
+  /** Chỉ dùng cho role=garage_owner (nhân viên của AutoCare Workshop) */
+  garageName?: string;
 }
 
-// Sinh danh sách orders giả lập từ mockUsers + mở rộng
+/** Danh sách khách hàng mẫu dùng cho bảng "Người dùng" của admin. */
 const ADMIN_CUSTOMERS = [
   { name: "Nguyễn Văn A", email: "nguyenvana@example.com", city: "Hà Nội" },
   { name: "Trần Thị B", email: "tranthib@example.com", city: "TP.HCM" },
@@ -298,77 +240,6 @@ const ADMIN_CUSTOMERS = [
   { name: "Lý Văn L", email: "lyvanl@example.com", city: "Đà Nẵng" },
 ];
 
-const STATUS_LIST: OrderStatus[] = [
-  "pending",
-  "confirmed",
-  "shipping",
-  "completed",
-  "cancelled",
-];
-
-const PAYMENT_LIST: AdminOrderRow["paymentMethod"][] = [
-  "COD",
-  "Thẻ tín dụng",
-  "Chuyển khoản",
-  "Ví điện tử",
-];
-
-function pick<T>(arr: T[], i: number): T {
-  return arr[i % arr.length];
-}
-
-export const adminOrders: AdminOrderRow[] = Array.from({ length: 24 }).map(
-  (_, idx) => {
-    const customer = pick(ADMIN_CUSTOMERS, idx);
-    const day = 30 - Math.floor(idx / 4);
-    const date = `0${day <= 0 ? 1 : day}/${Math.max(9, 10 - Math.floor(idx / 12))}/2026`;
-    return {
-      id: `ORD-2026-${(250 - idx).toString().padStart(3, "0")}`,
-      date,
-      customer: customer.name,
-      customerEmail: customer.email,
-      itemsCount: (idx % 3) + 1,
-      totalVND: 250_000 + ((idx * 173_421) % 8_500_000),
-      status: pick(STATUS_LIST, idx + 1),
-      paymentMethod: pick(PAYMENT_LIST, idx),
-      city: customer.city,
-    };
-  },
-);
-
-// =========================
-// Admin Users (extend từ mockUsers)
-// =========================
-
-export type AdminUserRole = "customer" | "garage_owner" | "admin";
-
-export interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  avatar: string;
-  role: AdminUserRole;
-  city: string;
-  joinedAt: string;
-  totalOrders: number;
-  totalSpentVND: number;
-  status: "active" | "suspended";
-  /** Chỉ dùng cho role=garage_owner */
-  garageName?: string;
-}
-
-const avatarSeeds = [
-  "photo-1535713875002-d1d0cf377fde",
-  "photo-1438761681033-6461ffad8d80",
-  "photo-1500648767791-00dcc994a43e",
-  "photo-1507003211169-0a1dd7228f2d",
-  "photo-1494790108377-be9c29b29330",
-];
-
-const IMG = (seed: string) =>
-  `https://images.unsplash.com/${seed}?auto=format&fit=crop&w=200&q=70`;
-
 export const adminUsers: AdminUser[] = [
   // user từ mockUsers
   ...mockUsers.map<AdminUser>((u) => ({
@@ -376,37 +247,37 @@ export const adminUsers: AdminUser[] = [
     name: u.name,
     email: u.email,
     phone: u.phone,
-    avatar: u.avatar,
     role: "customer",
+    roleNames: ["CUSTOMER"],
     city: "Hà Nội",
     joinedAt: u.memberSince,
-    totalOrders: u.orders.length,
-    totalSpentVND: u.orders.reduce((s, o) => s + o.totalVND, 0),
+    totalOrders: 0,
+    totalSpentVND: 0,
     status: "active",
   })),
-  // garage owners
-  ...featuredGarages.map<AdminUser>((g) => ({
-    id: g.id,
-    name: g.name + " — Chủ garage",
-    email: `owner@${g.slug}.vn`,
-    phone: g.phone,
-    avatar: IMG(avatarSeeds[parseInt(g.id.replace("g", "")) % avatarSeeds.length]),
+  // Chủ xưởng AutoCare (web chỉ phục vụ một xưởng duy nhất)
+  {
+    id: "owner1",
+    name: "Trần Minh Quân — Chủ xưởng AutoCare",
+    email: "owner@autocare.vn",
+    phone: "024 3876 1234",
     role: "garage_owner",
-    city: g.city,
-    joinedAt: "01/0" + (parseInt(g.id.replace("g", "")) + 4) + "/2025",
-    totalOrders: g.reviewsCount,
-    totalSpentVND: g.priceFrom * g.reviewsCount,
-    status: g.openNow ? "active" : "active",
-    garageName: g.name,
-  })),
+    roleNames: ["MANAGER"],
+    city: "Hà Nội",
+    joinedAt: "01/04/2025",
+    totalOrders: 184,
+    totalSpentVND: 42_000_000,
+    status: "active",
+    garageName: "AutoCare Workshop",
+  },
   // admin user (chính mình)
   {
     id: "admin1",
     name: "Admin AutoCare",
     email: "admin@autocare.vn",
     phone: "1900 6868",
-    avatar: IMG(avatarSeeds[0]),
     role: "admin",
+    roleNames: ["ADMIN"],
     city: "TP.HCM",
     joinedAt: "01/01/2024",
     totalOrders: 0,
@@ -419,8 +290,8 @@ export const adminUsers: AdminUser[] = [
     name: c.name,
     email: c.email,
     phone: `09${(10000000 + idx * 1234567).toString().slice(0, 8)}`,
-    avatar: IMG(avatarSeeds[idx % avatarSeeds.length]),
     role: "customer",
+    roleNames: ["CUSTOMER"],
     city: c.city,
     joinedAt: `${10 + idx}/0${(idx % 9) + 1}/2026`,
     totalOrders: (idx % 5) + 1,
@@ -439,44 +310,12 @@ export function formatKpiVND(n: number): string {
   return new Intl.NumberFormat("vi-VN").format(n) + "đ";
 }
 
-export function getStatusLabel(status: OrderStatus): string {
-  switch (status) {
-    case "pending":
-      return "Chờ xác nhận";
-    case "confirmed":
-      return "Đã xác nhận";
-    case "shipping":
-      return "Đang giao";
-    case "completed":
-      return "Hoàn tất";
-    case "cancelled":
-      return "Đã huỷ";
-  }
-}
-
-export function getStatusTone(
-  status: OrderStatus,
-): "primary" | "accent" | "success" | "warning" | "danger" {
-  switch (status) {
-    case "pending":
-      return "warning";
-    case "confirmed":
-      return "primary";
-    case "shipping":
-      return "accent";
-    case "completed":
-      return "success";
-    case "cancelled":
-      return "danger";
-  }
-}
-
 export function getRoleLabel(role: AdminUserRole): string {
   switch (role) {
     case "customer":
       return "Khách hàng";
     case "garage_owner":
-      return "Chủ garage";
+      return "Nhân viên xưởng";
     case "admin":
       return "Quản trị viên";
   }
@@ -500,5 +339,4 @@ export function relativeTime(iso: string): string {
 // Re-exports — dùng cho admin pages
 // =========================
 
-export { cars, parts, services, featuredGarages, mockUsers };
-export type { Order };
+export { mockParts, mockServices, mockUsers };

@@ -18,6 +18,7 @@ import Card from "../../components/Card";
 import Badge from "../../components/Badge";
 import { chatSuggestions } from "../../data/mock";
 import { agentApi } from "../../api/endpoints/ai";
+import { normalizeAiLink } from "../../utils/links";
 import type {
   ChatRequest,
   DetectionResponse,
@@ -203,9 +204,9 @@ const CAPABILITIES: Array<{ icon: React.ReactNode; title: string; desc: string; 
   },
   {
     icon: <IconSparkles size={16} />,
-    title: "Tư vấn mua xe cũ",
-    desc: "Lọc theo hãng, ngân sách, đời xe",
-    ask: "Tìm giúp tôi xe Toyota cũ giá dưới 800 triệu",
+    title: "Tư vấn linh kiện thay thế",
+    desc: "Gợi ý phụ tùng phù hợp với tình trạng xe",
+    ask: "Xe của tôi nên thay bộ lọc dầu loại nào?",
   },
   {
     icon: <IconCamera size={16} />,
@@ -216,7 +217,7 @@ const CAPABILITIES: Array<{ icon: React.ReactNode; title: string; desc: string; 
 ];
 
 const WELCOME_MESSAGE =
-  "Xin chào! Tôi là **trợ lý AI của AutoCare**. Tôi có thể giúp bạn giải đáp kiến thức về xe, hướng dẫn bảo dưỡng – chăm sóc xe, tra cứu thông tin và lịch sử dịch vụ của xe, tư vấn mua xe cũ, đặt lịch tại garage, hoặc kiểm tra hư hỏng khi bạn gửi ảnh xe. Bạn cần hỗ trợ gì hôm nay?";
+  "Xin chào! Tôi là **trợ lý AI của AutoCare Workshop**. Tôi có thể giúp bạn giải đáp kiến thức về xe, hướng dẫn bảo dưỡng – chăm sóc xe, tra cứu thông tin và lịch sử dịch vụ của xe, tư vấn linh kiện thay thế, đặt lịch tại xưởng, hoặc kiểm tra hư hỏng khi bạn gửi ảnh xe. Bạn cần hỗ trợ gì hôm nay?";
 
 export default function ChatAssistant() {
   const [messages, setMessages] = useState<Msg[]>([
@@ -632,7 +633,7 @@ export default function ChatAssistant() {
         </Card>
 
         <p className="text-xs text-ink-muted text-center mt-4">
-          Thông tin do AI cung cấp mang tính tham khảo. Chi phí sửa chữa thực tế cần được kỹ thuật viên kiểm tra trực tiếp tại garage.
+          Thông tin do AI cung cấp mang tính tham khảo. Chi phí sửa chữa thực tế cần được kỹ thuật viên kiểm tra trực tiếp tại xưởng.
         </p>
       </div>
     </div>
@@ -971,7 +972,7 @@ function MessageBubble({
                       {report.recommended_items.map((item) => (
                         <Link
                           key={item.id}
-                          to={item.link}
+                          to={normalizeAiLink(item.link)}
                           className="p-2.5 rounded-xl bg-primary/5 hover:bg-primary/10 border border-primary/15 flex items-center justify-between gap-2 transition-colors"
                         >
                           <div className="min-w-0">
@@ -1004,7 +1005,7 @@ function MessageBubble({
                     type="button"
                     onClick={() =>
                       onQuickAsk(
-                        `Kiểm tra lịch trống tại garage vào ngày mai để tôi đặt lịch sửa chữa xe ${report.vehicle_info || ""} theo báo giá vừa phân tích.`,
+                        `Kiểm tra lịch trống tại xưởng vào ngày mai để tôi đặt lịch sửa chữa xe ${report.vehicle_info || ""} theo báo giá vừa phân tích.`,
                       )
                     }
                     className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5"
@@ -1016,7 +1017,7 @@ function MessageBubble({
                     to="/services?category=S%E1%BB%ADa%20ch%E1%BB%AFa"
                     className="px-3 py-1.5 rounded-lg bg-bgsoft hover:bg-accent text-ink text-xs font-medium transition-colors flex items-center gap-1"
                   >
-                    <span>Xem danh sách Garage</span>
+                    <span>Xem danh sách dịch vụ</span>
                     <IconArrowRight size={12} />
                   </Link>
                 </div>

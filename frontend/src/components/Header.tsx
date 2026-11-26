@@ -1,26 +1,25 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
-  IconSearch,
   IconUser,
   IconMenu,
   IconClose,
   IconCar,
   IconCamera,
   IconChat,
-  IconCart,
   IconArrowRight,
   IconSparkles,
 } from "./icons";
 import Button from "./Button";
-import { useCartCount } from "../data/cartStore";
+import Avatar from "./Avatar";
+import SearchBox from "./SearchBox";
+import NotificationBell from "./NotificationBell";
+import { useToast } from "./Toast";
 import { useAuth } from "../data/authStore";
+import { GARAGE } from "../config/garage";
 
 const navItems = [
-  { to: "/cars", label: "Mua xe" },
-  { to: "/parts", label: "Phụ kiện" },
   { to: "/services", label: "Đặt lịch sửa chữa" },
-  { to: "/news", label: "Tin tức" },
 ];
 
 /** Nhóm "AI" — gộp 2 trang vào dropdown cho gọn nav. */
@@ -44,9 +43,27 @@ export default function Header() {
   const [userMenu, setUserMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
-  const cartCount = useCartCount();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const t = useToast();
+
+  /**
+   * Đăng xuất thật: revoke token phía server + xoá phiên cục bộ.
+   * Trước đây nút này chỉ `navigate("/login")` nên token vẫn nằm trong
+   * localStorage → header vẫn hiện tài khoản sau khi "đăng xuất".
+   */
+  const handleLogout = async () => {
+    setUserMenu(false);
+    setOpen(false);
+    try {
+      await logout();
+      t.info("Đã đăng xuất");
+    } catch {
+      // authApi.logout luôn clear token cục bộ dù server lỗi.
+      t.info("Đã đăng xuất");
+    }
+    navigate("/");
+  };
 
   // Đóng AI menu khi click-outside
   useEffect(() => {
@@ -68,7 +85,7 @@ export default function Header() {
           <span className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center">
             <IconCar size={20} />
           </span>
-          <span className="hidden sm:inline text-primary">AutoCare</span>
+          <span className="hidden sm:inline text-primary">{GARAGE.brand}</span>
         </Link>
 
         {/* Desktop nav */}
@@ -179,43 +196,26 @@ export default function Header() {
 
         {/* Search (desktop) */}
         <div className="hidden lg:flex flex-1 max-w-md ml-auto">
-          <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 w-full">
-            <IconSearch size={18} className="text-ink-muted" />
-            <input
-              placeholder="Tìm garage, dịch vụ..."
-              className="flex-1 bg-transparent outline-none text-sm placeholder:text-ink-muted"
-            />
-          </div>
+          <SearchBox
+            className="w-full"
+            placeholder="Tìm dịch vụ sửa chữa..."
+          />
         </div>
 
         {/* Actions */}
         <div className="hidden md:flex items-center gap-2 ml-auto lg:ml-2">
-          <Link
-            to="/cart"
-            className="relative p-2 rounded-lg hover:bg-bgsoft"
-            aria-label={`Giỏ hàng (${cartCount})`}
-          >
-            <IconCart size={22} />
-            {cartCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                {cartCount > 99 ? "99+" : cartCount}
-              </span>
-            )}
-          </Link>
-
           {/* Auth: đã login → avatar + dropdown, chưa → login/register buttons */}
           {user ? (
-            <div className="relative">
+            <>
+              {/* Chuông thông báo — nguồn dữ liệu thật từ notification-service. */}
+              <NotificationBell />
+              <div className="relative">
               <button
                 onClick={() => setUserMenu((v) => !v)}
                 className="flex items-center gap-2 p-1 pr-2 rounded-lg hover:bg-bgsoft transition-colors"
                 aria-label="Tài khoản"
               >
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
+                <Avatar name={user.name} src={user.avatar} size={32} />
                 <span className="text-sm text-ink hidden lg:inline max-w-[120px] truncate">
                   {user.name}
                 </span>
@@ -271,7 +271,7 @@ export default function Header() {
                       </span>
                     </Link>
                     <Link
-                      to="/profile?tab=orders"
+                      to="/profile?tab=bookings"
                       onClick={() => setUserMenu(false)}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-ink hover:bg-bgsoft"
                     >
@@ -285,17 +285,15 @@ export default function Header() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                        <line x1="3" y1="6" x2="21" y2="6" />
-                        <path d="M16 10a4 4 0 0 1-8 0" />
+                        <rect x="3" y="4" width="18" height="18" rx="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
                       </svg>
-                      Đơn hàng của tôi
+                      Lịch hẹn của tôi
                     </Link>
                     <button
-                      onClick={() => {
-                        setUserMenu(false);
-                        navigate("/login");
-                      }}
+                      onClick={handleLogout}
                       className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
                       <IconClose size={14} />
@@ -304,18 +302,14 @@ export default function Header() {
                   </div>
                 </>
               )}
-            </div>
-          ) : (
-            <>
-              <Link to="/login">
-                <Button variant="ghost" size="sm">
-                  Đăng nhập
-                </Button>
-              </Link>
-              <Link to="/login?mode=register">
-                <Button size="sm">Đăng ký</Button>
-              </Link>
+              </div>
             </>
+          ) : (
+            <Link to="/login">
+              <Button variant="ghost" size="sm">
+                Đăng nhập
+              </Button>
+            </Link>
           )}
         </div>
 
@@ -326,11 +320,6 @@ export default function Header() {
           aria-label="Mở menu"
         >
           {open ? <IconClose /> : <IconMenu />}
-          {cartCount > 0 && (
-            <span className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center">
-              {cartCount > 99 ? "99+" : cartCount}
-            </span>
-          )}
         </button>
       </div>
 
@@ -338,11 +327,11 @@ export default function Header() {
       {open && (
         <div className="md:hidden border-t border-ink/8 bg-white">
           <div className="container-page py-3 flex flex-col gap-1">
-            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 mb-2">
-              <IconSearch size={18} className="text-ink-muted" />
-              <input
-                placeholder="Tìm garage, dịch vụ..."
-                className="flex-1 bg-transparent outline-none text-sm"
+            <div className="mb-2">
+              <SearchBox
+                className="w-full"
+                placeholder="Tìm dịch vụ sửa chữa..."
+                inputClassName="h-full"
               />
             </div>
             {navItems.map((it) => (
@@ -405,20 +394,6 @@ export default function Header() {
               ))}
             </div>
 
-            <Link
-              to="/cart"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink hover:bg-bgsoft"
-            >
-              <IconCart size={18} />
-              <span>Giỏ hàng</span>
-              {cartCount > 0 && (
-                <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-white text-[11px] font-bold flex items-center justify-center">
-                  {cartCount > 99 ? "99+" : cartCount}
-                </span>
-              )}
-            </Link>
-
             {/* Auth trong mobile menu */}
             {user ? (
               <>
@@ -427,38 +402,22 @@ export default function Header() {
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink hover:bg-bgsoft"
                 >
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    className="w-7 h-7 rounded-full object-cover"
-                  />
+                  <Avatar name={user.name} src={user.avatar} size={28} />
                   <span className="line-clamp-1">{user.name}</span>
                   <IconArrowRight size={14} className="ml-auto" />
                 </Link>
                 <button
-                  onClick={() => {
-                    setOpen(false);
-                    navigate("/login");
-                  }}
+                  onClick={handleLogout}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50"
                 >
                   Đăng xuất
                 </button>
               </>
             ) : (
-              <div className="flex gap-2 pt-2 border-t border-ink/8 mt-2">
-                <Link to="/login" className="flex-1" onClick={() => setOpen(false)}>
+              <div className="pt-2 border-t border-ink/8 mt-2">
+                <Link to="/login" onClick={() => setOpen(false)}>
                   <Button variant="outline" fullWidth size="sm">
                     Đăng nhập
-                  </Button>
-                </Link>
-                <Link
-                  to="/login?mode=register"
-                  className="flex-1"
-                  onClick={() => setOpen(false)}
-                >
-                  <Button fullWidth size="sm">
-                    Đăng ký
                   </Button>
                 </Link>
               </div>

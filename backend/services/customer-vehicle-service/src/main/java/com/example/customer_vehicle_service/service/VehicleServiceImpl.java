@@ -149,7 +149,8 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     public void deleteVehicle(UUID id) {
         // Dùng native query để bypass @SQLRestriction — idempotent nếu đã xoá trước đó.
-        Vehicle vehicle = vehicleRepository.findByIdRaw(id)
+        // `id.toString()` vì native query bind UUID thành binary 16 byte, không khớp cột varchar(36).
+        Vehicle vehicle = vehicleRepository.findByIdRaw(id.toString())
                 .orElseThrow(() -> new VehicleNotFoundException("Không tìm thấy xe với id: " + id));
 
         if (vehicle.getDeletedAt() != null) {

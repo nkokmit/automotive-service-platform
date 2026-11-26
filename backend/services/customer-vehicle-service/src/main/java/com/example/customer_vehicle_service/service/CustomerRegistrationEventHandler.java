@@ -17,7 +17,8 @@ public class CustomerRegistrationEventHandler {
 
     @Transactional
     public void handle(UserRegisteredEvent event) {
-        if (customerRepository.countByUserIdIncludingDeleted(event.userId()) > 0) {
+        // `toString()` vì native query bind UUID thành binary 16 byte, không khớp cột varchar(36).
+        if (customerRepository.countByUserIdIncludingDeleted(event.userId().toString()) > 0) {
             log.info("Bỏ qua UserRegistered event đã xử lý: userId={}", event.userId());
             return;
         }

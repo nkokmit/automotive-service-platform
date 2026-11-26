@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   IconSearch,
@@ -8,23 +9,19 @@ import {
   IconStar,
   IconCar,
   IconBolt,
-  IconShoppingBag,
   IconShield,
   IconCheck,
+  IconPhone,
+  IconClock,
 } from "../components/icons";
 import Button from "../components/Button";
 import Card from "../components/Card";
 import Badge from "../components/Badge";
-import {
-  popularServices,
-  cars,
-  parts,
-  articles,
-  services,
-} from "../data/mock";
+import { useCatalog } from "../data/catalog";
+import { GARAGE } from "../config/garage";
 
-const formatVND = (n: number) =>
-  new Intl.NumberFormat("vi-VN").format(n) + "đ";
+/** Số dịch vụ tối đa hiển thị ở trang chủ. */
+const HOME_SERVICE_LIMIT = 8;
 
 const compactVND = (n: number) => {
   // 489.000.000 -> "489tr", 1.450.000 -> "1,4tr"
@@ -34,19 +31,38 @@ const compactVND = (n: number) => {
 };
 
 export default function Home() {
-  // Top 4 dịch vụ nổi bật (theo bookingsCount)
-  const featuredServices = [...services]
-    .filter((s) => s.isFeatured)
-    .sort((a, b) => b.bookingsCount - a.bookingsCount)
-    .slice(0, 4);
+  const { services } = useCatalog();
 
-  // Top 4 xe nổi bật
-  const featuredCars = cars.filter((c) => c.isFeatured).slice(0, 4);
+  /** Danh mục dịch vụ đang chọn — "Tất cả" hoặc tên nhóm. */
+  const [activeCategory, setActiveCategory] = useState("Tất cả");
 
-  // Top 8 phụ kiện bán chạy
-  const topParts = parts
-    .filter((p) => p.isBestSeller || p.isFeatured)
-    .slice(0, 8);
+  // Chip danh mục dịch vụ — suy ra từ catalog đang hiển thị (API thật hoặc mẫu).
+  const categoryChips = useMemo(() => {
+    const names = Array.from(new Set(services.map((s) => s.category))).filter(
+      Boolean,
+    );
+    // Luôn có "Tất cả" ở đầu để người dùng bỏ lọc nhanh.
+    return [
+      { name: "Tất cả", count: services.length },
+      ...names.slice(0, 8).map((name) => ({
+        name,
+        count: services.filter((s) => s.category === name).length,
+      })),
+    ];
+  }, [services]);
+
+  // Dịch vụ hiển thị: lọc theo danh mục đang chọn.
+  const visibleServices = useMemo(() => {
+    const filtered =
+      activeCategory === "Tất cả"
+        ? services
+        : services.filter((s) => s.category === activeCategory);
+
+    // Backend chưa có cột `is_featured` / `bookings_count` (xem entity
+    // `Service.java`) nên không có tiêu chí "nổi bật" thật để sắp xếp.
+    // Giữ thứ tự backend trả về (mới nhất trước) thay vì bịa tiêu chí.
+    return filtered.slice(0, HOME_SERVICE_LIMIT);
+  }, [services, activeCategory]);
 
   return (
     <>
@@ -55,34 +71,35 @@ export default function Home() {
         <div className="container-page py-12 md:py-20 grid lg:grid-cols-2 gap-10 items-center">
           <div>
             <Badge tone="primary" className="mb-4">
-              <IconSparkles size={14} /> Nền tảng chăm sóc xe toàn diện
+              <IconSparkles size={14} /> {GARAGE.tagline}
             </Badge>
             <h1 className="text-3xl md:text-5xl font-bold leading-tight text-ink">
-              Mua bán xe, phụ kiện &amp;
+              {GARAGE.name}
               <br />
-              <span className="text-primary">đặt lịch sửa chữa dễ dàng</span>
+              <span className="text-primary">
+                Bảo dưỡng — Sửa chữa — Chẩn đoán AI
+              </span>
             </h1>
             <p className="mt-4 text-ink-light text-base md:text-lg max-w-lg">
-              Hệ sinh thái ô tô: tìm xe phù hợp, mua phụ kiện chính hãng,
-              đặt lịch dịch vụ tại garage uy tín — tất cả ở một nơi, có AI
-              hỗ trợ 24/7.
+              Xưởng sửa chữa ô tô chuyên nghiệp tại {GARAGE.city}. Đặt lịch
+              trực tuyến, phân tích hư hỏng bằng AI, tư vấn kỹ thuật 24/7 — tất
+              cả tại một nơi.
             </p>
 
-            {/* Quick search bar — bám sát use-case 4.4 */}
+            {/* Quick search bar */}
             <div className="mt-8 bg-white p-2 rounded-2xl shadow-card flex flex-col sm:flex-row gap-2">
               <div className="flex items-center gap-2 flex-1 px-3">
                 <IconSearch size={18} className="text-ink-muted" />
                 <input
-                  placeholder="Tìm xe, phụ kiện, dịch vụ..."
+                  placeholder="Tìm dịch vụ sửa chữa..."
                   className="flex-1 outline-none text-sm bg-transparent"
                 />
               </div>
               <div className="flex items-center gap-2 px-3 sm:border-l border-ink/10">
                 <IconMapPin size={18} className="text-ink-muted" />
-                <input
-                  placeholder="TP.HCM"
-                  className="flex-1 outline-none text-sm bg-transparent sm:w-28"
-                />
+                <span className="text-sm text-ink-muted sm:w-40 truncate">
+                  {GARAGE.district}, {GARAGE.city}
+                </span>
               </div>
               <Link to="/services" className="sm:self-stretch">
                 <Button size="md">
@@ -95,10 +112,9 @@ export default function Home() {
             {/* Quick category chips */}
             <div className="mt-5 flex flex-wrap items-center gap-2">
               {[
-                { label: "Mua xe", to: "/cars" },
-                { label: "Phụ kiện", to: "/parts" },
                 { label: "Đặt lịch sửa chữa", to: "/services" },
-                { label: "Tin tức ô tô", to: "/news" },
+                { label: "Phân tích hư hỏng AI", to: "/ai/damage" },
+                { label: "Trợ lý AI", to: "/ai/assistant" },
               ].map((c) => (
                 <Link
                   key={c.to}
@@ -132,145 +148,94 @@ export default function Home() {
           <div className="relative hidden lg:block">
             <div className="aspect-[5/4] rounded-3xl bg-primary overflow-hidden shadow-cardHover">
               <img
-                src="https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=1200&q=70"
-                alt="Ô tô"
+                src={GARAGE.image}
+                alt={GARAGE.name}
                 className="w-full h-full object-cover opacity-90"
               />
             </div>
-            {/* Floating cards — gắn với 3 nghiệp vụ chính (mua xe / phụ kiện / dịch vụ) */}
+            {/* Floating cards */}
             <div className="absolute -bottom-6 -left-6 bg-white rounded-2xl shadow-cardHover p-4 flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
-                <IconCar size={22} className="text-ink" />
+                <IconWrench size={22} className="text-ink" />
               </div>
               <div>
-                <div className="text-sm font-semibold">200+ xe</div>
-                <div className="text-xs text-ink-muted">Đang bán</div>
+                <div className="text-sm font-semibold">
+                  {GARAGE.technicians} kỹ thuật viên
+                </div>
+                <div className="text-xs text-ink-muted">{GARAGE.bays} bãi sửa</div>
               </div>
             </div>
             <div className="absolute -top-4 -right-4 bg-white rounded-2xl shadow-cardHover p-4 flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-                <IconWrench size={22} className="text-white" />
+                <IconStar size={22} className="text-white" />
               </div>
               <div>
-                <div className="text-sm font-semibold">500+ garage</div>
-                <div className="text-xs text-ink-muted">Liên kết toàn quốc</div>
+                <div className="text-sm font-semibold">
+                  {GARAGE.rating} / 5 đánh giá
+                </div>
+                <div className="text-xs text-ink-muted">
+                  {GARAGE.reviewsCount} lượt
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ============== DỊCH VỤ PHỔ BIẾN (category chips) ============== */}
-      <section className="container-page py-12 md:py-16">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold">
-              Dịch vụ phổ biến
-            </h2>
-            <p className="text-ink-light mt-1">
-              Khám phá nhanh các dịch vụ cần thiết
-            </p>
-          </div>
-          <Link
-            to="/services"
-            className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-          >
-            Xem tất cả <IconArrowRight size={14} />
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          {popularServices.map((s) => (
-            <Link
-              to={`/services?category=${encodeURIComponent(s.name)}`}
-              key={s.id}
-              className="group bg-white border border-ink/8 rounded-2xl p-4 text-center hover:bg-bgsoft transition-colors"
+      {/* ============== THÔNG TIN XƯỞNG ============== */}
+      <section className="container-page py-8 md:py-10">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {
+              icon: <IconMapPin size={20} className="text-primary" />,
+              title: GARAGE.address,
+              desc: `${GARAGE.district}, ${GARAGE.city}`,
+            },
+            {
+              icon: <IconClock size={20} className="text-primary" />,
+              title: GARAGE.workingHours,
+              desc: "Làm việc cả thứ 7 & Chủ nhật",
+            },
+            {
+              icon: <IconPhone size={20} className="text-primary" />,
+              title: GARAGE.hotline,
+              desc: GARAGE.phone,
+            },
+            {
+              icon: <IconShield size={20} className="text-primary" />,
+              title: "Bảo hành rõ ràng",
+              desc: "Linh kiện chính hãng, bảo hành dịch vụ 12 tháng",
+            },
+          ].map((b) => (
+            <div
+              key={b.title}
+              className="bg-white border border-ink/8 rounded-2xl p-5 flex items-start gap-3"
             >
-              <div className="text-3xl mb-2">{s.icon}</div>
-              <div className="text-xs sm:text-sm font-medium">{s.name}</div>
-            </Link>
+              <div className="w-10 h-10 rounded-xl bg-bgsoft flex items-center justify-center shrink-0">
+                {b.icon}
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-semibold mb-0.5 text-sm">{b.title}</h3>
+                <p className="text-xs text-ink-muted">{b.desc}</p>
+              </div>
+            </div>
           ))}
         </div>
       </section>
 
-      {/* ============== XE NỔI BẬT (thay cho "Garage nổi bật") ============== */}
-      <section className="container-page py-8 md:py-12">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <Badge tone="accent" className="mb-2">
-              <IconCar size={14} /> Mua bán xe
-            </Badge>
-            <h2 className="text-2xl md:text-3xl font-bold">Xe nổi bật</h2>
-            <p className="text-ink-light mt-1">
-              Xe đã qua sử dụng chất lượng, giá tốt từ salon &amp; cá nhân
-            </p>
-          </div>
-          <Link
-            to="/cars"
-            className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-          >
-            Xem tất cả <IconArrowRight size={14} />
-          </Link>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {featuredCars.map((car) => (
-            <Link to="/cars" key={car.id} className="group">
-              <Card>
-                <div className="aspect-[4/3] overflow-hidden rounded-t-2xl bg-bgsoft relative">
-                  <img
-                    src={car.image}
-                    alt={car.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {car.isNew && (
-                    <Badge tone="accent" className="absolute top-3 left-3">
-                      Mới
-                    </Badge>
-                  )}
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center gap-1.5 text-xs text-ink-muted mb-1">
-                    <IconMapPin size={14} /> {car.city} · {car.year} ·{" "}
-                    {car.odoKm.toLocaleString("vi-VN")} km
-                  </div>
-                  <h3 className="font-semibold leading-tight mb-2 line-clamp-2">
-                    {car.title}
-                  </h3>
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <div className="text-primary font-bold text-lg">
-                        {compactVND(car.priceVND)}
-                      </div>
-                      <div className="text-xs text-ink-muted">
-                        {car.seller.name}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-ink-muted">
-                      <IconStar size={14} className="text-accent-hover" />
-                      <span className="font-medium text-ink">
-                        {car.rating}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ============== DỊCH VỤ GARA NỔI BẬT ============== */}
-      <section className="container-page py-8 md:py-12">
+      {/* ============ DỊCH VỤ PHỔ BIẾN + DANH MỤC (gộp 1 section) ============ */}
+      <section className="container-page py-12 md:py-16">
         <div className="flex items-end justify-between mb-6">
           <div>
             <Badge tone="primary" className="mb-2">
               <IconWrench size={14} /> Đặt lịch sửa chữa
             </Badge>
             <h2 className="text-2xl md:text-3xl font-bold">
-              Dịch vụ gara nổi bật
+              Dịch vụ phổ biến
             </h2>
             <p className="text-ink-light mt-1">
-              Đặt lịch nhanh với garage uy tín — có xác nhận trong vài phút
+              Khám phá nhanh các dịch vụ cần thiết tại {GARAGE.name} — đặt lịch
+              trực tuyến, xác nhận trong 30 phút
             </p>
           </div>
           <Link
@@ -281,130 +246,111 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {featuredServices.map((s) => (
-            <Link to={`/services/${s.slug}`} key={s.id} className="group">
-              <Card>
-                <div className="aspect-[4/3] overflow-hidden rounded-t-2xl bg-bgsoft">
-                  <img
-                    src={s.image}
-                    alt={s.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <div className="p-4">
-                  <Badge tone="default" className="mb-2">
-                    {s.category}
-                  </Badge>
-                  <h3 className="font-semibold leading-tight mb-1 line-clamp-2">
-                    {s.name}
-                  </h3>
-                  <div className="text-xs text-ink-muted mb-2">
-                    {s.provider.name} · {s.provider.city}
-                  </div>
-                  <div className="flex items-end justify-between">
-                    <div className="text-primary font-bold text-sm">
-                      {compactVND(s.priceFrom)}
-                    </div>
-                    <div className="flex items-center gap-1 text-xs">
-                      <IconStar
-                        size={14}
-                        className="text-accent-hover"
-                      />
-                      <span className="font-medium">{s.rating}</span>
-                      <span className="text-ink-muted">
-                        ({s.bookingsCount})
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ============== PHỤ KIỆN NỔI BẬT ============== */}
-      <section className="bg-bgsoft/40">
-        <div className="container-page py-12 md:py-16">
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              <Badge tone="primary" className="mb-2">
-                <IconShoppingBag size={14} /> Phụ kiện &amp; phụ tùng
-              </Badge>
-              <h2 className="text-2xl md:text-3xl font-bold">
-                Phụ kiện bán chạy
-              </h2>
-              <p className="text-ink-light mt-1">
-                Chính hãng · Giao nhanh toàn quốc · Đổi trả 14 ngày
-              </p>
-            </div>
-            <Link
-              to="/parts"
-              className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-            >
-              Xem tất cả <IconArrowRight size={14} />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {topParts.map((p) => {
-              const discount = p.originalPriceVND
-                ? Math.round(
-                    ((p.originalPriceVND - p.priceVND) / p.originalPriceVND) *
-                      100,
-                  )
-                : 0;
+        {/* Chip danh mục — dòng trên, cuộn ngang khi nhiều danh mục.
+            Không dùng icon emoji: nhóm dịch vụ đến từ DB (admin tự tạo nên
+            không có icon), icon cứng sẽ lệch với dữ liệu thật. */}
+        <div className="-mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-none">
+            {categoryChips.map((s) => {
+              const isActive = activeCategory === s.name;
               return (
-                <Link to={`/parts/${p.slug}`} key={p.id} className="group">
-                  <Card>
-                    <div className="aspect-square overflow-hidden rounded-t-2xl bg-white relative">
-                      <img
-                        src={p.image}
-                        alt={p.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      {discount > 0 && (
-                        <Badge
-                          tone="accent"
-                          className="absolute top-2 left-2"
-                        >
-                          -{discount}%
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <div className="text-[11px] uppercase tracking-wide text-ink-muted mb-1">
-                        {p.brand} · {p.category}
-                      </div>
-                      <h3 className="text-sm font-medium leading-snug mb-2 line-clamp-2">
-                        {p.name}
-                      </h3>
-                      <div className="flex items-end justify-between">
-                        <div>
-                          <div className="text-primary font-bold text-sm">
-                            {compactVND(p.priceVND)}
-                          </div>
-                          {p.originalPriceVND && (
-                            <div className="text-xs text-ink-muted line-through">
-                              {compactVND(p.originalPriceVND)}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-ink-muted">
-                          <IconStar
-                            size={12}
-                            className="text-accent-hover"
-                          />
-                          <span>{p.rating}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
+                <button
+                  key={s.name}
+                  onClick={() => setActiveCategory(s.name)}
+                  aria-pressed={isActive}
+                  className={[
+                    "group shrink-0 snap-start w-[104px] sm:w-auto bg-white border rounded-2xl px-4 py-3 text-center transition-colors",
+                    isActive
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                      : "border-ink/8 hover:bg-bgsoft",
+                  ].join(" ")}
+                >
+                  <div
+                    className={[
+                      "text-xs sm:text-sm font-medium leading-tight line-clamp-2",
+                      isActive ? "text-primary" : "",
+                    ].join(" ")}
+                  >
+                    {s.name}
+                  </div>
+                  <div className="text-[11px] text-ink-muted mt-0.5">
+                    {s.count} dịch vụ
+                  </div>
+                </button>
               );
             })}
           </div>
+        </div>
+
+        {/* Danh sách dịch vụ theo danh mục đang chọn */}
+        {visibleServices.length === 0 ? (
+          <Card>
+            <div className="p-10 text-center text-ink-muted">
+              <IconWrench size={40} className="mx-auto mb-3 text-ink-muted" />
+              <p className="font-medium">Chưa có dịch vụ phù hợp</p>
+              <p className="text-sm mt-1">
+                Xem tất cả dịch vụ của {GARAGE.name} để đặt lịch.
+              </p>
+              <Link to="/services" className="inline-block mt-4">
+                <Button size="sm">Xem tất cả dịch vụ</Button>
+              </Link>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {visibleServices.map((s) => (
+              <Link to={`/services/${s.slug}`} key={s.id} className="group">
+                <Card>
+                  <div className="aspect-[4/3] overflow-hidden rounded-t-2xl bg-bgsoft">
+                    <img
+                      src={s.image}
+                      alt={s.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <Badge tone="default" className="mb-2">
+                      {s.category}
+                    </Badge>
+                    <h3 className="font-semibold leading-tight mb-1 line-clamp-2">
+                      {s.name}
+                    </h3>
+                    <div className="text-xs text-ink-muted mb-2">
+                      {GARAGE.name} · ~{s.durationMin} phút
+                    </div>
+                    <div className="flex items-end justify-between">
+                      <div className="text-primary font-bold text-sm">
+                        {compactVND(s.priceFrom)}
+                      </div>
+                      {s.rating > 0 && (
+                        <div className="flex items-center gap-1 text-xs">
+                          <IconStar
+                            size={14}
+                            className="text-accent-hover"
+                          />
+                          <span className="font-medium">{s.rating}</span>
+                          {s.bookingsCount > 0 && (
+                            <span className="text-ink-muted">
+                              ({s.bookingsCount})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Nút "Xem tất cả" cho mobile — trên desktop đã có ở góc trên */}
+        <div className="mt-6 sm:hidden">
+          <Link to="/services">
+            <Button variant="outline" fullWidth>
+              Xem tất cả dịch vụ <IconArrowRight size={14} />
+            </Button>
+          </Link>
         </div>
       </section>
 
@@ -440,7 +386,7 @@ export default function Home() {
               </div>
               <p className="text-white/85 text-sm leading-relaxed">
                 Upload ảnh xe, AI tự động phát hiện vết trầy xước, móp, vỡ...
-                và gợi ý chi phí sửa chữa + garage phù hợp.
+                và gợi ý chi phí sửa chữa tại {GARAGE.name}.
               </p>
               <div className="mt-5 inline-flex items-center gap-1 text-sm font-medium">
                 Thử ngay <IconArrowRight size={16} />
@@ -464,7 +410,7 @@ export default function Home() {
                 <h3 className="text-xl font-bold">Trợ lý AI</h3>
               </div>
               <p className="text-ink-light text-sm leading-relaxed">
-                Hỏi đáp về bảo dưỡng, sửa chữa, phụ tùng... Bằng ngôn ngữ
+                Hỏi đáp về bảo dưỡng, sửa chữa, linh kiện... Bằng ngôn ngữ
                 tự nhiên, có trích dẫn nguồn từ bài viết chuyên môn.
               </p>
               <div className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-primary">
@@ -476,66 +422,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ============== TIN TỨC ============== */}
-      <section className="container-page py-8 md:py-12">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold">Bài viết mới</h2>
-            <p className="text-ink-light mt-1">
-              Kiến thức hữu ích cho chủ xe
-            </p>
-          </div>
-          <Link
-            to="/news"
-            className="text-sm text-primary font-medium hover:underline hidden sm:inline-flex items-center gap-1"
-          >
-            Xem tất cả <IconArrowRight size={14} />
-          </Link>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {articles.slice(0, 3).map((a) => (
-            <Link to={`/news/${a.slug}`} key={a.id} className="group">
-              <Card>
-                <div className="aspect-[16/10] overflow-hidden rounded-t-2xl bg-bgsoft">
-                  <img
-                    src={a.image}
-                    alt={a.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <div className="p-5">
-                  <Badge tone="primary" className="mb-2">
-                    {a.category}
-                  </Badge>
-                  <h3 className="font-semibold leading-tight mb-2 group-hover:text-primary transition-colors">
-                    {a.title}
-                  </h3>
-                  <p className="text-sm text-ink-light line-clamp-2">
-                    {a.excerpt}
-                  </p>
-                  <div className="mt-3 text-xs text-ink-muted">
-                    {a.publishedAt} · {a.readMinutes} phút đọc
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </section>
-
       {/* ============== VALUE PROP / TRUST ============== */}
       <section className="container-page py-8 md:py-12">
         <div className="grid sm:grid-cols-3 gap-4">
           {[
             {
               icon: <IconShield size={22} className="text-primary" />,
-              title: "Garage & sản phẩm xác minh",
-              desc: "Mọi garage đối tác và sản phẩm đều qua kiểm duyệt.",
+              title: "Phụ tùng chính hãng",
+              desc: "Mọi linh kiện dùng cho sửa chữa đều là chính hãng, có bảo hành từ nhà sản xuất.",
             },
             {
               icon: <IconCheck size={22} className="text-primary" />,
               title: "Bảo hành rõ ràng",
-              desc: "Bảo hành dịch vụ đến 12 tháng, phụ kiện chính hãng.",
+              desc: "Bảo hành dịch vụ đến 12 tháng, cam kết minh bạch từng dòng báo giá.",
             },
             {
               icon: <IconBolt size={22} className="text-primary" />,
@@ -562,17 +461,19 @@ export default function Home() {
         <div className="bg-bgsoft rounded-3xl p-8 md:p-12 text-center">
           <IconCar size={36} className="text-primary mx-auto mb-4" />
           <h2 className="text-2xl md:text-3xl font-bold mb-3">
-            Bạn là chủ xe hoặc garage?
+            Sẵn sàng chăm sóc xe của bạn?
           </h2>
           <p className="text-ink-light max-w-xl mx-auto mb-6">
-            Đăng ký để đăng bán xe, bán phụ kiện, hoặc tiếp cận hàng nghìn
-            khách hàng đang tìm kiếm dịch vụ.
+            Đặt lịch sửa chữa tại {GARAGE.name}, hoặc chụp ảnh xe để AI đánh
+            giá hư hỏng và gợi ý phương án — tất cả chỉ vài thao tác.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button size="lg">Đăng ký miễn phí</Button>
             <Link to="/services">
+              <Button size="lg">Đặt lịch ngay</Button>
+            </Link>
+            <Link to="/ai/damage">
               <Button size="lg" variant="outline">
-                Khám phá dịch vụ
+                Phân tích hư hỏng
               </Button>
             </Link>
           </div>

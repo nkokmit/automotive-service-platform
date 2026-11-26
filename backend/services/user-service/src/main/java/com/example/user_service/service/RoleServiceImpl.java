@@ -94,7 +94,8 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public void deleteRole(UUID id) {
         // Native query để bypass @SQLRestriction — idempotent nếu role đã bị xoá trước đó.
-        Role role = roleRepository.findByIdRaw(id)
+        // `id.toString()` vì native query bind UUID thành binary 16 byte, không khớp cột varchar(36).
+        Role role = roleRepository.findByIdRaw(id.toString())
                 .orElseThrow(() -> new RoleNotFoundException("Không tìm thấy role với id: " + id));
 
         if (role.getDeletedAt() != null) {

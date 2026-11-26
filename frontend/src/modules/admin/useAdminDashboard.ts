@@ -1,0 +1,352 @@
+/**
+ * Dữ liệu dashboard cho admin — gom từ nhiều service thật.
+ *
+ * Backend KHÔNG có endpoint "dashboard" nên ta tổng hợp từ các API có sẵn:
+ *  - GET /api/invoices       (billing-service)      → doanh thu, đơn gần đây
+ *  - GET /api/work-orders    (work-order-service)   → số phiếu sửa chữa
+ *  - GET /api/staff/bookings (booking-service)      → lịch hẹn sắp tới
+ *  - GET /api/users          (user-service)         → tổng tài khoản
+ *
+ * Mỗi nguồn được bọc try/catch riêng: một service lỗi không được làm hỏng
+ * cả trang — phần đó sẽ hiển thị 0 và ghi nhận vào `errors`.
+ */
+import { useCallback, useEffect, useState } from "react";
+import { billingApi } from "../../api/endpoints/billing";
+import { workOrderApi } from "../../api/endpoints/workOrder";
+import { staffBookingApi } from "../../api/endpoints/booking";
+import { adminUserApi } from "../../api/endpoints/user";
+import type {
+  InvoiceSummaryResponse,
+  WorkOrderListItemResponse,
+} from "../../api/types";
+
+export interface DashboardKpi {
+  id: "revenue" | "orders" | "users" | "conversion";
+  label: string;
+  value: string;
+  delta: number;
+  /** Icon key để UI chọn icon phù hợp. */
+  icon: "revenue" | "orders" | "users" | "conversion";
+  tone: "primary" | "accent" | "success" | "warning";
+}
+
+export interface DashboardOrderRow {
+  id: string;
+  date: string;
+  customer: string;
+  customerEmail: string;
+  totalVND: number;
+  status: string;
+}
+
+export interface DashboardActivity {
+  id: string;
+  kind: "invoice" | "work_order" | "booking";
+  title: string;
+  description: string;
+  actor: string;
+  timestamp: string;
+}
+
+export interface DashboardState {
+  kpis: DashboardKpi[];
+  revenueByMonth: { month: string; revenue: number; orders: number }[];
+  recentOrders: DashboardOrderRow[];
+  activities: DashboardActivity[];
+  totals: {
+    invoices: number;
+    workOrders: number;
+    bookings: number;
+    users: number;
+    revenueThisMonth: number;
+  };
+  loading: boolean;
+  errors: string[];
+  reload: () => void;
+}
+
+const MONTH_LABEL = [
+  "T1",
+  "T2",
+  "T3",
+  "T4",
+  "T5",
+  "T6",
+  "T7",
+  "T8",
+  "T9",
+  "T10",
+  "T11",
+  "T12",
+];
+
+function fmtVND(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + " tỷ";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "tr";
+  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
+}
+
+function fmtDate(iso?: string | null): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+/** Phần trăm tăng/giảm so với kỳ trước. */
+function delta(current: number, previous: number): number {
+  if (previous <= 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
+/** Chuẩn hoá timestamp ISO cho JS Date. */
+function toDate(iso?: string | null): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function useAdminDashboard(): DashboardState {
+  const [kpis, setKpis] = useState<DashboardKpi[]>([]);
+  const [revenueByMonth, setRevenueByMonth] = useState<
+    { month: string; revenue: number; orders: number }[]
+  >([]);
+  const [recentOrders, setRecentOrders] = useState<DashboardOrderRow[]>([]);
+  const [activities, setActivities] = useState<DashboardActivity[]>([]);
+  const [totals, setTotals] = useState({
+    invoices: 0,
+    workOrders: 0,
+    bookings: 0,
+    users: 0,
+    revenueThisMonth: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [nonce, setNonce] = useState(0);
+
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErrors([]);
+
+    (async () => {
+      const errs: string[] = [];
+
+      // ── Hóa đơn (doanh thu + đơn gần đây) ────────────────────────────────
+      let invoices: InvoiceSummaryResponse[] = [];
+      try {
+        const page = await billingApi.listInvoices({ size: 100 });
+        invoices = page.items ?? [];
+      } catch (err) {
+        errs.push(
+          err instanceof Error
+            ? `Hóa đơn: ${err.message}`
+            : "Không tải được danh sách hóa đơn",
+        );
+      }
+
+      // ── Work Order ───────────────────────────────────────────────────────
+      let workOrders: WorkOrderListItemResponse[] = [];
+      let workOrderTotal = 0;
+      try {
+        const page = await workOrderApi.listWorkOrders({ size: 100 });
+        workOrders = page.items ?? [];
+        workOrderTotal = page.totalElements ?? workOrders.length;
+      } catch (err) {
+        errs.push(
+          err instanceof Error
+            ? `Phiếu sửa chữa: ${err.message}`
+            : "Không tải được danh sách phiếu sửa chữa",
+        );
+      }
+
+      // ── Lịch hẹn ─────────────────────────────────────────────────────────
+      let bookingTotal = 0;
+      try {
+        const page = await staffBookingApi.listBookings({ size: 1 });
+        bookingTotal = page.totalElements ?? 0;
+      } catch (err) {
+        errs.push(
+          err instanceof Error
+            ? `Lịch hẹn: ${err.message}`
+            : "Không tải được danh sách lịch hẹn",
+        );
+      }
+
+      // ── Người dùng ───────────────────────────────────────────────────────
+      let userTotal = 0;
+      try {
+        const page = await adminUserApi.listUsers({ size: 1 });
+        userTotal = page.totalElements ?? 0;
+      } catch (err) {
+        errs.push(
+          err instanceof Error
+            ? `Người dùng: ${err.message}`
+            : "Không tải được danh sách người dùng",
+        );
+      }
+
+      if (cancelled) return;
+
+      // ── Tính doanh thu theo tháng (12 tháng gần nhất) ────────────────────
+      const now = new Date();
+      const buckets = new Map<string, { revenue: number; orders: number }>();
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        buckets.set(`${d.getFullYear()}-${d.getMonth()}`, {
+          revenue: 0,
+          orders: 0,
+        });
+      }
+      let revenueThisMonth = 0;
+      let revenuePrevMonth = 0;
+      const prevKey = `${now.getFullYear()}-${now.getMonth() - 1}`;
+      const thisKey = `${now.getFullYear()}-${now.getMonth()}`;
+
+      for (const inv of invoices) {
+        const d = toDate(inv.issuedAt);
+        if (!d) continue;
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        const bucket = buckets.get(key);
+        // Hóa đơn VOID không tính doanh thu.
+        if (inv.status !== "VOID") {
+          if (bucket) {
+            bucket.revenue += Number(inv.grandTotal ?? 0);
+            bucket.orders += 1;
+          }
+          if (key === thisKey) revenueThisMonth += Number(inv.grandTotal ?? 0);
+          if (key === prevKey) revenuePrevMonth += Number(inv.grandTotal ?? 0);
+        }
+      }
+
+      const revenueChart = Array.from(buckets.entries()).map(([key, v]) => {
+        const [y, m] = key.split("-").map(Number);
+        return {
+          month: `${MONTH_LABEL[m]}/${String(y).slice(2)}`,
+          revenue: Math.round(v.revenue / 1_000_000),
+          orders: v.orders,
+        };
+      });
+
+      // ── Đơn gần đây (từ hóa đơn mới nhất) ───────────────────────────────
+      const sortedInvoices = [...invoices].sort((a, b) =>
+        (toDate(b.issuedAt)?.getTime() ?? 0) - (toDate(a.issuedAt)?.getTime() ?? 0),
+      );
+      const orders: DashboardOrderRow[] = sortedInvoices.slice(0, 6).map((inv) => ({
+        id: inv.code,
+        date: fmtDate(inv.issuedAt),
+        customer: "Khách hàng",
+        customerEmail: "",
+        totalVND: Number(inv.grandTotal ?? 0),
+        status: inv.status,
+      }));
+
+      // ── Hoạt động gần đây ────────────────────────────────────────────────
+      const acts: DashboardActivity[] = [];
+      for (const inv of sortedInvoices.slice(0, 4)) {
+        acts.push({
+          id: `inv-${inv.id}`,
+          kind: "invoice",
+          title: `Hóa đơn ${inv.code}`,
+          description: `${fmtVND(Number(inv.grandTotal ?? 0))} · ${inv.status}`,
+          actor: "Hệ thống",
+          timestamp: inv.issuedAt,
+        });
+      }
+      for (const wo of workOrders.slice(0, 3)) {
+        acts.push({
+          id: `wo-${wo.id}`,
+          kind: "work_order",
+          title: `Phiếu sửa chữa ${wo.code}`,
+          description: `Trạng thái: ${wo.status}`,
+          actor: "Xưởng",
+          timestamp: wo.createdAt,
+        });
+      }
+      acts.sort(
+        (a, b) =>
+          (toDate(b.timestamp)?.getTime() ?? 0) - (toDate(a.timestamp)?.getTime() ?? 0),
+      );
+
+      // ── KPI ──────────────────────────────────────────────────────────────
+      const completedOrders = workOrders.filter(
+        (w) => w.status === "COMPLETED" || w.status === "CLOSED",
+      );
+      const conversion =
+        workOrders.length > 0
+          ? (completedOrders.length / workOrders.length) * 100
+          : 0;
+
+      setKpis([
+        {
+          id: "revenue",
+          label: "Doanh thu tháng này",
+          value: fmtVND(revenueThisMonth),
+          delta: delta(revenueThisMonth, revenuePrevMonth),
+          icon: "revenue",
+          tone: "primary",
+        },
+        {
+          id: "orders",
+          label: "Phiếu sửa chữa",
+          value: new Intl.NumberFormat("vi-VN").format(workOrderTotal),
+          delta: 0,
+          icon: "orders",
+          tone: "success",
+        },
+        {
+          id: "users",
+          label: "Tài khoản",
+          value: new Intl.NumberFormat("vi-VN").format(userTotal),
+          delta: 0,
+          icon: "users",
+          tone: "accent",
+        },
+        {
+          id: "conversion",
+          label: "Tỉ lệ hoàn thành",
+          value: conversion.toFixed(2) + "%",
+          delta: 0,
+          icon: "conversion",
+          tone: "warning",
+        },
+      ]);
+
+      setRevenueByMonth(revenueChart);
+      setRecentOrders(orders);
+      setActivities(acts.slice(0, 7));
+      setTotals({
+        invoices: invoices.length,
+        workOrders: workOrderTotal,
+        bookings: bookingTotal,
+        users: userTotal,
+        revenueThisMonth,
+      });
+      setErrors(errs);
+      if (!cancelled) setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nonce]);
+
+  return {
+    kpis,
+    revenueByMonth,
+    recentOrders,
+    activities,
+    totals,
+    loading,
+    errors,
+    reload,
+  };
+}

@@ -9,13 +9,7 @@ import { hydrateUser } from "./data/authStore";
 import Login from "./modules/auth/Login";
 import Profile from "./modules/auth/Profile";
 
-// Commerce module (cars / parts / cart / services)
-import CarsList from "./modules/commerce/CarsList";
-import CarDetail from "./modules/commerce/CarDetail";
-import PartsList from "./modules/commerce/PartsList";
-import PartDetail from "./modules/commerce/PartDetail";
-import Cart from "./modules/commerce/Cart";
-import Checkout from "./modules/commerce/Checkout";
+// Commerce module (services)
 import ServicesList from "./modules/commerce/ServicesList";
 import ServiceDetail from "./modules/commerce/ServiceDetail";
 
@@ -23,13 +17,15 @@ import ServiceDetail from "./modules/commerce/ServiceDetail";
 import DamageUpload from "./modules/ai/DamageUpload";
 import ChatAssistant from "./modules/ai/ChatAssistant";
 
-// Content module (news/articles)
-import NewsList from "./modules/content/NewsList";
-import ArticleDetail from "./modules/content/ArticleDetail";
+// Content module (static pages)
+import {
+  HelpPage,
+  TermsPage,
+  PrivacyPage,
+} from "./modules/content/StaticPages";
 
-// Demo pages (sẽ xoá khi lên production)
-import FoundationDemo from "./pages/FoundationDemo";
-import BoomDemo from "./pages/BoomDemo";
+// Search module
+import SearchPage from "./modules/search/SearchPage";
 
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
 import RequireAuth from "./components/RequireAuth";
@@ -42,12 +38,27 @@ import { IconArrowLeft, IconSparkles, IconSettings } from "./components/icons";
 import "./styles/globals.css";
 
 import AdminDashboard from "./modules/admin/AdminDashboard";
-import AdminGarages from "./modules/admin/AdminGarages";
+import AdminGarageProfile from "./modules/admin/AdminGarageProfile";
 import AdminServices from "./modules/admin/AdminServices";
 import AdminParts from "./modules/admin/AdminParts";
-import AdminOrders from "./modules/admin/AdminOrders";
+import AdminSuppliers from "./modules/admin/AdminSuppliers";
+import AdminPurchaseOrders from "./modules/admin/AdminPurchaseOrders";
+import AdminInventoryTransactions from "./modules/admin/AdminInventoryTransactions";
+import AdminCategories from "./modules/admin/AdminCategories";
+import AdminServiceBom from "./modules/admin/AdminServiceBom";
 import AdminUsers from "./modules/admin/AdminUsers";
 import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
+import AdminBookings from "./modules/admin/AdminBookings";
+import AdminBilling from "./modules/admin/AdminBilling";
+import AdminStaff from "./modules/admin/AdminStaff";
+import AdminStaffSchedule from "./modules/admin/AdminStaffSchedule";
+import AdminWorkShifts from "./modules/admin/AdminWorkShifts";
+import AdminScheduleBoard from "./modules/admin/AdminScheduleBoard";
+import AdminWorkOrders from "./modules/admin/AdminWorkOrders";
+import TechnicianWorkOrders from "./modules/admin/TechnicianWorkOrders";
+import AdminPermissions from "./modules/admin/AdminPermissions";
+import AdminRoles from "./modules/admin/AdminRoles";
+import AdminNotificationTemplates from "./modules/admin/AdminNotificationTemplates";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
@@ -55,13 +66,15 @@ import AdminCustomerVehicles from "./modules/admin/AdminCustomerVehicles";
 hydrateUser().finally(() => {
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
-      <ErrorBoundary
-        onError={(error, info) => {
-          // eslint-disable-next-line no-console
-          console.error("[Top-level ErrorBoundary]", error, info);
-        }}
-      >
-        <BrowserRouter>
+      {/* BrowserRouter đặt TRÊN ErrorBoundary: nếu lỗi xảy ra trong route,
+          ErrorPage vẫn dùng được <Link> mà không bị crash lần nữa. */}
+      <BrowserRouter>
+        <ErrorBoundary
+          onError={(error, info) => {
+            // eslint-disable-next-line no-console
+            console.error("[Top-level ErrorBoundary]", error, info);
+          }}
+        >
           <Routes>
             <Route path="/" element={<App />}>
               <Route index element={<Home />} />
@@ -78,12 +91,6 @@ hydrateUser().finally(() => {
               />
 
               {/* ============ COMMERCE module ============ */}
-              <Route path="cars" element={<CarsList />} />
-              <Route path="cars/:slug" element={<CarDetail />} />
-              <Route path="parts" element={<PartsList />} />
-              <Route path="parts/:slug" element={<PartDetail />} />
-              <Route path="cart" element={<Cart />} />
-              <Route path="checkout" element={<Checkout />} />
               <Route path="services" element={<ServicesList />} />
               <Route path="services/:slug" element={<ServiceDetail />} />
 
@@ -91,13 +98,13 @@ hydrateUser().finally(() => {
               <Route path="ai/damage" element={<DamageUpload />} />
               <Route path="ai/assistant" element={<ChatAssistant />} />
 
-              {/* ============ CONTENT module ============ */}
-              <Route path="news" element={<NewsList />} />
-              <Route path="news/:slug" element={<ArticleDetail />} />
+              {/* ============ SEARCH ============ */}
+              <Route path="search" element={<SearchPage />} />
 
-              {/* Demo pages — sẽ xoá ở production */}
-              <Route path="foundation" element={<FoundationDemo />} />
-              <Route path="boom-demo" element={<BoomDemo />} />
+              {/* ============ Trang tĩnh ============ */}
+              <Route path="help" element={<HelpPage />} />
+              <Route path="terms" element={<TermsPage />} />
+              <Route path="privacy" element={<PrivacyPage />} />
 
               <Route path="*" element={<NotFoundPage />} />
             </Route>
@@ -112,18 +119,42 @@ hydrateUser().finally(() => {
               }
             >
               <Route index element={<AdminDashboard />} />
-              <Route path="garages" element={<AdminGarages />} />
+              <Route path="garage" element={<AdminGarageProfile />} />
               <Route path="services" element={<AdminServices />} />
+              <Route path="services/bom/:serviceId" element={<AdminServiceBom />} />
+              <Route path="categories" element={<AdminCategories />} />
               <Route path="parts" element={<AdminParts />} />
-              <Route path="orders" element={<AdminOrders />} />
+              <Route path="suppliers" element={<AdminSuppliers />} />
+              <Route path="purchase-orders" element={<AdminPurchaseOrders />} />
+              <Route
+                path="inventory-transactions"
+                element={<AdminInventoryTransactions />}
+              />
+              <Route path="bookings" element={<AdminBookings />} />
+              <Route path="invoices" element={<AdminBilling />} />
+              <Route path="staff" element={<AdminStaff />} />
+              <Route
+                path="staff/:staffId/schedule"
+                element={<AdminStaffSchedule />}
+              />
+              <Route path="work-shifts" element={<AdminWorkShifts />} />
+              <Route path="schedule" element={<AdminScheduleBoard />} />
+              <Route path="work-orders" element={<AdminWorkOrders />} />
+              <Route path="work-orders/mine" element={<TechnicianWorkOrders />} />
               <Route path="vehicles" element={<AdminCustomerVehicles />} />
               <Route path="users" element={<AdminUsers />} />
+              <Route path="permissions" element={<AdminPermissions />} />
+              <Route path="roles" element={<AdminRoles />} />
+              <Route
+                path="notification-templates"
+                element={<AdminNotificationTemplates />}
+              />
               <Route
                 path="reports"
                 element={
                   <ComingSoon
                     title="Báo cáo & Thống kê"
-                    desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo garage, hiệu suất dịch vụ, cohort khách hàng..."
+                    desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo dịch vụ, hiệu suất kỹ thuật viên, cohort khách hàng..."
                   />
                 }
               />
@@ -139,8 +170,8 @@ hydrateUser().finally(() => {
               <Route path="*" element={<AdminNotFound />} />
             </Route>
           </Routes>
-        </BrowserRouter>
-      </ErrorBoundary>
+        </ErrorBoundary>
+      </BrowserRouter>
     </React.StrictMode>,
   );
 });

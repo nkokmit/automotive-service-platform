@@ -56,8 +56,8 @@ function buildError(res: Response, body: unknown): ApiError {
   return err;
 }
 
-function isApiError(err: unknown): err is ApiError {
-  return err instanceof Error && "status" in err;
+export function isApiError(err: unknown): err is ApiError {
+    return err instanceof Error && "status" in err;
 }
 
 export interface RequestOptions {

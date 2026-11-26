@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
 import { useToast } from "../../components/Toast";
 import { IconCar, IconCheck } from "../../components/icons";
 import { useAuth } from "../../data/authStore";
+import { GARAGE } from "../../config/garage";
 
 export default function Login() {
   const [params] = useSearchParams();
   const initialMode = params.get("mode") === "register" ? "register" : "login";
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [loading, setLoading] = useState(false);
-  // Backend xác thực bằng `username` (không phải email) — xem AuthController.java.
+  // Backend xác thực bằng `username` HOẶC `email`
+  // (xem CustomUserDetailsService.java) — nên ô "Tài khoản" nhận được cả hai.
   const [form, setForm] = useState({
     fullName: "",
     username: "",
@@ -21,8 +23,13 @@ export default function Login() {
     confirmPassword: "",
   });
   const navigate = useNavigate();
+  const location = useLocation();
   const t = useToast();
   const { login, register } = useAuth();
+
+  // Trang user định quay lại sau khi đăng nhập (do RequireAuth / các màn hình
+  // "mua" / "đặt lịch" truyền vào). Mặc định là /profile.
+  const from = (location.state as { from?: string } | null)?.from ?? "/profile";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,10 +52,11 @@ export default function Login() {
               fullName: form.fullName || undefined,
             });
       t.success(`Chào mừng ${session.user.name} quay lại!`);
-      navigate("/profile");
+      navigate(from, { replace: true });
     } catch (err) {
       // message đã là tiếng Việt từ GlobalExceptionHandler phía backend
-      t.error(err instanceof Error ? err.message : "Đăng nhập thất bại");
+      const message = err instanceof Error ? err.message : (mode === "login" ? "Đăng nhập thất bại" : "Đăng ký thất bại");
+      t.error(message);
     } finally {
       setLoading(false);
     }
@@ -63,7 +71,7 @@ export default function Login() {
             <span className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center">
               <IconCar size={22} />
             </span>
-            <span className="font-bold text-lg text-primary">AutoCare</span>
+            <span className="font-bold text-lg text-primary">{GARAGE.brand}</span>
           </div>
 
           <h1 className="text-2xl md:text-3xl font-bold mb-2">
@@ -104,8 +112,10 @@ export default function Login() {
               />
             )}
             <Input
-              label="Tên đăng nhập"
-              placeholder="nguyenvana"
+              label={mode === "login" ? "Tài khoản" : "Tên đăng nhập"}
+              placeholder={
+                mode === "login" ? "nguyenvana hoặc email" : "nguyenvana"
+              }
               value={form.username}
               onChange={(e) =>
                 setForm({ ...form, username: e.target.value })
@@ -113,17 +123,19 @@ export default function Login() {
               autoComplete="username"
               required
             />
-            <Input
-              type="email"
-              label="Email"
-              placeholder="you@example.com"
-              value={form.email}
-              onChange={(e) =>
-                setForm({ ...form, email: e.target.value })
-              }
-              autoComplete="email"
-              required
-            />
+            {mode === "register" && (
+              <Input
+                type="email"
+                label="Email"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={(e) =>
+                  setForm({ ...form, email: e.target.value })
+                }
+                autoComplete="email"
+                required
+              />
+            )}
             {mode === "register" && (
               <Input
                 label="Số điện thoại"
@@ -192,7 +204,9 @@ export default function Login() {
 
             <Button type="submit" size="lg" fullWidth disabled={loading}>
               {loading
-                ? "Đang xử lý..."
+                ? mode === "login"
+                  ? "Đang đăng nhập..."
+                  : "Đang thiết lập tài khoản..."
                 : mode === "login"
                   ? "Đăng nhập"
                   : "Tạo tài khoản"}
@@ -236,15 +250,15 @@ export default function Login() {
             <IconCar size={26} />
           </div>
           <h2 className="text-3xl font-bold leading-tight mb-4">
-            AutoCare — người bạn đồng hành tin cậy của chủ xe
+            {GARAGE.name} — người bạn đồng hành tin cậy của chủ xe
           </h2>
           <p className="text-white/85 mb-8">
-            Hơn 500 garage uy tín, đặt lịch trong 30 giây, trợ lý AI phân tích
-            hư hỏng tức thì.
+            Xưởng sửa chữa chuyên nghiệp tại {GARAGE.city}, đặt lịch trong 30
+            giây, trợ lý AI phân tích hư hỏng tức thì.
           </p>
           <ul className="space-y-3 text-sm">
             {[
-              "Tìm garage gần bạn với bản đồ",
+              "Dịch vụ & phụ tùng chính hãng tại xưởng",
               "Đặt lịch trực tuyến, xác nhận tức thì",
               "AI phân tích hư hỏng từ ảnh",
               "Lịch sử bảo dưỡng đầy đủ",

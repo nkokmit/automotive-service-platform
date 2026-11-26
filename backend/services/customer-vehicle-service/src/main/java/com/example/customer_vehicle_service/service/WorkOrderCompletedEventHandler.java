@@ -51,7 +51,7 @@ public class WorkOrderCompletedEventHandler {
             return;
         }
 
-        Vehicle vehicle = vehicleRepository.findByIdRaw(event.vehicleId())
+        Vehicle vehicle = vehicleRepository.findByIdRaw(event.vehicleId().toString())
                 .orElseThrow(() -> new IllegalStateException(
                         "Không tìm thấy vehicle " + event.vehicleId()
                                 + " cho Work Order " + event.workOrderId()));

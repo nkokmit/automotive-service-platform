@@ -13,19 +13,16 @@ import Card from "../../components/Card";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
-import { services } from "../../data/mock";
+import { SkeletonGrid } from "../../components/Loading";
+import { GARAGE } from "../../config/garage";
+import {
+  useCatalog,
+  useServiceCategoryOptions,
+  type CatalogService,
+} from "../../data/catalog";
 
 const formatVND = (n: number) =>
   new Intl.NumberFormat("vi-VN").format(n) + "đ";
-
-const categories = [
-  "Tất cả",
-  "Bảo dưỡng",
-  "Sửa chữa",
-  "Sơn & thân vỏ",
-  "Điện - Điều hòa",
-  "Lốp & phanh",
-] as const;
 
 const sortOptions = [
   { id: "popular", label: "Phổ biến nhất" },
@@ -39,9 +36,11 @@ type SortId = (typeof sortOptions)[number]["id"];
 
 export default function ServicesList() {
   const [params] = useSearchParams();
+  const { services, loading, usingFallback, error } = useCatalog();
+  const categories = useServiceCategoryOptions();
+
   const [filters, setFilters] = useState({
-    category: "Tất cả" as (typeof categories)[number],
-    city: "Tất cả",
+    category: "Tất cả" as string,
     maxPrice: 15000000,
   });
   const [sort, setSort] = useState<SortId>("popular");
@@ -50,26 +49,19 @@ export default function ServicesList() {
   // Đọc ?category=... từ URL (khi click từ Home hoặc service card)
   useEffect(() => {
     const cat = params.get("category");
-    if (cat && (categories as readonly string[]).includes(cat)) {
-      setFilters((f) => ({ ...f, category: cat as typeof categories[number] }));
+    if (cat && categories.includes(cat)) {
+      setFilters((f) => ({ ...f, category: cat }));
     }
-  }, [params]);
+  }, [params, categories]);
 
   const filtered = useMemo(() => {
     let result = services.filter((s) => {
-      if (
-        filters.category !== "Tất cả" &&
-        s.category !== filters.category
-      )
-        return false;
-      if (filters.city !== "Tất cả" && s.provider.city !== filters.city)
+      if (filters.category !== "Tất cả" && s.category !== filters.category)
         return false;
       if (s.priceFrom > filters.maxPrice) return false;
       if (
         query &&
-        !`${s.name} ${s.description} ${s.provider.name}`
-          .toLowerCase()
-          .includes(query.toLowerCase())
+        !`${s.name} ${s.description} ${s.category}`.toLowerCase().includes(query.toLowerCase())
       )
         return false;
       return true;
@@ -83,22 +75,16 @@ export default function ServicesList() {
         result = [...result].sort((a, b) => b.priceFrom - a.priceFrom);
         break;
       case "duration-asc":
-        result = [...result].sort(
-          (a, b) => a.durationMin - b.durationMin
-        );
+        result = [...result].sort((a, b) => a.durationMin - b.durationMin);
         break;
       case "rating":
         result = [...result].sort((a, b) => b.rating - a.rating);
         break;
       default:
-        result = [...result].sort(
-          (a, b) => b.bookingsCount - a.bookingsCount
-        );
+        result = [...result].sort((a, b) => b.bookingsCount - a.bookingsCount);
     }
     return result;
-  }, [filters, sort, query]);
-
-  const cities = Array.from(new Set(services.map((s) => s.provider.city)));
+  }, [services, filters, sort, query]);
 
   return (
     <div className="container-page py-6 md:py-8">
@@ -116,10 +102,19 @@ export default function ServicesList() {
           Dịch vụ sửa chữa &amp; bảo dưỡng
         </h1>
         <p className="text-ink-light">
-          {filtered.length} dịch vụ phù hợp — đặt lịch trực tuyến, xác nhận
-          trong 30 phút
+          {filtered.length} dịch vụ tại <strong>{GARAGE.name}</strong> — đặt lịch
+          trực tuyến, xác nhận trong 30 phút
         </p>
       </div>
+
+      {/* Cảnh báo fallback — API chưa sẵn sàng */}
+      {usingFallback && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {error?.includes("chưa có dữ liệu")
+            ? "Máy chủ đã kết nối được nhưng chưa có dữ liệu dịch vụ. Đang hiển thị danh mục mẫu."
+            : "Đang hiển thị danh mục dịch vụ mẫu. Hệ thống sẽ tự đồng bộ dữ liệu thật khi máy chủ sẵn sàng."}
+        </div>
+      )}
 
       {/* Top bar */}
       <div className="flex flex-col md:flex-row gap-3 mb-6">
@@ -136,6 +131,7 @@ export default function ServicesList() {
             value={sort}
             onChange={(e) => setSort(e.target.value as SortId)}
             className="h-11 px-3 rounded-xl border border-ink/15 bg-white text-sm"
+            aria-label="Sắp xếp"
           >
             {sortOptions.map((o) => (
               <option key={o.id} value={o.id}>
@@ -171,23 +167,6 @@ export default function ServicesList() {
             ))}
           </FilterSection>
 
-          <FilterSection title="Khu vực">
-            {["Tất cả", ...cities].map((c) => (
-              <label
-                key={c}
-                className="flex items-center gap-2 text-sm py-1 cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name="city"
-                  checked={filters.city === c}
-                  onChange={() => setFilters({ ...filters, city: c })}
-                />
-                {c}
-              </label>
-            ))}
-          </FilterSection>
-
           <FilterSection title="Khoảng giá">
             <div className="text-sm font-medium text-primary mb-2">
               {formatVND(filters.maxPrice)}
@@ -215,7 +194,6 @@ export default function ServicesList() {
             onClick={() =>
               setFilters({
                 category: "Tất cả",
-                city: "Tất cả",
                 maxPrice: 15000000,
               })
             }
@@ -226,7 +204,9 @@ export default function ServicesList() {
 
         {/* Results */}
         <div>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <SkeletonGrid count={4} lines={3} />
+          ) : filtered.length === 0 ? (
             <Card>
               <div className="p-10 text-center text-ink-muted">
                 <IconWrench size={40} className="mx-auto mb-3 text-ink-muted" />
@@ -249,7 +229,7 @@ export default function ServicesList() {
   );
 }
 
-function ServiceCard({ service }: { service: (typeof services)[number] }) {
+function ServiceCard({ service }: { service: CatalogService }) {
   return (
     <Link to={`/services/${service.slug}`}>
       <Card>
@@ -274,32 +254,34 @@ function ServiceCard({ service }: { service: (typeof services)[number] }) {
                   <span>{service.category}</span>
                   <span>•</span>
                   <IconMapPin size={12} />
-                  <span>{service.provider.city}</span>
+                  <span>{GARAGE.city}</span>
                 </div>
                 <h3 className="font-semibold text-lg leading-tight mb-1.5">
                   {service.name}
                 </h3>
                 <div className="flex items-center gap-1 text-xs text-ink-muted">
-                  <span>Bởi</span>
-                  <span className="font-medium text-ink">
-                    {service.provider.name}
-                  </span>
+                  <span>Tại</span>
+                  <span className="font-medium text-ink">{GARAGE.name}</span>
                   <IconStar
                     size={12}
                     className="text-accent-hover ml-1"
                   />
-                  <span className="font-medium">{service.provider.rating}</span>
-                  <span>({service.provider.reviewsCount})</span>
+                  <span className="font-medium">{GARAGE.rating}</span>
+                  <span>({GARAGE.reviewsCount})</span>
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <div className="flex items-center gap-1 justify-end">
-                  <IconStar size={14} className="text-accent-hover" />
-                  <span className="font-semibold">{service.rating}</span>
-                </div>
-                <div className="text-xs text-ink-muted">
-                  {service.bookingsCount} lượt đặt
-                </div>
+                {service.rating > 0 && (
+                  <div className="flex items-center gap-1 justify-end">
+                    <IconStar size={14} className="text-accent-hover" />
+                    <span className="font-semibold">{service.rating}</span>
+                  </div>
+                )}
+                {service.bookingsCount > 0 && (
+                  <div className="text-xs text-ink-muted">
+                    {service.bookingsCount} lượt đặt
+                  </div>
+                )}
               </div>
             </div>
 
@@ -313,7 +295,7 @@ function ServiceCard({ service }: { service: (typeof services)[number] }) {
               </div>
               <div className="flex items-center gap-1">
                 <IconCalendar size={14} />
-                {service.availableSlots} slot tuần tới
+                {service.requiredTechs} kỹ thuật viên
               </div>
               {service.warrantyMonths > 0 && (
                 <div className="flex items-center gap-1 text-primary">

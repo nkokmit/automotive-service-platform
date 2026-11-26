@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   IconDashboard,
   IconBuilding,
   IconWrench,
   IconPackage,
-  IconShoppingBag,
   IconUsers,
   IconChart,
   IconSettings,
@@ -16,8 +15,21 @@ import {
   IconArrowLeft,
   IconCar,
   IconLogout,
+  IconCheck,
+  IconActivity,
+  IconCalendar,
+  IconCash,
+  IconShield,
+  IconTruck,
+  IconList,
+  IconClock,
 } from "./icons";
 import { useAuth } from "../data/authStore";
+import { roleLabel } from "../api/types";
+import { useToast } from "./Toast";
+import Avatar from "./Avatar";
+import SearchBox from "./SearchBox";
+import NotificationBell from "./NotificationBell";
 
 // =========================
 // AdminLayout — shell chung cho /admin/*
@@ -45,17 +57,46 @@ const navGroups: NavGroup[] = [
   {
     label: "Quản lý",
     items: [
-      { to: "/admin/orders", label: "Đơn hàng", icon: IconShoppingBag, badge: "24" },
+      { to: "/admin/bookings", label: "Lịch hẹn xưởng", icon: IconCalendar },
+      { to: "/admin/invoices", label: "Hóa đơn", icon: IconCash },
+      { to: "/admin/work-orders", label: "Phiếu sửa chữa", icon: IconWrench },
+      {
+        to: "/admin/work-orders/mine",
+        label: "Việc của tôi",
+        icon: IconCheck,
+      },
+      { to: "/admin/staff", label: "Kỹ thuật viên", icon: IconUsers },
+      { to: "/admin/work-shifts", label: "Ca làm việc", icon: IconClock },
+      { to: "/admin/schedule", label: "Lịch trình xưởng", icon: IconCalendar },
       { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
       { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
+      { to: "/admin/suppliers", label: "Nhà cung cấp", icon: IconBuilding },
+      {
+        to: "/admin/purchase-orders",
+        label: "Đơn nhập hàng",
+        icon: IconTruck,
+      },
+      {
+        to: "/admin/inventory-transactions",
+        label: "Sổ kho",
+        icon: IconActivity,
+      },
       { to: "/admin/services", label: "Dịch vụ", icon: IconWrench },
-      { to: "/admin/garages", label: "Garage", icon: IconBuilding },
+      { to: "/admin/categories", label: "Nhóm danh mục", icon: IconList },
+      { to: "/admin/garage", label: "Hồ sơ xưởng", icon: IconBuilding },
       { to: "/admin/users", label: "Người dùng", icon: IconUsers },
     ],
   },
   {
     label: "Hệ thống",
     items: [
+      { to: "/admin/permissions", label: "Quyền", icon: IconShield },
+      { to: "/admin/roles", label: "Vai trò", icon: IconShield },
+      {
+        to: "/admin/notification-templates",
+        label: "Template thông báo",
+        icon: IconBell,
+      },
       { to: "/admin/reports", label: "Báo cáo", icon: IconChart },
       { to: "/admin/settings", label: "Cài đặt", icon: IconSettings },
     ],
@@ -65,6 +106,170 @@ const navGroups: NavGroup[] = [
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const t = useToast();
+
+  // Panel thông báo — dùng chung component NotificationBell.
+
+  // Ô tìm kiếm admin: điều hướng tới trang phù hợp dựa trên từ khoá.
+  //
+  // Lưu ý: từ khoá chỉ mang tính "định tuyến" (ví dụ "phụ tùng" → trang phụ tùng).
+  // Ta bỏ chính từ khoá định tuyến ra khỏi chuỗi lọc để bảng không bị lọc rỗng
+  // (tìm "phụ tùng" trong danh sách phụ tùng sẽ không ra dòng nào).
+  const ADMIN_ROUTES: {
+    match: RegExp;
+    to: string;
+    /** Các từ khoá chỉ dùng để định tuyến — không đưa vào bộ lọc của bảng. */
+    routeWords: string[];
+  }[] = [
+    {
+      match: /lịch hẹn|booking|hẹn/,
+      to: "/admin/bookings",
+      routeWords: ["lịch hẹn", "lịch", "booking", "bookings", "hẹn"],
+    },
+    {
+      match: /hóa đơn|invoice|bill|thanh toán|hoàn tiền/,
+      to: "/admin/invoices",
+      routeWords: [
+        "hóa đơn",
+        "invoice",
+        "invoices",
+        "thanh toán",
+        "hoàn tiền",
+      ],
+    },
+    {
+      match: /phiếu|work.?order/,
+      to: "/admin/work-orders",
+      routeWords: ["phiếu", "work order", "work-orders"],
+    },
+    {
+      // "ca làm việc" / "ca trực" → trang ca làm việc. Phải đứng trước rule
+      // "nhân viên" vì "ca làm việc" không chứa từ khoá nhân viên, nhưng để
+      // trước cho an toàn khi người dùng gõ "ca làm việc nhân viên".
+      match: /ca làm việc|ca trực|ca làm|lịch ca|work.?shift/,
+      to: "/admin/work-shifts",
+      routeWords: [
+        "ca làm việc",
+        "ca trực",
+        "ca làm",
+        "lịch ca",
+        "work shift",
+        "work-shifts",
+      ],
+    },
+    {
+      match: /nhân viên|kỹ thuật viên|nhân sự|staff|thợ/,
+      to: "/admin/staff",
+      routeWords: [
+        "nhân viên",
+        "kỹ thuật viên",
+        "nhân sự",
+        "staff",
+        "thợ",
+      ],
+    },
+    {
+      match: /xe|vehicle|khách|customer/,
+      to: "/admin/vehicles",
+      routeWords: ["xe", "xe của khách", "vehicle", "khách", "khách hàng", "customer"],
+    },
+    {
+      // "kho" chỉ dùng khi đi kèm "tồn"/"số lượng" — nếu để đứng độc lập
+      // thì cụm "sổ kho" sẽ bị kéo về trang phụ tùng.
+      match: /phụ tùng|phụ kiện|part|tồn kho|số lượng tồn/,
+      to: "/admin/parts",
+      routeWords: [
+        "phụ tùng",
+        "phụ kiện",
+        "part",
+        "parts",
+        "tồn kho",
+        "số lượng tồn",
+      ],
+    },
+    {
+      match: /nhà cung cấp|ncc|supplier|nguồn hàng/,
+      to: "/admin/suppliers",
+      routeWords: [
+        "nhà cung cấp",
+        "ncc",
+        "supplier",
+        "suppliers",
+        "nguồn hàng",
+      ],
+    },
+    {
+      match: /đơn nhập hàng|đơn hàng|nhập hàng|purchase/,
+      to: "/admin/purchase-orders",
+      routeWords: [
+        "đơn nhập hàng",
+        "đơn hàng",
+        "nhập hàng",
+        "purchase",
+        "purchase-orders",
+      ],
+    },
+    {
+      match: /sổ kho|nhật ký|giao dịch kho|transaction/,
+      to: "/admin/inventory-transactions",
+      routeWords: [
+        "sổ kho",
+        "sổ",
+        "nhật ký",
+        "giao dịch kho",
+        "transaction",
+        "transactions",
+      ],
+    },
+    {
+      match: /dịch vụ|service/,
+      to: "/admin/services",
+      routeWords: ["dịch vụ", "service", "services"],
+    },
+    {
+      match: /người dùng|user|tài khoản/,
+      to: "/admin/users",
+      routeWords: ["người dùng", "user", "users", "tài khoản"],
+    },
+    {
+      match: /quyền|permission|phân quyền/,
+      to: "/admin/permissions",
+      routeWords: ["quyền", "quyen", "permission", "permissions", "phân quyền"],
+    },
+    {
+      match: /vai trò|role/,
+      to: "/admin/roles",
+      routeWords: ["vai trò", "vai tro", "role", "roles"],
+    },
+  ];
+
+  const handleAdminSearch = (query: string) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+
+    const route = ADMIN_ROUTES.find((r) => r.match.test(q));
+    if (!route) {
+      navigate(`/admin/bookings?q=${encodeURIComponent(query)}`);
+      t.info(
+        `Không xác định "${query}" thuộc mục nào — đang tìm trong danh sách lịch hẹn.`,
+      );
+      return;
+    }
+
+    // Cắt bỏ các từ khoá chỉ dùng để định tuyến, phần còn lại mới lọc bảng.
+    let filter = q;
+    for (const w of route.routeWords) {
+      filter = filter.split(w).join(" ");
+    }
+    filter = filter.replace(/\s+/g, " ").trim();
+
+    navigate(
+      filter
+        ? `${route.to}?q=${encodeURIComponent(filter)}`
+        : route.to,
+    );
+  };
 
   return (
     <div className="min-h-screen bg-bgsoft/50 flex">
@@ -103,16 +308,12 @@ export default function AdminLayout() {
 
           {/* Search */}
           <div className="hidden md:flex flex-1 max-w-md">
-            <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-ink/15 bg-bgsoft/40 w-full focus-within:bg-white focus-within:border-primary transition-colors">
-              <IconSearch size={16} className="text-ink-muted" />
-              <input
-                placeholder="Tìm đơn hàng, khách hàng, garage..."
-                className="flex-1 bg-transparent outline-none text-sm placeholder:text-ink-muted"
-              />
-              <kbd className="hidden lg:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border border-ink/15 bg-white text-ink-muted">
-                ⌘K
-              </kbd>
-            </div>
+            <SearchBox
+              className="w-full"
+              placeholder="Tìm lịch hẹn, khách hàng, dịch vụ..."
+              shortcut
+              onNavigate={handleAdminSearch}
+            />
           </div>
 
           <div className="flex-1 md:flex-none" />
@@ -128,30 +329,24 @@ export default function AdminLayout() {
               <span className="hidden md:inline">Trang khách hàng</span>
             </Link>
 
-            <button
-              className="relative p-2 rounded-lg hover:bg-bgsoft text-ink-muted hover:text-ink"
-              aria-label="Thông báo"
-            >
-              <IconBell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
-            </button>
+            {/* Notifications — dùng chung component với Header (khách hàng).
+                Nguồn dữ liệu thật: notification-service (SSE + unread-count). */}
+            <NotificationBell />
 
             {/* User avatar */}
             <div className="flex items-center gap-2 pl-2 border-l border-ink/10">
-              <img
-                src={
-                  user?.avatar ||
-                  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=70"
-                }
-                alt={user?.name || "Admin"}
-                className="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20"
+              <Avatar
+                name={user?.name || "Admin AutoCare"}
+                src={user?.avatar}
+                size={32}
+                className="ring-2 ring-primary/20"
               />
               <div className="hidden sm:block min-w-0">
                 <div className="text-sm font-semibold truncate max-w-[120px]">
                   {user?.name || "Admin AutoCare"}
                 </div>
                 <div className="text-[10px] text-primary font-medium uppercase">
-                  Quản trị viên
+                  {roleLabel(user?.roles)}
                 </div>
               </div>
             </div>
@@ -214,7 +409,13 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
-                    end={item.to === "/admin"}
+                    end={
+                      item.to === "/admin" ||
+                      // Route con của "Phiếu sửa chữa" — `end` để trang cha
+                      // không bị highlight khi đang ở trang con.
+                      item.to === "/admin/work-orders" ||
+                      item.to === "/admin/work-orders/mine"
+                    }
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       [

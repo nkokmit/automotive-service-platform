@@ -18,6 +18,17 @@
   }
 }
 
+@layer utilities {
+  /* Ẩn thanh cuộn ngang nhưng vẫn cuộn được — dùng cho dải chip danh mục. */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ===== Toast animations ===== */
 @keyframes toast-slide-in {
   from {

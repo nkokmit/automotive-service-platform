@@ -43,7 +43,7 @@ spring:
             - id: customer-vehicle-service-service-history
               uri: lb://customer-vehicle-service
               predicates:
-                - Path=/api/service-history/**
+                - Path=/api/service-history,/api/service-history/**
 
             - id: booking-service-bookings
               uri: lb://booking-service

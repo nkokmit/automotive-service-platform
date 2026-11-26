@@ -286,7 +286,7 @@ class VehicleServiceImplTest {
     void deleteVehicle_softDeletesWithoutRemovingHistory() {
         Vehicle vehicle = vehicle();
         Instant before = Instant.now();
-        given(vehicleRepository.findByIdRaw(VEHICLE_ID)).willReturn(Optional.of(vehicle));
+        given(vehicleRepository.findByIdRaw(VEHICLE_ID.toString())).willReturn(Optional.of(vehicle));
 
         vehicleService.deleteVehicle(VEHICLE_ID);
 
@@ -303,7 +303,7 @@ class VehicleServiceImplTest {
         Instant deletedAt = Instant.parse("2026-01-01T00:00:00Z");
         vehicle.setDeletedAt(deletedAt);
         vehicle.setIsActive(false);
-        given(vehicleRepository.findByIdRaw(VEHICLE_ID)).willReturn(Optional.of(vehicle));
+        given(vehicleRepository.findByIdRaw(VEHICLE_ID.toString())).willReturn(Optional.of(vehicle));
 
         vehicleService.deleteVehicle(VEHICLE_ID);
 
@@ -314,7 +314,7 @@ class VehicleServiceImplTest {
 
     @Test
     void deleteVehicle_rejectsUnknownId() {
-        given(vehicleRepository.findByIdRaw(VEHICLE_ID)).willReturn(Optional.empty());
+        given(vehicleRepository.findByIdRaw(VEHICLE_ID.toString())).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> vehicleService.deleteVehicle(VEHICLE_ID))
                 .isInstanceOf(VehicleNotFoundException.class);

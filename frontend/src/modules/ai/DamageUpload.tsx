@@ -14,6 +14,7 @@ import Button from "../../components/Button";
 import Badge from "../../components/Badge";
 import { damageApi } from "../../api/endpoints/ai";
 import type { DetectionResponse, Severity } from "../../api/endpoints/ai";
+import { normalizeAiLink } from "../../utils/links";
 
 type Tone = "primary" | "warning" | "accent" | "default";
 
@@ -585,7 +586,7 @@ export default function DamageUpload() {
                       {result.recommended_items.map((item) => (
                         <Link
                           key={item.id}
-                          to={item.link}
+                          to={normalizeAiLink(item.link)}
                           className="p-3 rounded-xl bg-white hover:bg-primary/5 border border-ink/10 flex items-center justify-between gap-2 transition-colors"
                         >
                           <div className="min-w-0">
@@ -605,7 +606,7 @@ export default function DamageUpload() {
 
                 <Link to="/services?category=S%E1%BB%ADa%20ch%E1%BB%AFa" className="block">
                   <Button fullWidth size="lg">
-                    Tìm garage sửa chữa gần bạn
+                    Đặt lịch sửa chữa tại xưởng
                     <IconArrowRight size={16} />
                   </Button>
                 </Link>

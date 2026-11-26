@@ -48,6 +48,26 @@ venv.bak/
 *.cert
 *.pfx
 
+# ── Java / Maven / Gradle Build Output ────────────────────────────────────────
+# Build artifacts (jars, .class) must never be committed — the fat jar exceeds
+# GitHub's 100 MB per-file limit and blocks the push.
+target/
+build/
+*.jar
+*.war
+*.ear
+.gradle/
+.mvn/
+
+# ── Local Secrets & Scratch Files ─────────────────────────────────────────────
+# Never commit access tokens or throwaway debug scripts.
+.tok
+.tok_*
+.tmp-*
+*.tmp
+frontend/dev.err
+frontend/dev.log
+
 # ── AI / ML Models & Heavy Binaries ───────────────────────────────────────────
 # Large model weights (prevent exceeding GitHub 100MB file limit)
 *.onnx

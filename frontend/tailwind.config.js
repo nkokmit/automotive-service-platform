@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Bảng màu chính của dự án (chỉ 4 màu theo yêu cầu)
+        // Bảng màu chính của dự án
         primary: {
           DEFAULT: "#1D4533",
           hover: "#15382A",

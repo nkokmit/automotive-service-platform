@@ -35,6 +35,12 @@ public class RefreshTokenService {
     @Transactional
     public String createRefreshToken(UUID userId) {
         User user = authUserRepository.findById(userId).orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng"));
+        return createRefreshToken(user);
+    }
+    
+    @Transactional
+    public String createRefreshToken(User user) {
+        UUID userId = user.getId();
         refreshTokenRepository.deleteAllByUserId(userId);
 
         String rawToken = UUID.randomUUID().toString() + "-" + UUID.randomUUID().toString();

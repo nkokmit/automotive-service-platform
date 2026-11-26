@@ -61,7 +61,7 @@ class WorkOrderCompletedEventHandlerTest {
                 event.eventId().toString(), TOPIC, "WorkOrderCompletedEvent", WORK_ORDER_ID.toString()))
                 .willReturn(1);
         given(historyRepository.existsByWorkOrderId(WORK_ORDER_ID)).willReturn(false);
-        given(vehicleRepository.findByIdRaw(VEHICLE_ID)).willReturn(Optional.of(vehicle));
+        given(vehicleRepository.findByIdRaw(VEHICLE_ID.toString())).willReturn(Optional.of(vehicle));
 
         handler.handle(event, TOPIC);
 
@@ -144,7 +144,7 @@ class WorkOrderCompletedEventHandlerTest {
                 event.eventId().toString(), TOPIC, "WorkOrderCompletedEvent", WORK_ORDER_ID.toString()))
                 .willReturn(1);
         given(historyRepository.existsByWorkOrderId(WORK_ORDER_ID)).willReturn(false);
-        given(vehicleRepository.findByIdRaw(VEHICLE_ID))
+        given(vehicleRepository.findByIdRaw(VEHICLE_ID.toString()))
                 .willReturn(Optional.of(Vehicle.builder().id(VEHICLE_ID).build()));
 
         handler.handle(event, TOPIC);
