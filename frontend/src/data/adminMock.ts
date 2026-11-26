@@ -212,7 +212,6 @@ export interface AdminUser {
   name: string;
   email: string;
   phone: string;
-  avatar: string;
   role: AdminUserRole;
   /** Tên role thật từ backend (VD: ["ADMIN", "MECHANIC"]). */
   roleNames: string[];
@@ -224,17 +223,6 @@ export interface AdminUser {
   /** Chỉ dùng cho role=garage_owner (nhân viên của AutoCare Workshop) */
   garageName?: string;
 }
-
-const avatarSeeds = [
-  "photo-1535713875002-d1d0cf377fde",
-  "photo-1438761681033-6461ffad8d80",
-  "photo-1500648767791-00dcc994a43e",
-  "photo-1507003211169-0a1dd7228f2d",
-  "photo-1494790108377-be9c29b29330",
-];
-
-const IMG = (seed: string) =>
-  `https://images.unsplash.com/${seed}?auto=format&fit=crop&w=200&q=70`;
 
 /** Danh sách khách hàng mẫu dùng cho bảng "Người dùng" của admin. */
 const ADMIN_CUSTOMERS = [
@@ -259,7 +247,6 @@ export const adminUsers: AdminUser[] = [
     name: u.name,
     email: u.email,
     phone: u.phone,
-    avatar: u.avatar,
     role: "customer",
     roleNames: ["CUSTOMER"],
     city: "Hà Nội",
@@ -274,7 +261,6 @@ export const adminUsers: AdminUser[] = [
     name: "Trần Minh Quân — Chủ xưởng AutoCare",
     email: "owner@autocare.vn",
     phone: "024 3876 1234",
-    avatar: IMG(avatarSeeds[1]),
     role: "garage_owner",
     roleNames: ["MANAGER"],
     city: "Hà Nội",
@@ -290,7 +276,6 @@ export const adminUsers: AdminUser[] = [
     name: "Admin AutoCare",
     email: "admin@autocare.vn",
     phone: "1900 6868",
-    avatar: IMG(avatarSeeds[0]),
     role: "admin",
     roleNames: ["ADMIN"],
     city: "TP.HCM",
@@ -305,7 +290,6 @@ export const adminUsers: AdminUser[] = [
     name: c.name,
     email: c.email,
     phone: `09${(10000000 + idx * 1234567).toString().slice(0, 8)}`,
-    avatar: IMG(avatarSeeds[idx % avatarSeeds.length]),
     role: "customer",
     roleNames: ["CUSTOMER"],
     city: c.city,

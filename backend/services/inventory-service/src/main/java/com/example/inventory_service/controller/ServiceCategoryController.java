@@ -5,6 +5,7 @@ import com.example.inventory_service.common.PageResponse;
 import com.example.inventory_service.common.PageableFactory;
 import com.example.inventory_service.dto.request.CategoryRequest;
 import com.example.inventory_service.dto.response.CategoryResponse;
+import com.example.inventory_service.dto.response.ServiceResponse;
 import com.example.inventory_service.service.ServiceCategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -66,6 +68,19 @@ public class ServiceCategoryController {
             description = "Không tìm thấy nhóm dịch vụ.")
     public ApiResponse<CategoryResponse> getCategory(@PathVariable UUID categoryId) {
         return ApiResponse.success(serviceCategoryService.getCategoryById(categoryId));
+    }
+
+    @GetMapping("/{categoryId}/services")
+    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @Operation(summary = "Dịch vụ thuộc nhóm",
+            description = "Trả về danh sách dịch vụ thuộc nhóm, dịch vụ đang hoạt động "
+                    + "xếp trước. Dùng cho admin xem nhanh nhóm đang chứa dịch vụ nào.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về danh sách dịch vụ thuộc nhóm.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+            description = "Không tìm thấy nhóm dịch vụ.")
+    public ApiResponse<List<ServiceResponse>> getCategoryServices(@PathVariable UUID categoryId) {
+        return ApiResponse.success(serviceCategoryService.getServicesByCategory(categoryId));
     }
 
     @PostMapping

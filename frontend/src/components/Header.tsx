@@ -11,6 +11,7 @@ import {
   IconSparkles,
 } from "./icons";
 import Button from "./Button";
+import Avatar from "./Avatar";
 import SearchBox from "./SearchBox";
 import NotificationBell from "./NotificationBell";
 import { useToast } from "./Toast";
@@ -214,11 +215,7 @@ export default function Header() {
                 className="flex items-center gap-2 p-1 pr-2 rounded-lg hover:bg-bgsoft transition-colors"
                 aria-label="Tài khoản"
               >
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
+                <Avatar name={user.name} src={user.avatar} size={32} />
                 <span className="text-sm text-ink hidden lg:inline max-w-[120px] truncate">
                   {user.name}
                 </span>
@@ -405,11 +402,7 @@ export default function Header() {
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink hover:bg-bgsoft"
                 >
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    className="w-7 h-7 rounded-full object-cover"
-                  />
+                  <Avatar name={user.name} src={user.avatar} size={28} />
                   <span className="line-clamp-1">{user.name}</span>
                   <IconArrowRight size={14} className="ml-auto" />
                 </Link>

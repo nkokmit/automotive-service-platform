@@ -463,7 +463,6 @@ export interface MockUser {
   name: string;
   email: string;
   phone: string;
-  avatar: string;
   memberSince: string;
   loyaltyPoints: number;
   tier: "Thành viên" | "Bạc" | "Vàng" | "Bạch kim";
@@ -476,7 +475,6 @@ export const mockUsers: MockUser[] = [
     name: "Nguyễn Văn A",
     email: "nguyenvana@example.com",
     phone: "0901 234 567",
-    avatar: IMG("photo-1535713875002-d1d0cf377fde"),
     memberSince: "15/03/2024",
     loyaltyPoints: 1240,
     tier: "Vàng",

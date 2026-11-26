@@ -26,6 +26,7 @@ import {
 } from "../../utils/format";
 import ServiceCategoryManager, {
   useServiceCountByCategoryId,
+  useHiddenServiceCountByCategoryId,
 } from "./ServiceCategoryManager";
 import ServiceCategoryEditor from "./ServiceCategoryEditor";
 
@@ -149,6 +150,21 @@ export default function AdminServices() {
   /** Modal tạo nhóm dịch vụ, mở từ nút phụ cạnh dropdown "Danh mục". */
   const [categoryEditorOpen, setCategoryEditorOpen] = useState(false);
   /**
+   * Nhóm được chọn sẵn khi mở form thêm dịch vụ.
+   *
+   * <p>Được set khi admin bấm "Thêm dịch vụ" ngay trong danh sách dịch vụ của
+   * một nhóm (trong panel quản lý nhóm) → dropdown "Danh mục" hiện sẵn nhóm đó.
+   */
+  const [prefillCategoryName, setPrefillCategoryName] = useState<string | null>(
+    null,
+  );
+  /**
+   * Bộ đếm tín hiệu mở form thêm dịch vụ. Tăng lên mỗi khi admin bấm
+   * "Thêm dịch vụ" từ trong danh sách dịch vụ của một nhóm → `AdminTable`
+   * tự mở modal thêm với nhóm đã chọn sẵn.
+   */
+  const [addServiceSignal, setAddServiceSignal] = useState(0);
+  /**
    * Callback của `AdminTable` để cập nhật option của dropdown sau khi tạo
    * nhóm mới. Lưu trong ref vì nó được truyền qua `form` (useMemo) và không
    * nên là dependency gây render lại.
@@ -205,6 +221,10 @@ export default function AdminServices() {
 
   /** Số dịch vụ của từng nhóm — để cảnh báo khi xoá nhóm còn dịch vụ. */
   const serviceCountByCategoryId = useServiceCountByCategoryId(services);
+
+  /** Số dịch vụ đã ẩn của từng nhóm — để hiển thị "(+N ẩn)". */
+  const hiddenServiceCountByCategoryId =
+    useHiddenServiceCountByCategoryId(services);
 
   /** Tìm categoryId theo tên nhóm đã chọn trong form. */
   const resolveCategoryId = (name: string): string | undefined =>
@@ -371,6 +391,11 @@ export default function AdminServices() {
         searchKey="name"
         filters={filters}
         addLabel="Thêm dịch vụ"
+        // Nhóm được chọn sẵn khi admin bấm "Thêm dịch vụ" từ trong 1 nhóm.
+        initialValues={
+          prefillCategoryName ? { category: prefillCategoryName } : undefined
+        }
+        openAddSignal={addServiceSignal}
         form={form}
         onDelete={handleDelete}
         onDuplicate={(row) => void handleDuplicate(row)}
@@ -387,6 +412,14 @@ export default function AdminServices() {
         onChange={setCategories}
         onReload={loadCategories}
         serviceCountByCategoryId={serviceCountByCategoryId}
+        hiddenServiceCountByCategoryId={hiddenServiceCountByCategoryId}
+        onAddService={(categoryName) => {
+          setPrefillCategoryName(categoryName);
+          // Tăng tín hiệu → `AdminTable` mở modal thêm dịch vụ với nhóm đã
+          // chọn sẵn.
+          setAddServiceSignal((n) => n + 1);
+        }}
+        onServicesChanged={load}
       />
 
       {/* ── Modal tạo nhóm dịch vụ (mở từ nút phụ cạnh dropdown "Danh mục") ──

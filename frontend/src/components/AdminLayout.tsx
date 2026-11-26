@@ -27,6 +27,7 @@ import {
 import { useAuth } from "../data/authStore";
 import { roleLabel } from "../api/types";
 import { useToast } from "./Toast";
+import Avatar from "./Avatar";
 import SearchBox from "./SearchBox";
 import NotificationBell from "./NotificationBell";
 
@@ -334,13 +335,11 @@ export default function AdminLayout() {
 
             {/* User avatar */}
             <div className="flex items-center gap-2 pl-2 border-l border-ink/10">
-              <img
-                src={
-                  user?.avatar ||
-                  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=70"
-                }
-                alt={user?.name || "Admin"}
-                className="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20"
+              <Avatar
+                name={user?.name || "Admin AutoCare"}
+                src={user?.avatar}
+                size={32}
+                className="ring-2 ring-primary/20"
               />
               <div className="hidden sm:block min-w-0">
                 <div className="text-sm font-semibold truncate max-w-[120px]">

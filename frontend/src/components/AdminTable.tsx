@@ -48,6 +48,21 @@ export interface AdminTableProps<T extends { id: string }> {
   filters?: AdminTableFilter<T>[];
   /** Add button label + handler */
   addLabel?: string;
+  /**
+   * Giá trị khởi tạo cho form khi bấm "Thêm mới".
+   *
+   * <p>Dùng khi admin bấm "Thêm dịch vụ" từ trong một nhóm dịch vụ — nhóm đó
+   * sẽ được chọn sẵn trong dropdown "Danh mục".
+   */
+  initialValues?: Record<string, string | number>;
+  /**
+   * Tín hiệu mở form thêm mới từ bên ngoài.
+   *
+   * <p>Mỗi lần giá trị này thay đổi, `AdminTable` tự mở modal thêm. Dùng khi
+   * admin bấm "Thêm dịch vụ" từ trong danh sách dịch vụ của một nhóm (panel
+   * quản lý nhóm nằm ngoài bảng nên không gọi được `handleAddClick`).
+   */
+  openAddSignal?: number;
   /** Form modal khi thêm/sửa */
   form: AdminFormProps<T> | null;
   onAdd?: () => void;
@@ -99,6 +114,8 @@ export function AdminTable<T extends { id: string }>({
   searchKey,
   filters = [],
   addLabel = "Thêm mới",
+  initialValues,
+  openAddSignal,
   form,
   onAdd,
   onEdit,
@@ -170,6 +187,23 @@ export function AdminTable<T extends { id: string }>({
     setActiveRow(null);
     setShowForm(true);
   };
+
+  // Mở form thêm mới khi `openAddSignal` tăng (tín hiệu từ bên ngoài).
+  // Bỏ qua lần render đầu tiên (signal = undefined) để không mở form oan.
+  const prevSignal = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (openAddSignal === undefined) return;
+    if (prevSignal.current === undefined) {
+      prevSignal.current = openAddSignal;
+      return;
+    }
+    if (prevSignal.current !== openAddSignal) {
+      prevSignal.current = openAddSignal;
+      setFormMode("add");
+      setActiveRow(null);
+      setShowForm(true);
+    }
+  }, [openAddSignal]);
 
   const handleEditClick = (row: T) => {
     if (onEdit) {
@@ -405,6 +439,7 @@ export function AdminTable<T extends { id: string }>({
         <FormModal
           mode={formMode}
           initial={activeRow}
+          initialValues={formMode === "add" ? initialValues : undefined}
           title={formMode === "add" ? form.addTitle : form.editTitle}
           onClose={() => setShowForm(false)}
           onSubmit={async (values) => {
@@ -709,6 +744,7 @@ export interface AdminFormProps<T> {
 function FormModal({
   mode,
   initial,
+  initialValues,
   title,
   fields,
   onClose,
@@ -717,6 +753,8 @@ function FormModal({
 }: {
   mode: "add" | "edit";
   initial: Record<string, unknown> | null;
+  /** Giá trị khởi tạo khi thêm mới (prefill). */
+  initialValues?: Record<string, string | number>;
   title: string;
   fields: AdminFormField[];
   onClose: () => void;
@@ -731,7 +769,10 @@ function FormModal({
   const [values, setValues] = useState<Record<string, string | number>>(() => {
     const init: Record<string, string | number> = {};
     for (const f of visibleFields) {
-      const v = initial?.[f.key];
+      // Ưu tiên `initialValues` (prefill khi thêm mới), sau đó mới tới dữ
+      // liệu của bản ghi đang sửa.
+      const prefilled = initialValues?.[f.key];
+      const v = prefilled ?? initial?.[f.key];
       init[f.key] = v === undefined || v === null ? "" : String(v);
     }
     return init;

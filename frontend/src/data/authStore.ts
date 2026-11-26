@@ -35,8 +35,11 @@ export type AuthUser = {
   name: string;
   email: string;
   phone?: string;
-  /** Backend chưa có avatar → dùng avatar mặc định của mock cho tới khi bổ sung. */
-  avatar: string;
+  /**
+   * Backend chưa có trường avatar → `null`, giao diện tự sinh avatar chữ cái
+   * đầu từ tên (xem `components/Avatar.tsx`).
+   */
+  avatar?: string | null;
   /** Backend chưa có các field loyalty → giữ mặc định để UI không vỡ. */
   memberSince: string;
   totalOrders: number;
@@ -77,7 +80,7 @@ export function mapUserFromApi(dto: UserResponse): AuthUser {
     name: dto.fullName?.trim() || dto.username,
     email: dto.email,
     phone: dto.phone ?? undefined,
-    avatar: fallback.avatar,
+    avatar: null,
     memberSince,
     totalOrders: 0,
     totalSpentVND: 0,

@@ -594,6 +594,21 @@ export const inventoryApi = {
     return client.request<CategoryResponse>(`/api/service-categories/${id}`);
   },
 
+  /**
+   * Danh sách dịch vụ thuộc một nhóm — `GET /api/service-categories/{id}/services`.
+   * Cần authority `SERVICE_READ`.
+   *
+   * <p>Dịch vụ đang hoạt động xếp trước, sau đó dịch vụ đã ẩn. Dùng để admin
+   * xem nhanh nhóm đang chứa dịch vụ nào trước khi thêm/xoá/đổi nhóm.
+   */
+  listServicesByCategory: async (
+    categoryId: string,
+  ): Promise<ServiceResponse[]> => {
+    return client.request<ServiceResponse[]>(
+      `/api/service-categories/${categoryId}/services`,
+    );
+  },
+
   createServiceCategory: async (
     data: CategoryWriteRequest,
   ): Promise<CategoryResponse> => {

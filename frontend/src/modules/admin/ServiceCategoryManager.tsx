@@ -34,6 +34,7 @@ import { inventoryApi } from "../../api/endpoints/inventory";
 import { hasTokenAuthority } from "../../api/session";
 import type { CategoryResponse } from "../../api/types";
 import ServiceCategoryEditor from "./ServiceCategoryEditor";
+import CategoryServiceList from "./CategoryServiceList";
 
 export interface ServiceCategoryManagerProps {
   /** Danh sách nhóm đã load sẵn từ parent (để parent đồng bộ dropdown). */
@@ -47,8 +48,20 @@ export interface ServiceCategoryManagerProps {
    * không xoá được" và để admin biết nhóm nào đang dùng.
    */
   serviceCountByCategoryId?: Record<string, number>;
+  /**
+   * Số dịch vụ ĐÃ ẨN theo `categoryId` — chỉ dùng để hiển thị chi tiết
+   * "N dịch vụ (+M ẩn)". Không ảnh hưởng quyền xoá (xoá bị chặn khi tổng
+   * số dịch vụ > 0).
+   */
+  hiddenServiceCountByCategoryId?: Record<string, number>;
   /** Ẩn tiêu đề panel (khi nhúng vào card khác). */
   hideHeader?: boolean;
+  /**
+   * Mở form thêm dịch vụ thuộc một nhóm (truyền tên nhóm để pre-select).
+   */
+  onAddService?: (categoryName: string) => void;
+  /** Gọi sau khi dịch vụ trong nhóm bị thay đổi (để parent đồng bộ bảng). */
+  onServicesChanged?: () => void | Promise<void>;
 }
 
 export default function ServiceCategoryManager({
@@ -56,7 +69,10 @@ export default function ServiceCategoryManager({
   onChange,
   onReload,
   serviceCountByCategoryId = {},
+  hiddenServiceCountByCategoryId = {},
   hideHeader = false,
+  onAddService,
+  onServicesChanged,
 }: ServiceCategoryManagerProps) {
   const t = useToast();
   const canWrite = hasTokenAuthority("SERVICE_WRITE");
@@ -65,6 +81,11 @@ export default function ServiceCategoryManager({
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryResponse | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /**
+   * Nhóm đang mở danh sách dịch vụ. Bấm vào tên nhóm để xem các dịch vụ thuộc
+   * nhóm đó; bấm lần nữa để thu gọn.
+   */
+  const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
 
   const openCreate = useCallback(() => {
     setEditing(null);
@@ -96,9 +117,13 @@ export default function ServiceCategoryManager({
     async (c: CategoryResponse) => {
       const count = serviceCountByCategoryId[c.id] ?? 0;
       if (count > 0) {
+        // Nhóm chỉ xoá được khi không còn dịch vụ nào (kể cả đã ẩn) vì FK
+        // `fk_services_category` là ON DELETE RESTRICT — dịch vụ đã ẩn vẫn
+        // giữ liên kết với nhóm.
         t.error(
           `Nhóm "${c.name}" còn ${count} dịch vụ nên không thể xoá. ` +
-            `Hãy xoá (ẩn) hết dịch vụ thuộc nhóm này trước.`,
+            `Dịch vụ đã ẩn vẫn giữ liên kết với nhóm — hãy xoá dịch vụ ` +
+            `trong nhóm này trước.`,
         );
         return;
       }
@@ -122,16 +147,28 @@ export default function ServiceCategoryManager({
     [categories, onChange, onReload, serviceCountByCategoryId, t],
   );
 
-  /** Danh sách nhóm + số dịch vụ tương ứng, sắp xếp theo tên. */
+  /**
+   * Danh sách nhóm + số dịch vụ tương ứng, sắp xếp theo tên.
+   *
+   * <p>Tách `activeCount` (đang hiển thị cho khách) và `hiddenCount` (đã ẩn)
+   * để admin thấy rõ nhóm nào còn dịch vụ "thật" và nhóm nào chỉ còn dịch vụ
+   * đã ẩn (nhóm này vẫn chưa xoá được vì FK ON DELETE RESTRICT).
+   */
   const rows = useMemo(
     () =>
       [...categories]
         .sort((a, b) => a.name.localeCompare(b.name, "vi"))
-        .map((c) => ({
-          category: c,
-          count: serviceCountByCategoryId[c.id] ?? 0,
-        })),
-    [categories, serviceCountByCategoryId],
+        .map((c) => {
+          const all = serviceCountByCategoryId[c.id] ?? 0;
+          const hidden = hiddenServiceCountByCategoryId[c.id] ?? 0;
+          return {
+            category: c,
+            count: all,
+            activeCount: all - hidden,
+            hiddenCount: hidden,
+          };
+        }),
+    [categories, serviceCountByCategoryId, hiddenServiceCountByCategoryId],
   );
 
   return (
@@ -167,52 +204,98 @@ export default function ServiceCategoryManager({
             </div>
           ) : (
             <div className="divide-y divide-ink/5">
-              {rows.map(({ category, count }) => (
-                <div
-                  key={category.id}
-                  className="px-4 py-2.5 flex items-center gap-3 hover:bg-bgsoft/40 transition-colors"
-                >
-                  <Badge tone="default">{category.code}</Badge>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-ink truncate">
-                      {category.name}
+              {rows.map(({ category, count, activeCount, hiddenCount }) => {
+                const isOpen = openCategoryId === category.id;
+                return (
+                  <div key={category.id}>
+                    <div className="px-4 py-2.5 flex items-center gap-3 hover:bg-bgsoft/40 transition-colors">
+                      <Badge tone="default">{category.code}</Badge>
+
+                      {/* Bấm vào tên nhóm → xem / ẩn danh sách dịch vụ thuộc nhóm */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenCategoryId(isOpen ? null : category.id)
+                        }
+                        className="min-w-0 flex-1 text-left"
+                        title={
+                          isOpen
+                            ? "Ẩn danh sách dịch vụ của nhóm"
+                            : "Xem danh sách dịch vụ thuộc nhóm này"
+                        }
+                        aria-expanded={isOpen}
+                      >
+                        <div className="text-sm font-medium text-ink truncate hover:text-primary transition-colors">
+                          {category.name}
+                        </div>
+                        {category.description && (
+                          <div className="text-xs text-ink-muted truncate">
+                            {category.description}
+                          </div>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenCategoryId(isOpen ? null : category.id)
+                        }
+                        className="text-xs text-ink-muted whitespace-nowrap hover:text-primary transition-colors"
+                        title={
+                          activeCount > 0
+                            ? `${activeCount} dịch vụ đang hoạt động` +
+                              (hiddenCount > 0 ? `, ${hiddenCount} đã ẩn` : "")
+                            : "Chưa có dịch vụ"
+                        }
+                      >
+                        {count > 0
+                          ? `${activeCount} dịch vụ` +
+                            (hiddenCount > 0 ? ` (+${hiddenCount} ẩn)` : "")
+                          : "Chưa có dịch vụ"}
+                      </button>
+
+                      {canWrite && (
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(category)}
+                            className="p-1.5 rounded-md hover:bg-bgsoft text-ink-muted hover:text-primary"
+                            title="Sửa nhóm"
+                          >
+                            <IconEdit size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(category)}
+                            disabled={deletingId === category.id}
+                            className="p-1.5 rounded-md hover:bg-red-50 text-ink-muted hover:text-red-500 disabled:opacity-50"
+                            title={
+                              count > 0
+                                ? `Không xoá được vì nhóm còn ${count} dịch vụ (kể cả dịch vụ đã ẩn)`
+                                : "Xoá nhóm"
+                            }
+                          >
+                            <IconTrash size={15} />
+                          </button>
+                        </span>
+                      )}
                     </div>
-                    {category.description && (
-                      <div className="text-xs text-ink-muted truncate">
-                        {category.description}
+
+                    {/* Danh sách dịch vụ của nhóm */}
+                    {isOpen && (
+                      <div className="px-4 pb-3 pl-6 bg-bgsoft/30">
+                        <CategoryServiceList
+                          categoryId={category.id}
+                          categoryName={category.name}
+                          onClose={() => setOpenCategoryId(null)}
+                          onChanged={onServicesChanged}
+                          onAddService={onAddService}
+                        />
                       </div>
                     )}
                   </div>
-                  <span className="text-xs text-ink-muted whitespace-nowrap">
-                    {count > 0 ? `${count} dịch vụ` : "Chưa có dịch vụ"}
-                  </span>
-                  {canWrite && (
-                    <span className="inline-flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(category)}
-                        className="p-1.5 rounded-md hover:bg-bgsoft text-ink-muted hover:text-primary"
-                        title="Sửa nhóm"
-                      >
-                        <IconEdit size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(category)}
-                        disabled={deletingId === category.id}
-                        className="p-1.5 rounded-md hover:bg-red-50 text-ink-muted hover:text-red-500 disabled:opacity-50"
-                        title={
-                          count > 0
-                            ? "Không xoá được vì nhóm còn dịch vụ"
-                            : "Xoá nhóm"
-                        }
-                      >
-                        <IconTrash size={15} />
-                      </button>
-                    </span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -246,13 +329,39 @@ export default function ServiceCategoryManager({
   );
 }
 
-/** Hook tiện ích: đếm số dịch vụ theo categoryId. */
+/**
+ * Hook tiện ích: đếm số dịch vụ theo `categoryId` (TẤT CẢ, kể cả đã ẩn).
+ *
+ * <p>Khớp với backend: nhóm chỉ xoá được khi KHÔNG còn dịch vụ nào thuộc nhóm
+ * — kể cả dịch vụ đã ẩn. Lý do: dịch vụ bị "xoá" đi thực tế là soft-delete,
+ * dòng vẫn còn trong bảng `services` và FK `fk_services_category` là
+ * `ON DELETE RESTRICT` nên MySQL chặn xoá nhóm.
+ */
 export function useServiceCountByCategoryId(
-  services: { categoryId: string }[],
+  services: { categoryId: string; isActive?: boolean }[],
 ): Record<string, number> {
   return useMemo(() => {
     const map: Record<string, number> = {};
     for (const s of services) {
+      map[s.categoryId] = (map[s.categoryId] ?? 0) + 1;
+    }
+    return map;
+  }, [services]);
+}
+
+/**
+ * Hook tiện ích: đếm số dịch vụ ĐÃ ẨN theo `categoryId`.
+ *
+ * <p>Dùng để hiển thị chi tiết "N dịch vụ (+M ẩn)" cho admin — giúp phân biệt
+ * nhóm còn dịch vụ đang hiển thị với nhóm chỉ còn dịch vụ đã ẩn.
+ */
+export function useHiddenServiceCountByCategoryId(
+  services: { categoryId: string; isActive?: boolean }[],
+): Record<string, number> {
+  return useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const s of services) {
+      if (s.isActive !== false) continue;
       map[s.categoryId] = (map[s.categoryId] ?? 0) + 1;
     }
     return map;

@@ -12,6 +12,7 @@ import {
   IconList,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
+import Avatar from "../../components/Avatar";
 import Button from "../../components/Button";
 import { ConfirmModal } from "../../components/AdminTable";
 import { useToast } from "../../components/Toast";
@@ -43,20 +44,6 @@ const ROLE_TONE: Record<AdminUserRole, "default" | "primary" | "accent" | "warni
   admin: "warning",
 };
 
-/** Avatar tạm theo tên (backend chưa có trường avatar). */
-function avatarFor(seed: string): string {
-  const hash = Array.from(seed).reduce((a, c) => a + c.charCodeAt(0), 0);
-  const seeds = [
-    "photo-1535713875002-d1d0cf377fde",
-    "photo-1438761681033-6461ffad8d80",
-    "photo-1500648767791-00dcc994a43e",
-    "photo-1507003211169-0a1dd7228f2d",
-    "photo-1494790108377-be9c29b29330",
-  ];
-  const pick = seeds[hash % seeds.length];
-  return `https://images.unsplash.com/${pick}?auto=format&fit=crop&w=200&q=70`;
-}
-
 /** Map role của backend sang nhóm hiển thị của admin. */
 function mapRole(user: UserResponse): AdminUserRole {
   const names = (user.roles ?? []).map((r) => r.name?.toUpperCase() ?? "");
@@ -78,7 +65,6 @@ function mapUser(dto: UserResponse): AdminUser {
     name,
     email: dto.email,
     phone: dto.phone ?? "—",
-    avatar: avatarFor(dto.id),
     role: mapRole(dto),
     roleNames,
     city: "—",
@@ -412,11 +398,7 @@ export default function AdminUsers() {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={u.avatar}
-                          alt={u.name}
-                          className="w-10 h-10 rounded-full object-cover shrink-0"
-                        />
+                        <Avatar name={u.name} size={40} />
                         <div className="min-w-0">
                           <div className="font-semibold text-sm line-clamp-1">
                             {u.name}

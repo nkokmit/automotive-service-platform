@@ -21,6 +21,7 @@ import {
   IconWrench,
 } from "../../components/icons";
 import Card from "../../components/Card";
+import Avatar from "../../components/Avatar";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
@@ -181,10 +182,12 @@ export default function Profile() {
       <Card className="overflow-hidden mb-6">
         <div className="bg-gradient-to-br from-primary to-primary-hover p-6 md:p-8 text-white">
           <div className="flex items-start gap-4 flex-wrap">
-            <img
+            <Avatar
+              name={user.name}
               src={user.avatar}
-              alt={user.name}
-              className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border-4 border-white/20 shadow-cardHover"
+              size={96}
+              shape="xl"
+              className="border-4 border-white/20 shadow-cardHover"
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
