@@ -16,6 +16,7 @@ import SearchBox from "./SearchBox";
 import NotificationBell from "./NotificationBell";
 import { useToast } from "./Toast";
 import { useAuth } from "../data/authStore";
+import { useAdminAccess } from "../hooks/useAdminAccess";
 import { GARAGE } from "../config/garage";
 
 const navItems = [
@@ -44,6 +45,7 @@ export default function Header() {
   const [aiMenu, setAiMenu] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
+  const { canEnterAdmin } = useAdminAccess();
   const navigate = useNavigate();
   const t = useToast();
 
@@ -245,6 +247,10 @@ export default function Header() {
                       <IconUser size={16} />
                       Tài khoản của tôi
                     </Link>
+                    {/* Chi hien "Admin Panel" neu user co quyen vao khu vuc admin.
+                        Customer don le khong co quyen nao → an link de tranh
+                        vo vong vao trang 403. */}
+                    {canEnterAdmin && (
                     <Link
                       to="/admin"
                       onClick={() => setUserMenu(false)}
@@ -270,6 +276,7 @@ export default function Header() {
                         DEMO
                       </span>
                     </Link>
+                    )}
                     <Link
                       to="/profile?tab=bookings"
                       onClick={() => setUserMenu(false)}

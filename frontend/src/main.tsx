@@ -29,6 +29,7 @@ import SearchPage from "./modules/search/SearchPage";
 
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
 import RequireAuth from "./components/RequireAuth";
+import RequireAdmin from "./components/RequireAdmin";
 import AdminLayout from "./components/AdminLayout";
 import { ToastProvider } from "./components/Toast";
 import Card from "./components/Card";
@@ -117,52 +118,203 @@ hydrateUser().finally(() => {
                 </ToastProvider>
               }
             >
-              <Route index element={<AdminDashboard />} />
-              <Route path="services" element={<AdminServices />} />
-              <Route path="services/bom/:serviceId" element={<AdminServiceBom />} />
-              <Route path="categories" element={<AdminCategories />} />
-              <Route path="parts" element={<AdminParts />} />
-              <Route path="suppliers" element={<AdminSuppliers />} />
-              <Route path="purchase-orders" element={<AdminPurchaseOrders />} />
+              {/*
+                Moi route con deu boc `RequireAdmin`:
+                  1. `RequireAuth` — bat buoc dang nhap.
+                  2. Kiem tra authority theo `config/adminAccess.ts` — hien
+                     trang 403 neu role khong duoc phan quyen man hinh nay.
+
+                Luu y: `AdminLayout` KHONG boc RequireAuth de no hien thi
+                sidebar/topbar ngay; cac route con tu lo phan bao ve.
+              */}
+              <Route
+                index
+                element={
+                  <RequireAdmin>
+                    <AdminDashboard />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="services"
+                element={
+                  <RequireAdmin>
+                    <AdminServices />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="services/bom/:serviceId"
+                element={
+                  <RequireAdmin>
+                    <AdminServiceBom />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="categories"
+                element={
+                  <RequireAdmin>
+                    <AdminCategories />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="parts"
+                element={
+                  <RequireAdmin>
+                    <AdminParts />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="suppliers"
+                element={
+                  <RequireAdmin>
+                    <AdminSuppliers />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="purchase-orders"
+                element={
+                  <RequireAdmin>
+                    <AdminPurchaseOrders />
+                  </RequireAdmin>
+                }
+              />
               <Route
                 path="inventory-transactions"
-                element={<AdminInventoryTransactions />}
+                element={
+                  <RequireAdmin>
+                    <AdminInventoryTransactions />
+                  </RequireAdmin>
+                }
               />
-              <Route path="bookings" element={<AdminBookings />} />
-              <Route path="invoices" element={<AdminBilling />} />
-              <Route path="staff" element={<AdminStaff />} />
+              <Route
+                path="bookings"
+                element={
+                  <RequireAdmin>
+                    <AdminBookings />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="invoices"
+                element={
+                  <RequireAdmin>
+                    <AdminBilling />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="staff"
+                element={
+                  <RequireAdmin>
+                    <AdminStaff />
+                  </RequireAdmin>
+                }
+              />
               <Route
                 path="staff/:staffId/schedule"
-                element={<AdminStaffSchedule />}
+                element={
+                  <RequireAdmin>
+                    <AdminStaffSchedule />
+                  </RequireAdmin>
+                }
               />
-              <Route path="work-shifts" element={<AdminWorkShifts />} />
-              <Route path="schedule" element={<AdminScheduleBoard />} />
-              <Route path="work-orders" element={<AdminWorkOrders />} />
-              <Route path="work-orders/mine" element={<TechnicianWorkOrders />} />
-              <Route path="vehicles" element={<AdminCustomerVehicles />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="permissions" element={<AdminPermissions />} />
-              <Route path="roles" element={<AdminRoles />} />
+              <Route
+                path="work-shifts"
+                element={
+                  <RequireAdmin>
+                    <AdminWorkShifts />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="schedule"
+                element={
+                  <RequireAdmin>
+                    <AdminScheduleBoard />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="work-orders"
+                element={
+                  <RequireAdmin>
+                    <AdminWorkOrders />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="work-orders/mine"
+                element={
+                  <RequireAdmin>
+                    <TechnicianWorkOrders />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="vehicles"
+                element={
+                  <RequireAdmin>
+                    <AdminCustomerVehicles />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="users"
+                element={
+                  <RequireAdmin>
+                    <AdminUsers />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="permissions"
+                element={
+                  <RequireAdmin>
+                    <AdminPermissions />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="roles"
+                element={
+                  <RequireAdmin>
+                    <AdminRoles />
+                  </RequireAdmin>
+                }
+              />
               <Route
                 path="notification-templates"
-                element={<AdminNotificationTemplates />}
+                element={
+                  <RequireAdmin>
+                    <AdminNotificationTemplates />
+                  </RequireAdmin>
+                }
               />
               <Route
                 path="reports"
                 element={
-                  <ComingSoon
-                    title="Báo cáo & Thống kê"
-                    desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo dịch vụ, hiệu suất kỹ thuật viên, cohort khách hàng..."
-                  />
+                  <RequireAdmin>
+                    <ComingSoon
+                      title="Báo cáo & Thống kê"
+                      desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo dịch vụ, hiệu suất kỹ thuật viên, cohort khách hàng..."
+                    />
+                  </RequireAdmin>
                 }
               />
               <Route
                 path="settings"
                 element={
-                  <ComingSoon
-                    title="Cài đặt hệ thống"
-                    desc="Cấu hình chung: thông tin công ty, email templates, payment gateway, backup..."
-                  />
+                  <RequireAdmin>
+                    <ComingSoon
+                      title="Cài đặt hệ thống"
+                      desc="Cấu hình chung: thông tin công ty, email templates, payment gateway, backup..."
+                    />
+                  </RequireAdmin>
                 }
               />
               <Route path="*" element={<AdminNotFound />} />

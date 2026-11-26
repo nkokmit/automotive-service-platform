@@ -15,6 +15,7 @@ import { billingApi } from "../../api/endpoints/billing";
 import { workOrderApi } from "../../api/endpoints/workOrder";
 import { staffBookingApi } from "../../api/endpoints/booking";
 import { adminUserApi } from "../../api/endpoints/user";
+import { hasTokenAuthority } from "../../api/session";
 import type {
   InvoiceSummaryResponse,
   WorkOrderListItemResponse,
@@ -130,6 +131,17 @@ export function useAdminDashboard(): DashboardState {
   const [errors, setErrors] = useState<string[]>([]);
   const [nonce, setNonce] = useState(0);
 
+  /**
+   * Chi goi API ma role hien tai duoc phep doc.
+   *
+   * <p>Khong goi → khong duoc goi → khong co loi 403. Voi vai tro thu hep
+   * (VD thu ngan chi duoc xem hoa don) thi dashboard chi hien phan doc duoc.
+   */
+  const canReadInvoices = hasTokenAuthority("INVOICE_READ");
+  const canReadWorkOrders = hasTokenAuthority("WORK_ORDER_READ");
+  const canReadBookings = hasTokenAuthority("BOOKING_READ");
+  const canReadUsers = hasTokenAuthority("USER_READ");
+
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
@@ -142,56 +154,64 @@ export function useAdminDashboard(): DashboardState {
 
       // ── Hóa đơn (doanh thu + đơn gần đây) ────────────────────────────────
       let invoices: InvoiceSummaryResponse[] = [];
-      try {
-        const page = await billingApi.listInvoices({ size: 100 });
-        invoices = page.items ?? [];
-      } catch (err) {
-        errs.push(
-          err instanceof Error
-            ? `Hóa đơn: ${err.message}`
-            : "Không tải được danh sách hóa đơn",
-        );
+      if (canReadInvoices) {
+        try {
+          const page = await billingApi.listInvoices({ size: 100 });
+          invoices = page.items ?? [];
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Hóa đơn: ${err.message}`
+              : "Không tải được danh sách hóa đơn",
+          );
+        }
       }
 
       // ── Work Order ───────────────────────────────────────────────────────
       let workOrders: WorkOrderListItemResponse[] = [];
       let workOrderTotal = 0;
-      try {
-        const page = await workOrderApi.listWorkOrders({ size: 100 });
-        workOrders = page.items ?? [];
-        workOrderTotal = page.totalElements ?? workOrders.length;
-      } catch (err) {
-        errs.push(
-          err instanceof Error
-            ? `Phiếu sửa chữa: ${err.message}`
-            : "Không tải được danh sách phiếu sửa chữa",
-        );
+      if (canReadWorkOrders) {
+        try {
+          const page = await workOrderApi.listWorkOrders({ size: 100 });
+          workOrders = page.items ?? [];
+          workOrderTotal = page.totalElements ?? workOrders.length;
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Phiếu sửa chữa: ${err.message}`
+              : "Không tải được danh sách phiếu sửa chữa",
+          );
+        }
       }
 
       // ── Lịch hẹn ─────────────────────────────────────────────────────────
       let bookingTotal = 0;
-      try {
-        const page = await staffBookingApi.listBookings({ size: 1 });
-        bookingTotal = page.totalElements ?? 0;
-      } catch (err) {
-        errs.push(
-          err instanceof Error
-            ? `Lịch hẹn: ${err.message}`
-            : "Không tải được danh sách lịch hẹn",
-        );
+      if (canReadBookings) {
+        try {
+          const page = await staffBookingApi.listBookings({ size: 1 });
+          bookingTotal = page.totalElements ?? 0;
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Lịch hẹn: ${err.message}`
+              : "Không tải được danh sách lịch hẹn",
+          );
+        }
       }
 
       // ── Người dùng ───────────────────────────────────────────────────────
       let userTotal = 0;
-      try {
-        const page = await adminUserApi.listUsers({ size: 1 });
-        userTotal = page.totalElements ?? 0;
-      } catch (err) {
-        errs.push(
-          err instanceof Error
-            ? `Người dùng: ${err.message}`
-            : "Không tải được danh sách người dùng",
-        );
+      if (canReadUsers) {
+        try {
+          const page = await adminUserApi.listUsers({ size: 1 });
+          userTotal = page.totalElements ?? 0;
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Người dùng: ${err.message}`
+              : "Không tải được danh sách người dùng",
+          );
+        }
       }
 
       if (cancelled) return;
@@ -337,7 +357,13 @@ export function useAdminDashboard(): DashboardState {
     return () => {
       cancelled = true;
     };
-  }, [nonce]);
+  }, [
+    nonce,
+    canReadInvoices,
+    canReadWorkOrders,
+    canReadBookings,
+    canReadUsers,
+  ]);
 
   return {
     kpis,

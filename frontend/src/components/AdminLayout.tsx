@@ -38,6 +38,27 @@ import { useToast } from "./Toast";
 import Avatar from "./Avatar";
 import SearchBox from "./SearchBox";
 import NotificationBell from "./NotificationBell";
+import { hasTokenAuthority } from "../api/session";
+import {
+  ASSIGNED_LINE_READ,
+  BOOKING_READ,
+  CATALOG_READ,
+  CUSTOMER_READ,
+  INVENTORY_READ,
+  INVOICE_READ,
+  LEDGER_READ,
+  NOTIFICATION_TEMPLATE_READ,
+  PERMISSION_READ,
+  PURCHASE_ORDER_READ,
+  ROLE_READ,
+  STAFF_READ,
+  STAFF_SCHEDULE_READ,
+  SUPPLIER_READ,
+  USER_READ,
+  VEHICLE_READ,
+  WORK_ORDER_READ,
+  WORK_SHIFT_READ,
+} from "../config/adminAccess";
 
 // =========================
 // AdminLayout — shell chung cho /admin/*
@@ -54,6 +75,14 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   badge?: string;
+  /**
+   * Authority can co de thay muc nay trong sidebar.
+   *
+   * <p>`undefined` = khong gioi han (muc doanh nghiep chung). Khac rong = can
+   * it nhat MOT authority trong danh sach. Danh sach lay tu ma tran
+   * `config/adminAccess.ts` — cung chinh la authority ma backend kiem tra.
+   */
+  authority?: string[];
 }
 
 /**
@@ -76,6 +105,20 @@ type NavEntry = NavItem | NavFolder;
 /** Type guard: phân biệt folder với link đơn lẻ. */
 function isFolder(entry: NavEntry): entry is NavFolder {
   return "kind" in entry && entry.kind === "folder";
+}
+
+/**
+ * Muc nay co duoc hien thi voi nguoi dung hien tai khong.
+ *
+ * <p>Muc khong khai bao `authority` = luon hien (muc doanh nghiep chung).
+ * Muc co khai bao = can it nhat MOT authority trong danh sach.
+ */
+function isItemVisible(
+  item: NavItem,
+  can: (authority: string) => boolean,
+): boolean {
+  if (!item.authority || item.authority.length === 0) return true;
+  return item.authority.some((authority) => can(authority));
 }
 
 /**
@@ -103,8 +146,18 @@ const navGroups: NavGroup[] = [
         label: "Dịch vụ & danh mục",
         icon: IconWrench,
         items: [
-          { to: "/admin/services", label: "Dịch vụ", icon: IconWrench },
-          { to: "/admin/categories", label: "Nhóm danh mục", icon: IconList },
+          {
+            to: "/admin/services",
+            label: "Dịch vụ",
+            icon: IconWrench,
+            authority: [CATALOG_READ],
+          },
+          {
+            to: "/admin/categories",
+            label: "Nhóm danh mục",
+            icon: IconList,
+            authority: [CATALOG_READ],
+          },
         ],
       },
       {
@@ -113,17 +166,29 @@ const navGroups: NavGroup[] = [
         label: "Kho & phụ tùng",
         icon: IconBox,
         items: [
-          { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
-          { to: "/admin/suppliers", label: "Nhà cung cấp", icon: IconBuilding },
+          {
+            to: "/admin/parts",
+            label: "Phụ tùng",
+            icon: IconPackage,
+            authority: [INVENTORY_READ],
+          },
+          {
+            to: "/admin/suppliers",
+            label: "Nhà cung cấp",
+            icon: IconBuilding,
+            authority: [SUPPLIER_READ],
+          },
           {
             to: "/admin/purchase-orders",
             label: "Đơn nhập hàng",
             icon: IconTruck,
+            authority: [PURCHASE_ORDER_READ],
           },
           {
             to: "/admin/inventory-transactions",
             label: "Sổ kho",
             icon: IconActivity,
+            authority: [LEDGER_READ],
           },
         ],
       },
@@ -133,14 +198,30 @@ const navGroups: NavGroup[] = [
         label: "Vận hành xưởng",
         icon: IconCar,
         items: [
-          { to: "/admin/bookings", label: "Lịch hẹn xưởng", icon: IconCalendar },
-          { to: "/admin/work-orders", label: "Phiếu sửa chữa", icon: IconWrench },
+          {
+            to: "/admin/bookings",
+            label: "Lịch hẹn xưởng",
+            icon: IconCalendar,
+            authority: [BOOKING_READ],
+          },
+          {
+            to: "/admin/work-orders",
+            label: "Phiếu sửa chữa",
+            icon: IconWrench,
+            authority: [WORK_ORDER_READ],
+          },
           {
             to: "/admin/work-orders/mine",
             label: "Việc của tôi",
             icon: IconCheck,
+            authority: [ASSIGNED_LINE_READ],
           },
-          { to: "/admin/schedule", label: "Lịch trình xưởng", icon: IconCalendar },
+          {
+            to: "/admin/schedule",
+            label: "Lịch trình xưởng",
+            icon: IconCalendar,
+            authority: [STAFF_SCHEDULE_READ],
+          },
         ],
       },
       {
@@ -149,24 +230,60 @@ const navGroups: NavGroup[] = [
         label: "Nhân sự",
         icon: IconUsers,
         items: [
-          { to: "/admin/staff", label: "Kỹ thuật viên", icon: IconUsers },
-          { to: "/admin/work-shifts", label: "Ca làm việc", icon: IconClock },
+          {
+            to: "/admin/staff",
+            label: "Kỹ thuật viên",
+            icon: IconUsers,
+            authority: [STAFF_READ],
+          },
+          {
+            to: "/admin/work-shifts",
+            label: "Ca làm việc",
+            icon: IconClock,
+            authority: [WORK_SHIFT_READ],
+          },
         ],
       },
-      { to: "/admin/invoices", label: "Hóa đơn", icon: IconCash },
-      { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
-      { to: "/admin/users", label: "Người dùng", icon: IconUsers },
+      {
+        to: "/admin/invoices",
+        label: "Hóa đơn",
+        icon: IconCash,
+        authority: [INVOICE_READ],
+      },
+      {
+        to: "/admin/vehicles",
+        label: "Hồ sơ Xe & KH",
+        icon: IconCar,
+        authority: [CUSTOMER_READ, VEHICLE_READ],
+      },
+      {
+        to: "/admin/users",
+        label: "Người dùng",
+        icon: IconUsers,
+        authority: [USER_READ],
+      },
     ],
   },
   {
     label: "Hệ thống",
     items: [
-      { to: "/admin/permissions", label: "Quyền", icon: IconShield },
-      { to: "/admin/roles", label: "Vai trò", icon: IconShield },
+      {
+        to: "/admin/permissions",
+        label: "Quyền",
+        icon: IconShield,
+        authority: [PERMISSION_READ],
+      },
+      {
+        to: "/admin/roles",
+        label: "Vai trò",
+        icon: IconShield,
+        authority: [ROLE_READ],
+      },
       {
         to: "/admin/notification-templates",
         label: "Template thông báo",
         icon: IconBell,
+        authority: [NOTIFICATION_TEMPLATE_READ],
       },
       { to: "/admin/reports", label: "Báo cáo", icon: IconChart },
       { to: "/admin/settings", label: "Cài đặt", icon: IconSettings },
@@ -220,6 +337,18 @@ export default function AdminLayout() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const t = useToast();
+
+  /**
+   * Kiem tra quyen cua nguoi dung hien tai.
+   *
+   * <p>Lay tu claim `authorities` cua access token — cung nguon voi backend
+   * dung de kiem tra `@PreAuthorize`, nen menu khong bao gio "co quyen" ma
+   * API lai tra 403.
+   */
+  const can = useCallback(
+    (authority: string) => hasTokenAuthority(authority),
+    [],
+  );
 
   /**
    * Trạng thái mở/đóng của các folder trong sidebar.
@@ -477,6 +606,7 @@ export default function AdminLayout() {
           onNavigate={() => {}}
           isFolderOpen={isFolderOpen}
           toggleFolder={toggleFolder}
+          can={can}
         />
       </aside>
 
@@ -494,6 +624,7 @@ export default function AdminLayout() {
               onNavigate={() => setMobileOpen(false)}
               isFolderOpen={isFolderOpen}
               toggleFolder={toggleFolder}
+              can={can}
             />
           </div>
         </div>
@@ -685,11 +816,47 @@ function SidebarContent({
   onNavigate,
   isFolderOpen,
   toggleFolder,
+  can,
 }: {
   onNavigate: () => void;
   isFolderOpen: (id: string) => boolean;
   toggleFolder: (id: string) => void;
+  /** Kiem tra nguoi dung co authority hay khong. */
+  can: (authority: string) => boolean;
 }) {
+  /**
+   * Loc cac muc theo quyen.
+   *
+   * <p>- Muc link don le: an neu khong co quyen nao trong `authority`.
+   * <p>- Folder: loc TUNG muc ben trong; an folder neu khong con muc nao.
+   *
+   * <p>Quan trong: phai loc ca `folder.items`, khong chi kiem tra folder co
+   * "it nhat mot muc hien" hay khong — neu khong loc thi cac muc khong du
+   * quyen van xuat hien ben trong folder.
+   */
+  const visibleGroups = useMemo(
+    () =>
+      navGroups
+        .map((group): NavGroup => {
+          const items: NavEntry[] = [];
+          for (const entry of group.items) {
+            if (!isFolder(entry)) {
+              if (isItemVisible(entry, can)) items.push(entry);
+              continue;
+            }
+            // Loc cac muc con hop le.
+            const childItems = entry.items.filter((i) => isItemVisible(i, can));
+            // Folder khong con muc nao → an folder.
+            if (childItems.length === 0) continue;
+            items.push({ ...entry, items: childItems });
+          }
+          return { ...group, items };
+        })
+        // Nhom rong (khong con muc nao) → bo qua, tranh heading "Quản lý" rong.
+        .filter((group) => group.items.length > 0),
+    [can],
+  );
+
   return (
     <>
       {/* Logo */}
@@ -720,7 +887,7 @@ function SidebarContent({
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-4">
-        {navGroups.map((group, gi) => (
+        {visibleGroups.map((group, gi) => (
           <div key={gi}>
             {group.label && (
               <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-1.5 px-2">

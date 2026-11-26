@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --port 5173"
+    "preview": "vite preview --port 5173",
+    "check:access": "tsx scripts/check-admin-access.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -20,6 +21,7 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
+    "tsx": "^4.23.15",
     "typescript": "^5.6.2",
     "vite": "^5.4.8"
   }
