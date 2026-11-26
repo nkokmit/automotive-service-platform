@@ -18,8 +18,12 @@ public interface PermissionRepository extends JpaRepository<Permission, UUID> {
 
     /**
      * Lấy permission theo ID kể cả khi đã soft delete (native query để bypass {@code @SQLRestriction}).
+     *
+     * <p>Tham số nhận dạng {@link String} (hex 36 ký tự) vì Hibernate bind
+     * {@link UUID} trong native query thành binary 16 byte, không khớp cột
+     * {@code varchar(36)}.
      */
     @Query(value = "SELECT * FROM permissions WHERE id = :id", nativeQuery = true)
-    Optional<Permission> findByIdRaw(@Param("id") UUID id);
+    Optional<Permission> findByIdRaw(@Param("id") String id);
 }
 

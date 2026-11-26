@@ -58,7 +58,8 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public CustomerResponse createCustomer(CustomerCreateRequest request) {
         // Tài khoản không được liên kết với hồ sơ khác, kể cả hồ sơ đã xoá mềm.
-        if (request.userId() != null && customerRepository.countByUserIdIncludingDeleted(request.userId()) > 0) {
+        if (request.userId() != null
+                && customerRepository.countByUserIdIncludingDeleted(request.userId().toString()) > 0) {
             throw new CustomerAlreadyExistsException(
                     "Tài khoản đã được liên kết với khách hàng khác: " + request.userId());
         }
@@ -114,7 +115,8 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public void deleteCustomer(UUID id) {
         // Dùng native query để bypass @SQLRestriction — idempotent nếu đã xoá trước đó.
-        Customer customer = customerRepository.findByIdRaw(id)
+        // `id.toString()` vì native query bind UUID thành binary 16 byte, không khớp cột varchar(36).
+        Customer customer = customerRepository.findByIdRaw(id.toString())
                 .orElseThrow(() -> new CustomerNotFoundException("Không tìm thấy khách hàng với id: " + id));
 
         if (customer.getDeletedAt() != null) {
@@ -155,7 +157,7 @@ public class CustomerServiceImpl implements CustomerService {
      * chắc chắn là hồ sơ khác đang giữ tài khoản đó.
      */
     private void validateUserIdAvailable(UUID userId) {
-        if (customerRepository.countByUserIdIncludingDeleted(userId) > 0) {
+        if (customerRepository.countByUserIdIncludingDeleted(userId.toString()) > 0) {
             throw new CustomerAlreadyExistsException(
                     "Tài khoản đã được liên kết với khách hàng khác: " + userId);
         }

@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -81,7 +83,22 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     /**
      * Lấy xe theo ID kể cả khi đã soft delete (native query để bypass
      * {@code @SQLRestriction}).
+     *
+     * <p>Tham số nhận dạng {@link String} (hex 36 ký tự) vì Hibernate bind
+     * {@link UUID} trong native query thành binary 16 byte, không khớp cột
+     * {@code varchar(36)}.
      */
     @Query(value = "SELECT * FROM vehicles WHERE id = :id", nativeQuery = true)
-    Optional<Vehicle> findByIdRaw(@Param("id") UUID id);
+    Optional<Vehicle> findByIdRaw(@Param("id") String id);
+
+    /**
+     * Lấy nhiều xe theo id trong MỘT truy vấn.
+     *
+     * <p>Dùng khi cần tra cứu xe cho cả trang kết quả lịch sử bảo dưỡng — tránh
+     * N+1 query (mỗi dòng một lần {@code findById}).
+     *
+     * <p>Soft-deleted vehicle tự động bị loại nhờ {@code @SQLRestriction}, nên xe
+     * đã xoá sẽ không có trong kết quả → trường hiển thị tương ứng null.
+     */
+    List<Vehicle> findAllByIdIn(Collection<UUID> ids);
 }

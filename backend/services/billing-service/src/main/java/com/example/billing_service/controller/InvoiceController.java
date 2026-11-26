@@ -7,6 +7,7 @@ import com.example.billing_service.dto.response.InvoicePageResponse;
 import com.example.billing_service.dto.response.InvoiceResponse;
 import com.example.billing_service.enums.InvoiceStatus;
 import com.example.billing_service.service.InvoiceService;
+import com.example.billing_service.security.JwtUserIdResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -108,6 +109,6 @@ public class InvoiceController {
     }
 
     private UUID userId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+        return JwtUserIdResolver.resolveUserId(jwt);
     }
 }

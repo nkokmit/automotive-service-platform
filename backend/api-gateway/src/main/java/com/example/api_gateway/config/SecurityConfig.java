@@ -3,6 +3,7 @@ package com.example.api_gateway.config;
 import com.example.api_gateway.exception.SecurityErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
@@ -31,6 +32,17 @@ public class SecurityConfig {
                         // Authentication endpoints
                         .pathMatchers(
                                 "/api/auth/**"
+                        ).permitAll()
+
+                        // ── Catalog công khai ──────────────────────────────────────
+                        // Khách chưa đăng nhập vẫn xem được danh mục dịch vụ và phụ
+                        // tùng (trang /services, /parts của storefront là trang public).
+                        // Chỉ GET — mọi thao tác ghi vẫn đi qua xác thực ở service.
+                        .pathMatchers(HttpMethod.GET,
+                                "/api/services/**",
+                                "/api/service-categories/**",
+                                "/api/parts/**",
+                                "/api/part-categories/**"
                         ).permitAll()
 
                         // Only health is public; other Actuator endpoints stay protected.

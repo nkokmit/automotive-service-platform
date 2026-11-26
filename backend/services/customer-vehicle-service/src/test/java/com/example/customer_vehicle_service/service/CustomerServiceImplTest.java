@@ -58,7 +58,7 @@ class CustomerServiceImplTest {
         CustomerCreateRequest request = new CustomerCreateRequest(
                 "Nguyễn Văn A", "0901234567", "a@example.com", "Hà Nội", "ghi chú", userId, null);
 
-        given(customerRepository.countByUserIdIncludingDeleted(userId)).willReturn(0L);
+        given(customerRepository.countByUserIdIncludingDeleted(userId.toString())).willReturn(0L);
         given(customerRepository.save(any(Customer.class))).willAnswer(invocation -> invocation.getArgument(0));
         CustomerResponse expected = response(TRUE);
         given(customerMapper.toCustomerResponse(any(Customer.class))).willReturn(expected);
@@ -83,7 +83,7 @@ class CustomerServiceImplTest {
         CustomerCreateRequest request = new CustomerCreateRequest(
                 "Nguyễn Văn A", "0901234567", null, null, null, userId, null);
 
-        given(customerRepository.countByUserIdIncludingDeleted(userId)).willReturn(1L);
+        given(customerRepository.countByUserIdIncludingDeleted(userId.toString())).willReturn(1L);
 
         assertThatThrownBy(() -> customerService.createCustomer(request))
                 .isInstanceOf(CustomerAlreadyExistsException.class)
@@ -215,7 +215,7 @@ class CustomerServiceImplTest {
         UUID takenUserId = UUID.randomUUID();
         Customer customer = customer();
         given(customerRepository.findById(CUSTOMER_ID)).willReturn(Optional.of(customer));
-        given(customerRepository.countByUserIdIncludingDeleted(takenUserId)).willReturn(1L);
+        given(customerRepository.countByUserIdIncludingDeleted(takenUserId.toString())).willReturn(1L);
         CustomerUpdateRequest request = new CustomerUpdateRequest(
                 null, null, null, null, null, takenUserId, null);
 
@@ -281,7 +281,7 @@ class CustomerServiceImplTest {
     @Test
     void deleteCustomer_softDeletesRegardlessOfVehicleHistory() {
         Customer customer = customer();
-        given(customerRepository.findByIdRaw(CUSTOMER_ID)).willReturn(Optional.of(customer));
+        given(customerRepository.findByIdRaw(CUSTOMER_ID.toString())).willReturn(Optional.of(customer));
 
         customerService.deleteCustomer(CUSTOMER_ID);
 
@@ -294,7 +294,7 @@ class CustomerServiceImplTest {
     void deleteCustomer_isIdempotentWhenAlreadyDeleted() {
         Customer customer = customer();
         customer.setDeletedAt(Instant.now());
-        given(customerRepository.findByIdRaw(CUSTOMER_ID)).willReturn(Optional.of(customer));
+        given(customerRepository.findByIdRaw(CUSTOMER_ID.toString())).willReturn(Optional.of(customer));
 
         customerService.deleteCustomer(CUSTOMER_ID);
 
@@ -303,7 +303,7 @@ class CustomerServiceImplTest {
 
     @Test
     void deleteCustomer_throwsWhenNotFound() {
-        given(customerRepository.findByIdRaw(CUSTOMER_ID)).willReturn(Optional.empty());
+        given(customerRepository.findByIdRaw(CUSTOMER_ID.toString())).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> customerService.deleteCustomer(CUSTOMER_ID))
                 .isInstanceOf(CustomerNotFoundException.class);

@@ -30,7 +30,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -53,6 +55,8 @@ public class UserServiceImpl implements UserService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final ApplicationEventPublisher eventPublisher;
+
+    private final TransactionTemplate transactionTemplate;
 
     /** Role cố định được gán cho mọi tài khoản tự đăng ký. */
     private static final String DEFAULT_REGISTER_ROLE = "CUSTOMER";
@@ -148,7 +152,8 @@ public class UserServiceImpl implements UserService {
     @Override
     public void deleteUser(UUID id) {
         // Dùng native query để bypass @SQLRestriction — idempotent nếu user đã bị xoá trước đó.
-        User user = userRepository.findByIdRaw(id)
+        // `id.toString()` vì native query bind UUID thành binary 16 byte, không khớp cột varchar(36).
+        User user = userRepository.findByIdRaw(id.toString())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng với id: " + id));
 
         if (user.getDeletedAt() != null) {
@@ -186,9 +191,14 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public AuthenticationResponse registerUser(RegisterRequest request) {
         validateUniqueUsernameEmailAndPhone(request.username(), request.email(), request.phone(), null);
+        String encodedPassword = passwordEncoder.encode(request.password());
+        return transactionTemplate.execute(status -> persistRegisteredUser(request, encodedPassword));
+    }
 
+    private AuthenticationResponse persistRegisteredUser(RegisterRequest request, String encodedPassword) {
         // Role gán cứng server-side: endpoint public, không tin role do client gửi lên.
         Role defaultRole = roleRepository.findByName(DEFAULT_REGISTER_ROLE)
                 .orElseThrow(() -> new RoleNotFoundException(
@@ -196,7 +206,7 @@ public class UserServiceImpl implements UserService {
 
         User user = User.builder()
                 .username(request.username())
-                .password(passwordEncoder.encode(request.password()))
+                .password(encodedPassword)
                 .email(request.email())
                 .phone(request.phone())
                 .fullName(request.fullName())
@@ -223,7 +233,7 @@ public class UserServiceImpl implements UserService {
      */
     private AuthenticationResponse issueTokens(User user) {
         String accessToken = jwtService.generateToken(user);
-        String refreshToken = refreshTokenService.createRefreshToken(user.getId());
+        String refreshToken = refreshTokenService.createRefreshToken(user);
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -245,7 +255,7 @@ public class UserServiceImpl implements UserService {
         if (email != null) {
             long count = excludeUserId == null
                     ? userRepository.countByEmailIncludingDeleted(email)
-                    : userRepository.countByEmailAndIdNotIncludingDeleted(email, excludeUserId);
+                    : userRepository.countByEmailAndIdNotIncludingDeleted(email, excludeUserId.toString());
             if (count > 0) {
                 throw new UserEmailAlreadyExistsException("Email đã tồn tại: " + email);
             }
@@ -253,7 +263,7 @@ public class UserServiceImpl implements UserService {
         if (phone != null) {
             long count = excludeUserId == null
                     ? userRepository.countByPhoneIncludingDeleted(phone)
-                    : userRepository.countByPhoneAndIdNotIncludingDeleted(phone, excludeUserId);
+                    : userRepository.countByPhoneAndIdNotIncludingDeleted(phone, excludeUserId.toString());
             if (count > 0) {
                 throw new UserPhoneAlreadyExistsException("Số điện thoại đã tồn tại: " + phone);
             }

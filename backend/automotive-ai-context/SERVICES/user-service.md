@@ -58,7 +58,7 @@ grant are separate concerns in this model.
 
 | Endpoint | Required authority |
 | --- | --- |
-| `POST /api/auth/login` | public |
+| `POST /api/auth/login` | public (accepts username **or** email) |
 | `POST /api/auth/register` | public |
 | `POST /api/auth/refresh-token` | public |
 | `POST /api/auth/logout` | authenticated |
