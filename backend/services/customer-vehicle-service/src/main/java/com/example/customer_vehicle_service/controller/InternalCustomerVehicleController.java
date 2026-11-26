@@ -2,6 +2,7 @@ package com.example.customer_vehicle_service.controller;
 
 import com.example.customer_vehicle_service.common.ApiResponse;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
+import com.example.customer_vehicle_service.dto.response.CustomerIdentityResponse;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
 import com.example.customer_vehicle_service.service.CustomerService;
 import com.example.customer_vehicle_service.service.VehicleService;
@@ -29,6 +30,12 @@ public class InternalCustomerVehicleController {
     @PreAuthorize("hasAuthority('INTERNAL_CUSTOMER_READ')")
     public ApiResponse<CustomerResponse> getCustomer(@PathVariable UUID id) {
         return ApiResponse.success(customerService.getCustomerById(id));
+    }
+
+    @GetMapping("/customers/by-user/{userId}")
+    @PreAuthorize("hasAuthority('INTERNAL_CUSTOMER_READ')")
+    public ApiResponse<CustomerIdentityResponse> getCustomerByUserId(@PathVariable UUID userId) {
+        return ApiResponse.success(customerService.getCustomerIdentityByUserId(userId));
     }
 
     @GetMapping("/vehicles/{id}")

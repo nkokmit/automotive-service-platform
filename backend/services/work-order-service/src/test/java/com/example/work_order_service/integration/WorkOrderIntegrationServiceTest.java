@@ -7,6 +7,7 @@ import com.example.work_order_service.integration.client.CustomerVehicleClient;
 import com.example.work_order_service.integration.client.InventoryServiceClient;
 import com.example.work_order_service.integration.contract.BookingContract;
 import com.example.work_order_service.integration.contract.CustomerContract;
+import com.example.work_order_service.integration.contract.CustomerIdentityContract;
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
 import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
@@ -68,6 +69,30 @@ class WorkOrderIntegrationServiceTest {
         assertEquals(serviceId, catalog.service().id());
         assertEquals(partId, catalog.bom().get(0).partId());
         assertEquals(2, catalog.bom().get(0).defaultQuantity());
+    }
+
+    @Test
+    void resolvesCustomerProfileByAuthenticatedUserId() {
+        UUID userId = UUID.randomUUID();
+        CustomerIdentityContract customer = new CustomerIdentityContract(customerId, true);
+        when(customerVehicleClient.getCustomerByUserId(userId))
+                .thenReturn(new ServiceApiResponse<>(0, "Success", customer));
+
+        assertEquals(customer, integrationService.getCustomerByUserId(userId));
+        verify(customerVehicleClient).getCustomerByUserId(userId);
+    }
+
+    @Test
+    void rejectsInactiveCustomerProfileDuringResolution() {
+        UUID userId = UUID.randomUUID();
+        CustomerIdentityContract customer = new CustomerIdentityContract(customerId, false);
+        when(customerVehicleClient.getCustomerByUserId(userId))
+                .thenReturn(new ServiceApiResponse<>(0, "Success", customer));
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> integrationService.getCustomerByUserId(userId));
+
+        assertEquals(ErrorCode.UNAUTHORIZED, exception.getErrorCode());
     }
 
     @Test

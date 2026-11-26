@@ -1,181 +1,256 @@
 openapi: "3.1.0"
 info:
-  title: Garage Service API
-  version: "1.0.0"
-  description: Garage slot availability and booking management
-
-servers:
-  - url: http://localhost/api/v1
-
-tags:
-  - name: garages
-  - name: bookings
-  - name: slots
-
+  title: Garage API
+  version: 0.1.0
 paths:
-  /garages:
+  /api/work-orders/me/feedback-eligible:
     get:
-      tags: [garages]
-      summary: List all active garages
+      operationId: getFeedbackEligibleWorkOrders
+      summary: Liệt kê Work Order tôi có thể đánh giá
+      security:
+        - bearerAuth: []
       parameters:
-        - name: city
+        - name: page
           in: query
           schema:
-            type: string
-          example: "Hà Nội"
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
       responses:
         "200":
-          description: List of garages
+          description: Work Order đã đóng của khách hiện tại chưa được đánh giá
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Garage"
-
-  /garages/{garage_id}/slots:
-    get:
-      tags: [slots]
-      summary: Get available time slots for a garage on a date
+                $ref: "#/components/schemas/FeedbackEligibleWorkOrdersEnvelope"
+        "401":
+          description: Thiếu hoặc sai access token
+        "403":
+          description: Không xác định được hồ sơ khách hàng hiện tại
+        "503":
+          description: Không thể xác định hồ sơ khách hàng
+  /api/work-orders/{workOrderId}/feedback:
+    post:
+      operationId: submitWorkOrderFeedback
+      summary: Gửi đánh giá cho Work Order đã đóng
+      security:
+        - bearerAuth: []
       parameters:
-        - name: garage_id
+        - name: workOrderId
           in: path
           required: true
           schema:
             type: string
             format: uuid
-        - name: date
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-          example: "2026-10-20"
-      responses:
-        "200":
-          description: Available slots
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  garage_id:
-                    type: string
-                  date:
-                    type: string
-                  slots:
-                    type: array
-                    items:
-                      type: string
-                    example: ["08:00", "09:00", "10:00", "14:00", "15:00"]
-
-  /bookings:
-    post:
-      tags: [bookings]
-      summary: Create a new booking
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateBookingRequest"
+              $ref: "#/components/schemas/CreateWorkOrderFeedbackRequest"
       responses:
         "201":
-          description: Booking created
+          description: Đã lưu đánh giá
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BookingResponse"
+                $ref: "#/components/schemas/WorkOrderFeedbackEnvelope"
+        "400":
+          description: Điểm hoặc nhận xét không hợp lệ
+        "401":
+          description: Thiếu hoặc sai access token
+        "403":
+          description: Work Order không thuộc khách hàng hiện tại
+        "404":
+          description: Không tìm thấy Work Order
         "409":
-          description: Slot already taken
-
-  /bookings/{booking_id}:
+          description: Work Order chưa đóng hoặc đã được đánh giá
+        "503":
+          description: Không thể xác định hồ sơ khách hàng
+  /api/work-orders/reviews/summary:
     get:
-      tags: [bookings]
-      summary: Get booking by ID
+      operationId: getHomepageReviewSummary
+      summary: Tổng hợp đánh giá công khai cho trang chủ
+      security: []
       parameters:
-        - name: booking_id
-          in: path
-          required: true
+        - name: limit
+          in: query
           schema:
-            type: string
-            format: uuid
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 5
       responses:
         "200":
+          description: Điểm trung bình, số lượt và đánh giá mới nhất cùng service line đã thực hiện
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BookingResponse"
-
+                $ref: "#/components/schemas/HomepageReviewSummaryEnvelope"
+        "400":
+          description: Giới hạn số review không hợp lệ
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
-    Garage:
+    CreateWorkOrderFeedbackRequest:
       type: object
+      required:
+        - rating
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          maxLength: 1000
+          description: Nhận xét văn bản thuần, không bắt buộc.
+    FeedbackEligibleWorkOrder:
+      type: object
+      required:
+        - workOrderId
+        - workOrderCode
+      properties:
+        workOrderId:
+          type: string
+          format: uuid
+        workOrderCode:
+          type: string
+    FeedbackEligiblePage:
+      type: object
+      required:
+        - items
+        - page
+        - size
+        - totalElements
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackEligibleWorkOrder"
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+    WorkOrderFeedback:
+      type: object
+      required:
+        - id
+        - workOrderId
+        - rating
+        - createdAt
       properties:
         id:
           type: string
           format: uuid
-        name:
+        workOrderId:
           type: string
-        address:
-          type: string
-        city:
-          type: string
-        phone:
-          type: string
+          format: uuid
         rating:
-          type: number
-        services:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    HomepageReview:
+      type: object
+      required:
+        - rating
+        - createdAt
+        - completedServices
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        completedServices:
           type: array
           items:
             type: string
-
-    CreateBookingRequest:
+          description: Tên snapshot của service line COMPLETED; không kèm giá hoặc định danh.
+    HomepageReviewSummary:
       type: object
-      required: [garage_id, date, time_slot, service_type, customer_name, phone]
+      required:
+        - averageRating
+        - reviewCount
+        - recentReviews
       properties:
-        garage_id:
-          type: string
-          format: uuid
-        date:
-          type: string
-          format: date
-        time_slot:
-          type: string
-          example: "09:00"
-        service_type:
-          type: string
-          enum: [oil_change, tire_rotation, full_inspection, brake_service, ac_service, glass_repair, other]
-        customer_name:
-          type: string
-        phone:
-          type: string
-        notes:
-          type: string
-          nullable: true
-
-    BookingResponse:
+        averageRating:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 5
+        reviewCount:
+          type: integer
+          format: int64
+        recentReviews:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/HomepageReview"
+    FeedbackEligibleWorkOrdersEnvelope:
       type: object
+      required:
+        - code
+        - message
+        - result
       properties:
-        booking_id:
+        code:
+          type: integer
+        message:
           type: string
-          format: uuid
-        garage_id:
+        result:
+          $ref: "#/components/schemas/FeedbackEligiblePage"
+    WorkOrderFeedbackEnvelope:
+      type: object
+      required:
+        - code
+        - message
+        - result
+      properties:
+        code:
+          type: integer
+        message:
           type: string
-        date:
+        result:
+          $ref: "#/components/schemas/WorkOrderFeedback"
+    HomepageReviewSummaryEnvelope:
+      type: object
+      required:
+        - code
+        - message
+        - result
+      properties:
+        code:
+          type: integer
+        message:
           type: string
-        time_slot:
-          type: string
-        service_type:
-          type: string
-        customer_name:
-          type: string
-        phone:
-          type: string
-        status:
-          type: string
-          enum: [confirmed, cancelled, completed, no_show]
-        created_at:
-          type: string
-          format: date-time
-
+        result:
+          $ref: "#/components/schemas/HomepageReviewSummary"

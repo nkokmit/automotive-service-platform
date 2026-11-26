@@ -1,0 +1,180 @@
+@startuml
+title Automotive Service Platform - Class Diagram
+left to right direction
+skinparam classAttributeIconSize 0
+hide empty members
+
+' Solid: database foreign key. Dashed: logical reference, not a database FK.
+' Labels identify the referencing column on the source class.
+package "User Service" {
+  class User
+  class Role
+  class Permission
+  class RefreshToken
+}
+
+package "Customer Vehicle Service" {
+  class Customer
+  class Vehicle
+  class VehicleServiceHistory
+  class "ProcessedEvent" as CustomerProcessedEvent <<inbox>>
+}
+
+package "Staff Service" {
+  class StaffMember
+  class WorkShift
+  class StaffRecurringSchedule
+  class StaffScheduleException
+  class StaffAbsence
+}
+
+package "Inventory Service" {
+  class ServiceCategory
+  class "Service" as CatalogService
+  class PartCategory
+  class Part
+  class ServiceBom
+  class PartVehicleCompatibility
+  class Supplier
+  class PurchaseOrder
+  class PurchaseOrderItem
+  class InventoryTransaction
+  class ProcessedReservationRequest <<inbox>>
+}
+
+package "Booking Service" {
+  class Booking
+  class BookingService
+  class BookingStatusHistory
+  class BookingCapacityDayLock <<locking table>>
+}
+
+package "Work Order Service" {
+  class WorkOrder
+  class Estimate
+  class WorkOrderServiceLine
+  class WorkOrderPartLine
+  class WorkOrderStatusHistory
+  class "ProcessedEvent" as WorkOrderProcessedEvent <<inbox>>
+  class "OutboxEvent" as WorkOrderOutboxEvent <<outbox>>
+}
+
+package "Billing Service" {
+  class Invoice
+  class InvoiceItem
+  class Payment
+  class "ProcessedEvent" as BillingProcessedEvent <<inbox>>
+  class "OutboxEvent" as BillingOutboxEvent <<outbox>>
+}
+
+package "Notification Service" {
+  class Notification
+  class NotificationTemplate
+  class NotificationDelivery
+  class "ProcessedEvent" as NotificationProcessedEvent <<inbox>>
+}
+
+' User service: many-to-many mappings use user_roles and role_permissions.
+User "0..*" -- "0..*" Role : user_roles (user_id, role_id)
+Role "0..*" -- "0..*" Permission : role_permissions (role_id, permission_id)
+RefreshToken "0..*" --> "0..1" User : user_id
+
+' Customer and vehicle
+Customer "0..1" ..> "0..1" User : user_id
+VehicleServiceHistory "0..*" --> "1" Vehicle : vehicle_id
+VehicleServiceHistory "0..*" --> "0..1" Customer : customer_id
+VehicleServiceHistory "0..1" ..> "0..1" WorkOrder : work_order_id
+
+' Staff
+StaffMember "0..1" ..> "0..1" User : user_id
+StaffRecurringSchedule "0..*" --> "1" StaffMember : staff_id
+StaffRecurringSchedule "0..*" --> "1" WorkShift : shift_id
+StaffScheduleException "0..*" --> "1" StaffMember : staff_id
+StaffScheduleException "0..*" --> "1" WorkShift : shift_id
+StaffAbsence "0..*" --> "1" StaffMember : staff_id
+StaffScheduleException "0..*" ..> "0..1" User : created_by
+StaffAbsence "0..*" ..> "0..1" User : recorded_by
+
+' Inventory
+CatalogService "0..*" --> "1" ServiceCategory : category_id
+Part "0..*" --> "1" PartCategory : category_id
+ServiceBom "0..*" --> "1" CatalogService : service_id
+ServiceBom "0..*" --> "1" Part : part_id
+PartVehicleCompatibility "0..*" --> "1" Part : part_id
+PurchaseOrder "0..*" --> "1" Supplier : supplier_id
+PurchaseOrderItem "0..*" --> "1" PurchaseOrder : purchase_order_id
+PurchaseOrderItem "0..*" --> "1" Part : part_id
+InventoryTransaction "0..*" --> "1" Part : part_id
+PurchaseOrder "0..*" ..> "1" User : created_by
+InventoryTransaction "0..*" ..> "1" User : created_by
+InventoryTransaction "0..*" ..> "0..1" PurchaseOrder : reference_id [PURCHASE_ORDER]
+InventoryTransaction "0..*" ..> "0..1" WorkOrder : reference_id [WORK_ORDER]
+ProcessedReservationRequest "0..*" ..> "1" WorkOrder : work_order_id
+ProcessedReservationRequest "0..*" ..> "1" Estimate : estimate_id
+
+' Booking
+Booking "0..*" ..> "1" Customer : customer_id
+Booking "0..*" ..> "0..1" Vehicle : vehicle_id
+Booking "0..1" ..> "0..1" WorkOrder : work_order_id
+Booking "0..*" ..> "0..1" User : created_by
+BookingService "0..*" --> "1" Booking : booking_id
+BookingService "0..*" ..> "1" CatalogService : service_id
+BookingStatusHistory "0..*" --> "1" Booking : booking_id
+BookingStatusHistory "0..*" ..> "0..1" User : changed_by
+
+' Work orders
+WorkOrder "0..1" ..> "1" Booking : booking_id
+WorkOrder "0..*" ..> "1" Customer : customer_id
+WorkOrder "0..*" ..> "1" Vehicle : vehicle_id
+WorkOrder "0..*" ..> "1" User : advisor_id
+Estimate "0..*" --> "1" WorkOrder : work_order_id
+Estimate "0..*" ..> "1" User : created_by
+WorkOrderServiceLine "0..*" --> "1" Estimate : estimate_id
+WorkOrderServiceLine "0..*" ..> "1" CatalogService : service_id
+WorkOrderServiceLine "0..*" ..> "0..1" StaffMember : assigned_tech_id
+WorkOrderPartLine "0..*" --> "1" Estimate : estimate_id
+WorkOrderPartLine "0..*" ..> "0..1" WorkOrderServiceLine : source_service_line_id
+WorkOrderPartLine "0..*" ..> "1" Part : part_id
+WorkOrderStatusHistory "0..*" --> "1" WorkOrder : work_order_id
+WorkOrderStatusHistory "0..*" ..> "1" User : changed_by
+
+' Billing: item IDs are polymorphic according to item_type.
+Invoice "0..1" ..> "1" WorkOrder : work_order_id
+Invoice "0..*" ..> "1" Customer : customer_id
+Invoice "0..*" ..> "1" Vehicle : vehicle_id
+Invoice "0..*" ..> "0..1" User : issued_by
+InvoiceItem "0..*" --> "1" Invoice : invoice_id
+InvoiceItem "0..*" ..> "0..1" WorkOrderServiceLine : reference_item_id [SERVICE]
+InvoiceItem "0..*" ..> "0..1" WorkOrderPartLine : reference_item_id [PART]
+InvoiceItem "0..*" ..> "0..1" CatalogService : catalog_id [SERVICE]
+InvoiceItem "0..*" ..> "0..1" Part : catalog_id [PART]
+Payment "0..*" --> "1" Invoice : invoice_id
+Payment "0..*" ..> "1" User : processed_by
+
+' Notifications: reference_id depends on reference_type.
+Notification "0..*" ..> "1" User : recipient_id
+Notification "0..*" ..> "0..1" Booking : reference_id [BOOKING]
+Notification "0..*" ..> "0..1" WorkOrder : reference_id [WORK_ORDER]
+Notification "0..*" ..> "0..1" Invoice : reference_id [INVOICE]
+Notification "0..*" ..> "0..1" Part : reference_id [PART]
+NotificationDelivery "0..*" --> "0..1" Notification : notification_id
+NotificationDelivery "0..*" ..> "0..1" NotificationTemplate : template_code + channel
+
+note bottom of InventoryTransaction
+  reference_id also supports STOCK_TAKE and MANUAL;
+  no corresponding entity is defined.
+end note
+note bottom of NotificationDelivery
+  Template matching is logical, not an FK.
+  Manual deliveries need not have a template.
+end note
+note bottom of Booking
+  booking.work_order_id and work_order.booking_id
+  are separate references; synchronization is not
+  enforced by a database foreign key.
+end note
+note bottom of CustomerProcessedEvent
+  Inbox/outbox aggregate IDs are generic event metadata,
+  not foreign keys to a single entity type.
+end note
+@enduml

@@ -15,6 +15,7 @@ class ErrorCodeTest {
                 Map.entry(ErrorCode.INVALID_REQUEST, 6000),
                 Map.entry(ErrorCode.WORK_ORDER_NOT_FOUND, 6001),
                 Map.entry(ErrorCode.INVALID_WORK_ORDER_STATUS_TRANSITION, 6002),
+                Map.entry(ErrorCode.WORK_ORDER_FEEDBACK_ALREADY_EXISTS, 6003),
                 Map.entry(ErrorCode.ESTIMATE_NOT_FOUND, 6101),
                 Map.entry(ErrorCode.ESTIMATE_NOT_EDITABLE, 6102),
                 Map.entry(ErrorCode.SERVICE_LINE_NOT_FOUND, 6103),

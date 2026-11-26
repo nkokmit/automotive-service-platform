@@ -3,6 +3,7 @@ package com.example.customer_vehicle_service.service;
 import com.example.customer_vehicle_service.dto.request.CustomerCreateRequest;
 import com.example.customer_vehicle_service.dto.request.CustomerUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
+import com.example.customer_vehicle_service.dto.response.CustomerIdentityResponse;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import org.springframework.data.domain.Pageable;
 
@@ -26,6 +27,8 @@ public interface CustomerService {
      * Chi tiết một khách hàng. Khách hàng đã xoá mềm không trả về.
      */
     CustomerResponse getCustomerById(UUID id);
+
+    CustomerIdentityResponse getCustomerIdentityByUserId(UUID userId);
 
     CustomerResponse createCustomer(CustomerCreateRequest request);
 

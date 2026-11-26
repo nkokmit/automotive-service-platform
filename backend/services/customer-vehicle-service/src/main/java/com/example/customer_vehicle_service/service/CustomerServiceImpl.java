@@ -3,6 +3,7 @@ package com.example.customer_vehicle_service.service;
 import com.example.customer_vehicle_service.dto.request.CustomerCreateRequest;
 import com.example.customer_vehicle_service.dto.request.CustomerUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
+import com.example.customer_vehicle_service.dto.response.CustomerIdentityResponse;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.exception.CustomerAlreadyExistsException;
@@ -43,6 +44,15 @@ public class CustomerServiceImpl implements CustomerService {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new CustomerNotFoundException("Không tìm thấy khách hàng với id: " + id));
         return customerMapper.toCustomerResponse(customer);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CustomerIdentityResponse getCustomerIdentityByUserId(UUID userId) {
+        Customer customer = customerRepository.findByUserId(userId)
+                .orElseThrow(() -> new CustomerNotFoundException(
+                        "Không tìm thấy hồ sơ khách hàng cho tài khoản"));
+        return new CustomerIdentityResponse(customer.getId(), customer.getIsActive());
     }
 
     @Override
