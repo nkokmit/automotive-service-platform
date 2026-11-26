@@ -19,17 +19,6 @@ import Card from "../components/Card";
 import Badge from "../components/Badge";
 import { useCatalog } from "../data/catalog";
 import { GARAGE } from "../config/garage";
-/** Icon gợi ý cho từng nhóm dịch vụ của xưởng. */
-const CATEGORY_ICONS: Record<string, string> = {
-  "Bảo dưỡng": "🛢️",
-  "Sửa chữa": "🔧",
-  "Sơn & thân vỏ": "🎨",
-  "Điện - Điều hòa": "❄️",
-  "Lốp & phanh": "🛞",
-  "Động cơ & hộp số": "⚙️",
-  "Hệ thống treo": "🔩",
-  "Bảo dưỡng xe điện": "🔋",
-};
 
 /** Số dịch vụ tối đa hiển thị ở trang chủ. */
 const HOME_SERVICE_LIMIT = 8;
@@ -54,10 +43,9 @@ export default function Home() {
     );
     // Luôn có "Tất cả" ở đầu để người dùng bỏ lọc nhanh.
     return [
-      { name: "Tất cả", icon: "✨", count: services.length },
+      { name: "Tất cả", count: services.length },
       ...names.slice(0, 8).map((name) => ({
         name,
-        icon: CATEGORY_ICONS[name] ?? "🔧",
         count: services.filter((s) => s.category === name).length,
       })),
     ];
@@ -258,7 +246,9 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Chip danh mục — dòng trên, cuộn ngang khi nhiều danh mục */}
+        {/* Chip danh mục — dòng trên, cuộn ngang khi nhiều danh mục.
+            Không dùng icon emoji: nhóm dịch vụ đến từ DB (admin tự tạo nên
+            không có icon), icon cứng sẽ lệch với dữ liệu thật. */}
         <div className="-mx-4 px-4 sm:mx-0 sm:px-0">
           <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-none">
             {categoryChips.map((s) => {
@@ -275,7 +265,6 @@ export default function Home() {
                       : "border-ink/8 hover:bg-bgsoft",
                   ].join(" ")}
                 >
-                  <div className="text-2xl mb-1">{s.icon}</div>
                   <div
                     className={[
                       "text-xs sm:text-sm font-medium leading-tight line-clamp-2",
