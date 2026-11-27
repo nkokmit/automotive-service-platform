@@ -95,6 +95,8 @@ function pageLabelFor(pathname: string): string | undefined {
     "/admin/permissions": "Quyền",
     "/admin/roles": "Vai trò",
     "/admin/notification-templates": "Template thông báo",
+    "/admin/news": "Bài viết tin tức",
+    "/admin/news-categories": "Danh mục bài viết",
   };
   // Route con: `/admin/staff/:id/schedule` → "Kỹ thuật viên"
   const key = Object.keys(LABELS)

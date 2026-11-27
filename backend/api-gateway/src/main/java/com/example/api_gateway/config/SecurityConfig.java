@@ -45,6 +45,17 @@ public class SecurityConfig {
                                 "/api/part-categories/**"
                         ).permitAll()
 
+                        // ── Tin tức công khai ─────────────────────────────────────────
+                        // Khách chưa đăng nhập vẫn đọc được tin tức, danh mục bài
+                        // viết và bình luận. Chỉ GET — mọi thao tác ghi (đăng bài,
+                        // quản lý danh mục, kiểm duyệt bình luận) đi qua xác thực
+                        // và phân quyền ở news-service.
+                        .pathMatchers(HttpMethod.GET,
+                                "/api/news-articles/**",
+                                "/api/news-categories/**",
+                                "/api/news-comments/**"
+                        ).permitAll()
+
                         // Only health is public; other Actuator endpoints stay protected.
                         .pathMatchers("/actuator/health/**").permitAll()
 

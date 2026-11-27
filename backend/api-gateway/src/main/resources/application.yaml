@@ -141,6 +141,25 @@ spring:
               predicates:
                 - Path=/api/inventory-transactions/**
 
+            # Lưu ý: phải khai báo CẢ path gốc lẫn path con (`/api/news-articles`
+            # và `/api/news-articles/**`). Predicate `/**` KHÔNG khớp path gốc →
+            # request list bài viết sẽ rơi xuống static resource handler của
+            # gateway và trả về "No static resource api/news-articles".
+            - id: news-service-categories
+              uri: lb://news-service
+              predicates:
+                - Path=/api/news-categories,/api/news-categories/**
+
+            - id: news-service-articles
+              uri: lb://news-service
+              predicates:
+                - Path=/api/news-articles,/api/news-articles/**
+
+            - id: news-service-comments
+              uri: lb://news-service
+              predicates:
+                - Path=/api/news-comments,/api/news-comments/**
+
 eureka:
   client:
     service-url:
@@ -197,6 +216,8 @@ springdoc:
         name: billing-service
       - url: /v3/api-docs/notification-service
         name: notification-service
+      - url: /v3/api-docs/news-service
+        name: news-service
     # Luôn render danh sách URL (không cố gắng tự fetch qua Eureka ở runtime)
     urls-primary-name: user-service
   # Không scan package nào vì gateway không có controller - tránh warning

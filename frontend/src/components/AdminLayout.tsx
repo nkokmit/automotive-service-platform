@@ -31,6 +31,7 @@ import {
   IconClock,
   IconChevronDown,
   IconBox,
+  IconNote,
 } from "./icons";
 import { useAuth } from "../data/authStore";
 import { roleLabel } from "../api/types";
@@ -48,6 +49,8 @@ import {
   INVOICE_READ,
   LEDGER_READ,
   NOTIFICATION_TEMPLATE_READ,
+  NEWS_ARTICLE_READ,
+  NEWS_CATEGORY_READ,
   PERMISSION_READ,
   PURCHASE_ORDER_READ,
   ROLE_READ,
@@ -241,6 +244,26 @@ const navGroups: NavGroup[] = [
             label: "Ca làm việc",
             icon: IconClock,
             authority: [WORK_SHIFT_READ],
+          },
+        ],
+      },
+      {
+        kind: "folder",
+        id: "news",
+        label: "Tin tức",
+        icon: IconNote,
+        items: [
+          {
+            to: "/admin/news",
+            label: "Bài viết",
+            icon: IconNote,
+            authority: [NEWS_ARTICLE_READ],
+          },
+          {
+            to: "/admin/news-categories",
+            label: "Danh mục bài viết",
+            icon: IconList,
+            authority: [NEWS_CATEGORY_READ],
           },
         ],
       },
@@ -547,6 +570,18 @@ export default function AdminLayout() {
         "giao dịch kho",
         "transaction",
         "transactions",
+      ],
+    },
+    {
+      match: /tin tức|tin tuc|bài viết|bai viet|news|danh mục bài viết/,
+      to: "/admin/news",
+      routeWords: [
+        "tin tức",
+        "tin tuc",
+        "bài viết",
+        "bai viet",
+        "news",
+        "danh mục bài viết",
       ],
     },
     {

@@ -16,6 +16,60 @@
   .container-page {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
+
+  /*
+   * Nội dung bài viết tin tức — HTML do quản lý soạn.
+   * Giữ đúng bảng màu chung (primary / ink) để đồng nhất với UI chung.
+   */
+  .news-content p {
+    @apply mb-4;
+  }
+
+  .news-content h2,
+  .news-content h3 {
+    @apply font-bold text-ink mt-6 mb-3;
+  }
+
+  .news-content h2 {
+    @apply text-xl;
+  }
+
+  .news-content h3 {
+    @apply text-lg;
+  }
+
+  .news-content ul,
+  .news-content ol {
+    @apply mb-4 pl-5;
+  }
+
+  .news-content ul {
+    @apply list-disc;
+  }
+
+  .news-content ol {
+    @apply list-decimal;
+  }
+
+  .news-content li {
+    @apply mb-1.5;
+  }
+
+  .news-content a {
+    @apply text-primary underline underline-offset-2;
+  }
+
+  .news-content strong {
+    @apply font-semibold text-ink;
+  }
+
+  .news-content blockquote {
+    @apply border-l-4 border-accent pl-4 italic text-ink-light my-4;
+  }
+
+  .news-content img {
+    @apply rounded-xl my-4;
+  }
 }
 
 @layer utilities {

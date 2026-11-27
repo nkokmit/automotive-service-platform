@@ -74,6 +74,15 @@ export const ASSIGNED_LINE_COMPLETE = "SERVICE_LINE_COMPLETE";
 export const PART_ISSUE = "PART_ISSUE";
 export const PART_RELEASE = "PART_RELEASE";
 
+/** Tin tuc: danh muc bai viet, bai viet va binh luan. */
+export const NEWS_CATEGORY_READ = "NEWS_CATEGORY_READ";
+export const NEWS_CATEGORY_WRITE = "NEWS_CATEGORY_WRITE";
+export const NEWS_ARTICLE_READ = "NEWS_ARTICLE_READ";
+export const NEWS_ARTICLE_WRITE = "NEWS_ARTICLE_WRITE";
+export const NEWS_COMMENT_READ = "NEWS_COMMENT_READ";
+export const NEWS_COMMENT_CREATE = "NEWS_COMMENT_CREATE";
+export const NEWS_COMMENT_MODERATE = "NEWS_COMMENT_MODERATE";
+
 /**
  * Authority ma MOT man hinh can co — chi can MOT trong danh sach.
  *
@@ -137,6 +146,10 @@ export const ADMIN_ACCESS_RULES: AccessRule[] = [
     anyOf: [CUSTOMER_READ, VEHICLE_READ],
   },
 
+  // ── Tin tuc ───────────────────────────────────────────────────────────────
+  { path: "/admin/news", anyOf: [NEWS_ARTICLE_READ] },
+  { path: "/admin/news-categories", anyOf: [NEWS_CATEGORY_READ] },
+
   // ── He thong ───────────────────────────────────────────────────────────────
   { path: "/admin/users", anyOf: [USER_READ] },
   { path: "/admin/roles", anyOf: [ROLE_READ] },
@@ -162,6 +175,7 @@ export const ADMIN_ACCESS_RULES: AccessRule[] = [
       STAFF_READ,
       INVENTORY_READ,
       CATALOG_READ,
+      NEWS_ARTICLE_READ,
     ],
   },
 ];
@@ -181,6 +195,7 @@ export const ADMIN_ENTRY_AUTHORITIES = [
   INVENTORY_READ,
   CATALOG_READ,
   USER_READ,
+  NEWS_ARTICLE_READ,
 ];
 
 /**

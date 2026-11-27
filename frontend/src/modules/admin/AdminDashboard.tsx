@@ -15,6 +15,7 @@ import {
   IconCar,
   IconSparkles,
   IconRefresh,
+  IconNote,
 } from "../../components/icons";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
@@ -67,6 +68,7 @@ export default function AdminDashboard() {
   const canReadUsers = hasTokenAuthority("USER_READ");
   const canReadCatalog = hasTokenAuthority("SERVICE_READ");
   const canReadInventory = hasTokenAuthority("PART_READ");
+  const canReadNews = hasTokenAuthority("NEWS_ARTICLE_READ");
 
   const canSeeRevenue = canReadInvoices;
   const canSeeWorkOrders = canReadWorkOrders;
@@ -386,6 +388,15 @@ export default function AdminDashboard() {
                     label="Người dùng"
                     desc={`${totals.users} tài khoản`}
                     tone="warning"
+                  />
+                )}
+                {canReadNews && (
+                  <QuickLink
+                    to="/admin/news"
+                    icon={<IconNote size={18} />}
+                    label="Tin tức"
+                    desc="Đăng & quản lý bài viết"
+                    tone="primary"
                   />
                 )}
               </div>

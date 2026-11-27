@@ -27,6 +27,10 @@ import {
 // Search module
 import SearchPage from "./modules/search/SearchPage";
 
+// News module (tin tức — public)
+import NewsList from "./modules/news/NewsList";
+import NewsDetail from "./modules/news/NewsDetail";
+
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
 import RequireAuth from "./components/RequireAuth";
 import RequireAdmin from "./components/RequireAdmin";
@@ -59,6 +63,8 @@ import TechnicianWorkOrders from "./modules/admin/TechnicianWorkOrders";
 import AdminPermissions from "./modules/admin/AdminPermissions";
 import AdminRoles from "./modules/admin/AdminRoles";
 import AdminNotificationTemplates from "./modules/admin/AdminNotificationTemplates";
+import AdminNews from "./modules/admin/AdminNews";
+import AdminNewsCategories from "./modules/admin/AdminNewsCategories";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
@@ -100,6 +106,10 @@ hydrateUser().finally(() => {
 
               {/* ============ SEARCH ============ */}
               <Route path="search" element={<SearchPage />} />
+
+              {/* ============ NEWS module (tin tức) ============ */}
+              <Route path="news" element={<NewsList />} />
+              <Route path="news/:slug" element={<NewsDetail />} />
 
               {/* ============ Trang tĩnh ============ */}
               <Route path="help" element={<HelpPage />} />
@@ -284,6 +294,22 @@ hydrateUser().finally(() => {
                 element={
                   <RequireAdmin>
                     <AdminRoles />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="news"
+                element={
+                  <RequireAdmin>
+                    <AdminNews />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="news-categories"
+                element={
+                  <RequireAdmin>
+                    <AdminNewsCategories />
                   </RequireAdmin>
                 }
               />

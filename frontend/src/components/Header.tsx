@@ -21,6 +21,7 @@ import { GARAGE } from "../config/garage";
 
 const navItems = [
   { to: "/services", label: "Đặt lịch sửa chữa" },
+  { to: "/news", label: "Tin tức" },
 ];
 
 /** Nhóm "AI" — gộp 2 trang vào dropdown cho gọn nav. */

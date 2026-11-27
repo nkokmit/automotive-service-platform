@@ -1242,6 +1242,64 @@ export interface StaffBookingVehicleRequest {
   customerNote?: string | null;
 }
 
+// ── News service (news-service) ──────────────────────────────────────────────
+/** Khớp `NewsCategoryResponse.java`. */
+export interface NewsCategoryResponse {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+}
+
+/** Khớp `NewsArticleStatus.java`. */
+export type NewsArticleStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+
+/** Khớp `NewsArticleResponse.java`. */
+export interface NewsArticleResponse {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryCode: string;
+  slug: string;
+  title: string;
+  summary: string | null;
+  content: string | null;
+  thumbnailUrl: string | null;
+  authorName: string | null;
+  authorId: string | null;
+  status: NewsArticleStatus;
+  isFeatured: boolean;
+  viewCount: number;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp `NewsCommentResponse.java`. */
+export interface NewsCommentResponse {
+  id: string;
+  articleId: string;
+  articleTitle: string | null;
+  userId: string | null;
+  userName: string | null;
+  content: string;
+  parentId: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp `NewsStatsResponse.java`. */
+export interface NewsStatsResponse {
+  totalArticles: number;
+  publishedArticles: number;
+  draftArticles: number;
+  archivedArticles: number;
+  totalCategories: number;
+  totalComments: number;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
