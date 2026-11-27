@@ -52,6 +52,12 @@ import type {
   NewsCommentResponse,
 } from "../../api/types";
 import type { NewsCommentSort } from "../../api/endpoints/news";
+import {
+  buildCommentTree,
+  flattenCommentTree,
+  COMMENT_INDENT_PX,
+  type CommentNode,
+} from "../news/commentTree";
 
 /** Các lựa chọn sắp xếp bình luận trong modal quản lý. */
 const COMMENT_SORT_OPTIONS: { value: NewsCommentSort; label: string }[] = [
@@ -406,6 +412,15 @@ export default function AdminNews() {
       archived: articles.filter((a) => a.status === "ARCHIVED").length,
     }),
     [articles],
+  );
+
+  /**
+   * Cây bình luận dựng từ danh sách phẳng — dùng để render phân cấp trong
+   * modal kiểm duyệt (bình luận cha/con có thụt lền rõ ràng).
+   */
+  const commentTree = useMemo(
+    () => flattenCommentTree(buildCommentTree(comments)),
+    [comments],
   );
 
   return (
@@ -922,45 +937,68 @@ export default function AdminNews() {
                   Bài viết này chưa có bình luận nào.
                 </p>
               ) : (
-                comments.map((c) => (
+                commentTree.map((node) => (
                   <div
-                    key={c.id}
-                    className="border-b border-ink/5 pb-3 last:border-0 last:pb-0"
+                    key={node.comment.id}
+                    className={[
+                      "border-b border-ink/5 pb-3",
+                      node.depth > 0 ? "last:border-0 last:pb-0" : "",
+                    ].join(" ")}
+                    style={
+                      node.depth > 0
+                        ? { marginLeft: `${node.depth * COMMENT_INDENT_PX}px` }
+                        : undefined
+                    }
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
+                          {node.depth > 0 && (
+                            <span className="text-ink/30 text-xs leading-none">
+                              ↳
+                            </span>
+                          )}
                           <span className="text-sm font-semibold">
-                            {c.userName ?? "Người dùng"}
+                            {node.comment.userName ?? "Người dùng"}
                           </span>
                           <span className="text-xs text-ink-muted">
-                            {new Date(c.createdAt).toLocaleString("vi-VN")}
+                            {new Date(node.comment.createdAt).toLocaleString(
+                              "vi-VN",
+                            )}
                           </span>
-                          {!c.isActive && (
+                          {node.parentAuthor && (
+                            <span className="text-xs text-ink-muted">
+                              · Trả lời{" "}
+                              <strong className="text-ink-light">
+                                {node.parentAuthor}
+                              </strong>
+                            </span>
+                          )}
+                          {!node.comment.isActive && (
                             <Badge tone="warning">Đã ẩn</Badge>
                           )}
                         </div>
                         <p className="text-sm text-ink-light mt-1 whitespace-pre-wrap">
-                          {c.content}
+                          {node.comment.content}
                         </p>
                         <div className="flex items-center gap-3 mt-2">
                           <span
                             className={[
                               "inline-flex items-center gap-1 text-xs",
-                              c.likedByMe
+                              node.comment.likedByMe
                                 ? "text-red-500"
                                 : "text-ink-muted",
                             ].join(" ")}
-                            title={`${c.likeCount ?? 0} lượt thích`}
+                            title={`${node.comment.likeCount ?? 0} lượt thích`}
                           >
-                            <IconHeart size={13} filled={c.likedByMe} />
-                            {c.likeCount ?? 0}
+                            <IconHeart size={13} filled={node.comment.likedByMe} />
+                            {node.comment.likeCount ?? 0}
                           </span>
                           {canComment && (
                             <button
                               type="button"
                               onClick={() => {
-                                setReplyTarget(c);
+                                setReplyTarget(node.comment);
                                 setReplyText("");
                               }}
                               className="text-xs text-primary hover:underline"
@@ -973,14 +1011,18 @@ export default function AdminNews() {
                       {canModerate && (
                         <div className="inline-flex items-center gap-1 shrink-0">
                           <button
-                            onClick={() => void toggleComment(c)}
+                            onClick={() => void toggleComment(node.comment)}
                             className="p-1.5 rounded-md hover:bg-bgsoft text-ink-muted hover:text-primary"
-                            title={c.isActive ? "Ẩn bình luận" : "Hiện bình luận"}
+                            title={
+                              node.comment.isActive
+                                ? "Ẩn bình luận"
+                                : "Hiện bình luận"
+                            }
                           >
                             <IconEye size={15} />
                           </button>
                           <button
-                            onClick={() => void deleteComment(c)}
+                            onClick={() => void deleteComment(node.comment)}
                             className="p-1.5 rounded-md hover:bg-red-50 text-ink-muted hover:text-red-500"
                             title="Xoá bình luận"
                           >

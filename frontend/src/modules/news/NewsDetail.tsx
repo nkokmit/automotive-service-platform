@@ -10,7 +10,7 @@
  * Bình luận yêu cầu authority `NEWS_COMMENT_CREATE` — nếu chưa đăng nhập,
  * hiển thị lời nhắc đăng nhập thay vì form.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   IconArrowLeft,
@@ -38,6 +38,12 @@ import type {
   NewsCommentResponse,
 } from "../../api/types";
 import type { NewsCommentSort } from "../../api/endpoints/news";
+import {
+  buildCommentTree,
+  flattenCommentTree,
+  COMMENT_INDENT_PX,
+  type CommentNode,
+} from "./commentTree";
 import { formatNewsDate } from "./NewsList";
 
 /** Các lựa chọn sắp xếp bình luận. */
@@ -65,6 +71,15 @@ export default function NewsDetail() {
   const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
 
   const canComment = hasTokenAuthority("NEWS_COMMENT_CREATE");
+
+  /**
+   * Cây bình luận — dựng từ danh sách phẳng để hiển thị phân cấp
+   * (bình luận cha/con thụt lền rõ ràng).
+   */
+  const commentTree = useMemo(
+    () => flattenCommentTree(buildCommentTree(comments)),
+    [comments],
+  );
 
   const load = useCallback(async () => {
     if (!slug) return;
@@ -376,14 +391,14 @@ export default function NewsDetail() {
                 </p>
               ) : (
                 <ul className="space-y-4">
-                  {comments.map((c) => (
+                  {commentTree.map((node) => (
                     <CommentItem
-                      key={c.id}
-                      comment={c}
+                      key={node.comment.id}
+                      node={node}
                       canReply={canComment}
-                      liking={likingIds.has(c.id)}
-                      onReply={() => setReplyTo(c)}
-                      onToggleLike={() => void toggleLike(c)}
+                      liking={likingIds.has(node.comment.id)}
+                      onReply={() => setReplyTo(node.comment)}
+                      onToggleLike={() => void toggleLike(node.comment)}
                     />
                   ))}
                 </ul>
@@ -444,25 +459,32 @@ export default function NewsDetail() {
 
 /** Một bình luận (kèm nút trả lời và nút thích). */
 function CommentItem({
-  comment,
+  node,
   canReply,
   liking,
   onReply,
   onToggleLike,
 }: {
-  comment: NewsCommentResponse;
+  node: CommentNode;
   canReply: boolean;
   liking: boolean;
   onReply: () => void;
   onToggleLike: () => void;
 }) {
-  const isReply = comment.parentId != null;
+  const comment = node.comment;
+  const isReply = node.depth > 0;
+  // Thụt lền theo độ sâu thực sự trong cây (cấp 1 = 0, cấp 2 = 20px, ...).
+  const indentStyle =
+    node.depth > 0
+      ? { marginLeft: `${node.depth * COMMENT_INDENT_PX}px` }
+      : undefined;
   return (
     <li
       className={[
         "border-b border-ink/5 pb-4 last:border-0 last:pb-0",
-        isReply ? "ml-6 md:ml-10" : "",
+        isReply ? "border-l-2 border-ink/8 pl-3" : "",
       ].join(" ")}
+      style={indentStyle}
     >
       <div className="flex items-start gap-3">
         <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -476,6 +498,12 @@ function CommentItem({
             <span className="text-xs text-ink-muted">
               {formatNewsDate(comment.createdAt)}
             </span>
+            {node.parentAuthor && (
+              <span className="text-xs text-ink-muted">
+                · Trả lời{" "}
+                <strong className="text-ink-light">{node.parentAuthor}</strong>
+              </span>
+            )}
           </div>
           <p className="text-sm text-ink-light mt-1 whitespace-pre-wrap">
             {comment.content}
