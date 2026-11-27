@@ -35,6 +35,29 @@ public interface NewsCommentRepository extends JpaRepository<NewsComment, UUID> 
     List<NewsComment> findActiveByArticleId(@Param("articleId") UUID articleId);
 
     /**
+     * Bình luận đang hiển thị, sắp xếp theo lượt thích giảm dần.
+     *
+     * <p>Dùng cho lựa chọn "bình luận nhiều người thích nhất". Cột
+     * {@code like_count} là denormalized nên sort được bằng index.
+     */
+    @Query("""
+            SELECT c FROM NewsComment c
+            WHERE c.article.id = :articleId AND c.isActive = true
+            ORDER BY c.likeCount DESC, c.createdAt ASC
+            """)
+    List<NewsComment> findActiveByArticleIdOrderByLikeCountDesc(@Param("articleId") UUID articleId);
+
+    /**
+     * Bình luận đang hiển thị, sắp xếp mới nhất trước.
+     */
+    @Query("""
+            SELECT c FROM NewsComment c
+            WHERE c.article.id = :articleId AND c.isActive = true
+            ORDER BY c.createdAt DESC
+            """)
+    List<NewsComment> findActiveByArticleIdOrderByCreatedAtDesc(@Param("articleId") UUID articleId);
+
+    /**
      * Tất cả bình luận (kể cả đã ẩn) của một bài viết — dùng cho admin duyệt/ẩn.
      */
     @Query("""
@@ -43,6 +66,26 @@ public interface NewsCommentRepository extends JpaRepository<NewsComment, UUID> 
             ORDER BY c.createdAt DESC
             """)
     List<NewsComment> findAllByArticleId(@Param("articleId") UUID articleId);
+
+    /**
+     * Tất cả bình luận (kể cả đã ẩn), sắp xếp mới nhất trước.
+     */
+    @Query("""
+            SELECT c FROM NewsComment c
+            WHERE c.article.id = :articleId
+            ORDER BY c.createdAt ASC
+            """)
+    List<NewsComment> findAllByArticleIdOrderByCreatedAtAsc(@Param("articleId") UUID articleId);
+
+    /**
+     * Tất cả bình luận (kể cả đã ẩn), sắp xếp theo lượt thích giảm dần.
+     */
+    @Query("""
+            SELECT c FROM NewsComment c
+            WHERE c.article.id = :articleId
+            ORDER BY c.likeCount DESC, c.createdAt ASC
+            """)
+    List<NewsComment> findAllByArticleIdOrderByLikeCountDesc(@Param("articleId") UUID articleId);
 
     /**
      * Đếm số bình luận đang hiển thị của một bài viết.

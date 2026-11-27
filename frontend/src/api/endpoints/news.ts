@@ -50,6 +50,27 @@ export interface NewsCommentWriteRequest {
   parentId?: string | null;
 }
 
+/**
+ * Cách sắp xếp bình luận — khớp `NewsCommentSort.java`.
+ *
+ * - `oldest`: cũ nhất trước (mặc định, giữ luồng hội thoại)
+ * - `newest`: mới nhất trước
+ * - `mostLiked`: nhiều lượt thích nhất trước
+ */
+export type NewsCommentSort = "oldest" | "newest" | "mostLiked";
+
+/** Kết quả tải lên ảnh — khớp `NewsImageUploadResponse.java`. */
+export interface NewsImageUploadResponse {
+  /** URL công khai để nhúng vào nội dung bài viết. */
+  url: string;
+  /** Tên file trong kho lưu trữ. */
+  filename: string;
+  /** MIME type của ảnh. */
+  contentType: string;
+  /** Dung lượng (bytes). */
+  size: number;
+}
+
 export interface ListNewsArticlesParams {
   keyword?: string;
   categoryId?: string;
@@ -226,18 +247,43 @@ export const newsApi = {
     await client.request<void>(`/api/news-articles/${id}`, { method: "DELETE" });
   },
 
-  // ── Bình luận ───────────────────────────────────────────────────────────────
-  /** Bình luận đang hiển thị của một bài viết — công khai. */
-  listComments: async (articleId: string): Promise<NewsCommentResponse[]> => {
+  // ── Ảnh ────────────────────────────────────────────────────────────────────
+  /**
+   * Tải lên ảnh cho bài viết.
+   *
+   * Endpoint backend: `POST /api/news-images/upload` (multipart).
+   * Cần authority `NEWS_ARTICLE_WRITE`.
+   *
+   * @param file ảnh do quản trị chọn từ máy (JPEG/PNG/WEBP/GIF, ≤ 5 MB)
+   */
+  uploadImage: async (file: File): Promise<NewsImageUploadResponse> => {
+    const form = new FormData();
+    form.append("file", file);
+    return client.request<NewsImageUploadResponse>("/api/news-images/upload", {
+      method: "POST",
+      formData: form,
+    });
+  },
+
+  // ── Bình luận ───────────────────────────────────────────────────────────────  /** Bình luận đang hiển thị của một bài viết — công khai. */
+  listComments: async (
+    articleId: string,
+    sort?: NewsCommentSort,
+  ): Promise<NewsCommentResponse[]> => {
+    const query = sort && sort !== "oldest" ? `?sort=${sort}` : "";
     return client.request<NewsCommentResponse[]>(
-      `/api/news-comments/articles/${articleId}`,
+      `/api/news-comments/articles/${articleId}${query}`,
     );
   },
 
   /** Tất cả bình luận (kể cả đã ẩn). Cần authority `NEWS_COMMENT_MODERATE`. */
-  listAllComments: async (articleId: string): Promise<NewsCommentResponse[]> => {
+  listAllComments: async (
+    articleId: string,
+    sort?: NewsCommentSort,
+  ): Promise<NewsCommentResponse[]> => {
+    const query = sort && sort !== "newest" ? `?sort=${sort}` : "";
     return client.request<NewsCommentResponse[]>(
-      `/api/news-comments/articles/${articleId}/all`,
+      `/api/news-comments/articles/${articleId}/all${query}`,
     );
   },
 
@@ -268,5 +314,15 @@ export const newsApi = {
     await client.request<void>(`/api/news-comments/${commentId}`, {
       method: "DELETE",
     });
+  },
+
+  /** Thích / bỏ thích bình luận. Cần authority `NEWS_COMMENT_CREATE`. */
+  toggleCommentLike: async (
+    commentId: string,
+  ): Promise<NewsCommentResponse> => {
+    return client.request<NewsCommentResponse>(
+      `/api/news-comments/${commentId}/like`,
+      { method: "PATCH" },
+    );
   },
 };

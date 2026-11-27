@@ -21,12 +21,15 @@ import {
   IconSend,
   IconNote,
   IconRefresh,
+  IconHeart,
+  IconSort,
 } from "../../components/icons";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { Spinner } from "../../components/Loading";
 import { newsApi } from "../../api/endpoints/news";
+import { resolveMediaUrl } from "../../api/media";
 import { hasTokenAuthority, hasSession } from "../../api/session";
 import { useAuth } from "../../data/authStore";
 import { useToast } from "../../components/Toast";
@@ -34,7 +37,15 @@ import type {
   NewsArticleResponse,
   NewsCommentResponse,
 } from "../../api/types";
+import type { NewsCommentSort } from "../../api/endpoints/news";
 import { formatNewsDate } from "./NewsList";
+
+/** Các lựa chọn sắp xếp bình luận. */
+const COMMENT_SORT_OPTIONS: { value: NewsCommentSort; label: string }[] = [
+  { value: "oldest", label: "Cũ nhất" },
+  { value: "newest", label: "Mới nhất" },
+  { value: "mostLiked", label: "Nhiều lượt thích" },
+];
 
 export default function NewsDetail() {
   const { slug = "" } = useParams();
@@ -50,6 +61,8 @@ export default function NewsDetail() {
   const [commentText, setCommentText] = useState("");
   const [replyTo, setReplyTo] = useState<NewsCommentResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [commentSort, setCommentSort] = useState<NewsCommentSort>("oldest");
+  const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
 
   const canComment = hasTokenAuthority("NEWS_COMMENT_CREATE");
 
@@ -84,6 +97,57 @@ export default function NewsDetail() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Tải lại danh sách bình luận theo thứ tự đang chọn. */
+  const loadComments = useCallback(async () => {
+    if (!article) return;
+    try {
+      const list = await newsApi.listComments(article.id, commentSort);
+      setComments(list ?? []);
+    } catch {
+      // Giữ nguyên danh sách cũ nếu tải lại thất bại.
+    }
+  }, [article, commentSort]);
+
+  useEffect(() => {
+    void loadComments();
+  }, [loadComments]);
+
+  /** Đổi thứ tự sắp xếp bình luận. */
+  const changeSort = useCallback(
+    (next: NewsCommentSort) => {
+      setCommentSort(next);
+    },
+    [],
+  );
+
+  /** Thích / bỏ thích bình luận. */
+  const toggleLike = useCallback(
+    async (comment: NewsCommentResponse) => {
+      if (!hasSession()) {
+        t.error("Đăng nhập để thích bình luận");
+        return;
+      }
+      setLikingIds((prev) => new Set(prev).add(comment.id));
+      try {
+        const saved = await newsApi.toggleCommentLike(comment.id);
+        setComments((prev) =>
+          prev.map((c) => (c.id === saved.id ? saved : c)),
+        );
+      } catch (err) {
+        t.error(
+          err instanceof Error ? err.message : "Không thích được bình luận",
+        );
+      } finally {
+        setLikingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(comment.id);
+          return next;
+        });
+      }
+    },
+    [t],
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!article) return;
@@ -202,7 +266,7 @@ export default function NewsDetail() {
               {article.thumbnailUrl && (
                 <figure className="mb-6">
                   <img
-                    src={article.thumbnailUrl}
+                    src={resolveMediaUrl(article.thumbnailUrl)}
                     alt={article.title}
                     className="w-full rounded-2xl object-cover"
                   />
@@ -229,6 +293,31 @@ export default function NewsDetail() {
                   ({comments.length})
                 </span>
               </h2>
+
+              {/* Thanh sắp xếp bình luận */}
+              {comments.length > 0 && (
+                <div className="flex items-center justify-end gap-2 mb-3">
+                  <IconSort size={14} className="text-ink-muted" />
+                  <span className="text-xs text-ink-muted">Sắp xếp:</span>
+                  <div className="inline-flex items-center gap-1 rounded-lg bg-bgsoft p-0.5">
+                    {COMMENT_SORT_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => changeSort(option.value)}
+                        className={[
+                          "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                          commentSort === option.value
+                            ? "bg-white text-primary shadow-sm"
+                            : "text-ink-muted hover:text-ink",
+                        ].join(" ")}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Form gửi bình luận */}
               {canComment ? (
@@ -292,7 +381,9 @@ export default function NewsDetail() {
                       key={c.id}
                       comment={c}
                       canReply={canComment}
+                      liking={likingIds.has(c.id)}
                       onReply={() => setReplyTo(c)}
+                      onToggleLike={() => void toggleLike(c)}
                     />
                   ))}
                 </ul>
@@ -314,7 +405,7 @@ export default function NewsDetail() {
                         <div className="aspect-[16/9] rounded-xl overflow-hidden bg-bgsoft mb-1.5">
                           {r.thumbnailUrl && (
                             <img
-                              src={r.thumbnailUrl}
+                              src={resolveMediaUrl(r.thumbnailUrl)}
                               alt={r.title}
                               className="w-full h-full object-cover"
                             />
@@ -351,15 +442,19 @@ export default function NewsDetail() {
   );
 }
 
-/** Một bình luận (kèm nút trả lời). */
+/** Một bình luận (kèm nút trả lời và nút thích). */
 function CommentItem({
   comment,
   canReply,
+  liking,
   onReply,
+  onToggleLike,
 }: {
   comment: NewsCommentResponse;
   canReply: boolean;
+  liking: boolean;
   onReply: () => void;
+  onToggleLike: () => void;
 }) {
   const isReply = comment.parentId != null;
   return (
@@ -385,14 +480,37 @@ function CommentItem({
           <p className="text-sm text-ink-light mt-1 whitespace-pre-wrap">
             {comment.content}
           </p>
-          {canReply && !isReply && (
+          <div className="flex items-center gap-3 mt-2">
             <button
-              onClick={onReply}
-              className="text-xs text-primary mt-1.5 hover:underline"
+              type="button"
+              onClick={onToggleLike}
+              disabled={liking}
+              title={
+                comment.likedByMe
+                  ? "Bỏ thích bình luận"
+                  : "Thích bình luận này"
+              }
+              className={[
+                "inline-flex items-center gap-1 text-xs transition-colors",
+                "disabled:opacity-60",
+                comment.likedByMe
+                  ? "text-red-500 hover:text-red-600"
+                  : "text-ink-muted hover:text-red-500",
+              ].join(" ")}
             >
-              Trả lời
+              <IconHeart size={14} filled={comment.likedByMe} />
+              {comment.likeCount > 0 && <span>{comment.likeCount}</span>}
             </button>
-          )}
+            {canReply && (
+              <button
+                type="button"
+                onClick={onReply}
+                className="text-xs text-primary hover:underline"
+              >
+                Trả lời
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </li>

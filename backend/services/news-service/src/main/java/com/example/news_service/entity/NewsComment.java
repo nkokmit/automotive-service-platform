@@ -57,6 +57,14 @@ public class NewsComment {
     @Builder.Default
     private Boolean isActive = Boolean.TRUE;
 
+    /**
+     * Số lượt thích — cột denormalized để sắp xếp bình luận theo "nhiều
+     * người thích nhất" mà không phải JOIN bảng {@code news_comment_likes}.
+     */
+    @Column(name = "like_count", nullable = false)
+    @Builder.Default
+    private Integer likeCount = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

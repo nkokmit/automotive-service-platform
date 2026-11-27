@@ -36,7 +36,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/api/news-categories/**",
                                 "/api/news-articles/**",
-                                "/api/news-comments/**"
+                                "/api/news-comments/**",
+                                // Ảnh bài viết là tài nguyên tĩnh, hiển thị
+                                // trong bài cho cả khách chưa đăng nhập.
+                                "/api/news-images/**"
                         ).permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()

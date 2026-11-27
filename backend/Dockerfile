@@ -18,5 +18,9 @@ RUN apt-get update \
     && useradd --system --gid app --home-dir /app app
 WORKDIR /app
 COPY --from=build --chown=app:app /build/application.jar ./application.jar
+# Tạo sẵn thư mục lưu ảnh với đúng quyền sở hữu của user `app` — nếu không,
+# Docker tạo named volume (news-uploads) với quyền root và container không
+# ghi được ảnh vào kho.
+RUN mkdir -p /app/uploads && chown -R app:app /app
 USER app
 ENTRYPOINT ["java", "-jar", "/app/application.jar"]

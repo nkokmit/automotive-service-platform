@@ -24,6 +24,7 @@ import Button from "../../components/Button";
 import Input from "../../components/Input";
 import { SkeletonGrid } from "../../components/Loading";
 import { newsApi } from "../../api/endpoints/news";
+import { resolveMediaUrl } from "../../api/media";
 import type {
   NewsArticleResponse,
   NewsCategoryResponse,
@@ -170,7 +171,7 @@ export default function NewsList() {
             <div className="aspect-[16/9] md:aspect-auto bg-bgsoft overflow-hidden">
               {hero.thumbnailUrl ? (
                 <img
-                  src={hero.thumbnailUrl}
+                  src={resolveMediaUrl(hero.thumbnailUrl)}
                   alt={hero.title}
                   className="w-full h-full object-cover"
                 />
@@ -344,7 +345,7 @@ function NewsCard({ article }: { article: NewsArticleResponse }) {
         <div className="aspect-[16/9] bg-bgsoft overflow-hidden rounded-t-2xl">
           {article.thumbnailUrl ? (
             <img
-              src={article.thumbnailUrl}
+              src={resolveMediaUrl(article.thumbnailUrl)}
               alt={article.title}
               className="w-full h-full object-cover"
             />

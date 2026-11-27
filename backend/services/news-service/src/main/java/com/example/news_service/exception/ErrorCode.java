@@ -32,6 +32,10 @@ public enum ErrorCode {
     NEWS_COMMENT_NOT_FOUND(6201, "Không tìm thấy bình luận"),
     NEWS_COMMENT_FORBIDDEN(6202, "Bạn không có quyền thao tác trên bình luận này"),
 
+    // NewsImage (63xx)
+    NEWS_IMAGE_NOT_FOUND(6301, "Không tìm thấy ảnh"),
+    NEWS_IMAGE_UPLOAD_FAILED(6302, "Không tải lên được ảnh"),
+
     // Authentication & Authorization (14xx)
     UNAUTHENTICATED(1401, "Chưa đăng nhập hoặc token không hợp lệ"),
     UNAUTHORIZED(1403, "Bạn không có quyền");

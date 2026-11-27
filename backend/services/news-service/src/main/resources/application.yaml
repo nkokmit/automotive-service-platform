@@ -3,6 +3,12 @@ server:
 
 app:
   api-gateway-url: ${API_GATEWAY_URL:http://localhost:8000}
+  # Kho lưu ảnh bài viết. Trong Docker Compose, thư mục này được mount thành
+  # volume `news-uploads` để ảnh còn tồn tại sau khi container restart.
+  image-storage:
+    directory: ${NEWS_IMAGE_STORAGE_DIR:/app/uploads}
+    max-size-bytes: ${NEWS_IMAGE_MAX_SIZE_BYTES:5242880}
+    public-base-path: /api/news-images
 
 spring:
   application:
@@ -24,6 +30,12 @@ spring:
         format_sql: true
         jdbc:
           time_zone: UTC
+
+  servlet:
+    multipart:
+      # Giới hạn dung lượng ảnh tải lên cho bài viết.
+      max-file-size: ${NEWS_IMAGE_MAX_FILE_SIZE:5MB}
+      max-request-size: ${NEWS_IMAGE_MAX_REQUEST_SIZE:6MB}
 
   flyway:
     enabled: true

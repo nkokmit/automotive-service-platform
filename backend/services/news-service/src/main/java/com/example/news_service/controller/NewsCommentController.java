@@ -3,6 +3,7 @@ package com.example.news_service.controller;
 import com.example.news_service.common.ApiResponse;
 import com.example.news_service.dto.request.NewsCommentRequest;
 import com.example.news_service.dto.response.NewsCommentResponse;
+import com.example.news_service.enums.NewsCommentSort;
 import com.example.news_service.service.NewsCommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,21 +38,31 @@ public class NewsCommentController {
     @GetMapping("/articles/{articleId}")
     @PreAuthorize("permitAll()")
     @Operation(summary = "Bình luận của một bài viết",
-            description = "Trả về các bình luận đang hiển thị của bài viết.")
+            description = "Trả về các bình luận đang hiển thị của bài viết. "
+                    + "Dùng `sort` để chọn thứ tự: newest (mới nhất), "
+                    + "oldest (cũ nhất — mặc định), mostLiked (nhiều người thích nhất).")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về danh sách bình luận.")
-    public ApiResponse<List<NewsCommentResponse>> getCommentsByArticle(@PathVariable UUID articleId) {
-        return ApiResponse.success(newsCommentService.getCommentsByArticle(articleId));
+    public ApiResponse<List<NewsCommentResponse>> getCommentsByArticle(
+            @PathVariable UUID articleId,
+            @RequestParam(required = false) String sort) {
+        return ApiResponse.success(newsCommentService.getCommentsByArticle(
+                articleId, NewsCommentSort.fromRaw(sort)));
     }
 
     @GetMapping("/articles/{articleId}/all")
     @PreAuthorize("hasAuthority('NEWS_COMMENT_MODERATE')")
     @Operation(summary = "Tất cả bình luận của một bài viết (quản lý)",
-            description = "Bao gồm cả bình luận đã bị ẩn — dùng cho quản lý.")
+            description = "Bao gồm cả bình luận đã bị ẩn — dùng cho quản lý. "
+                    + "Dùng `sort` để chọn thứ tự: newest (mới nhất — mặc định), "
+                    + "oldest (cũ nhất), mostLiked (nhiều người thích nhất).")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về danh sách bình luận.")
-    public ApiResponse<List<NewsCommentResponse>> getAllCommentsByArticle(@PathVariable UUID articleId) {
-        return ApiResponse.success(newsCommentService.getAllCommentsByArticle(articleId));
+    public ApiResponse<List<NewsCommentResponse>> getAllCommentsByArticle(
+            @PathVariable UUID articleId,
+            @RequestParam(required = false) String sort) {
+        return ApiResponse.success(newsCommentService.getAllCommentsByArticle(
+                articleId, NewsCommentSort.fromRaw(sort)));
     }
 
     @PostMapping("/articles/{articleId}")
@@ -81,6 +92,17 @@ public class NewsCommentController {
                                                             @RequestParam(defaultValue = "false") boolean active) {
         return ApiResponse.success(active ? "Đã hiển thị bình luận" : "Đã ẩn bình luận",
                 newsCommentService.setCommentActive(commentId, active));
+    }
+
+    @PatchMapping("/{commentId}/like")
+    @PreAuthorize("hasAuthority('NEWS_COMMENT_CREATE')")
+    @Operation(summary = "Thích / bỏ thích bình luận",
+            description = "Người dùng đã đăng nhập thích hoặc bỏ thích bình luận. "
+                    + "Gọi lại nhiều lần vẫn giữ đúng 1 lượt thích cho mỗi người.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+            description = "Trả về bình luận sau khi cập nhật lượt thích.")
+    public ApiResponse<NewsCommentResponse> toggleLike(@PathVariable UUID commentId) {
+        return ApiResponse.success(newsCommentService.toggleLike(commentId));
     }
 
     @DeleteMapping("/{commentId}")

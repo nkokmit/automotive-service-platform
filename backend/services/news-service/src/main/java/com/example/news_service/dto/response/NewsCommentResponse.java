@@ -13,6 +13,10 @@ public record NewsCommentResponse(
         String content,
         UUID parentId,
         Boolean isActive,
+        /** Tổng số lượt thích của bình luận. */
+        Integer likeCount,
+        /** Người đang đăng nhập đã thích bình luận này chưa. */
+        Boolean likedByMe,
         Instant createdAt,
         Instant updatedAt
 ) {

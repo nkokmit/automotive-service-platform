@@ -160,6 +160,14 @@ spring:
               predicates:
                 - Path=/api/news-comments,/api/news-comments/**
 
+            # Ảnh bài viết (upload + phục vụ ảnh).
+            # GET /api/news-images/{filename} là public vì ảnh xuất hiện trong
+            # bài viết mà khách chưa đăng nhập vẫn xem được.
+            - id: news-service-images
+              uri: lb://news-service
+              predicates:
+                - Path=/api/news-images,/api/news-images/**
+
 eureka:
   client:
     service-url:

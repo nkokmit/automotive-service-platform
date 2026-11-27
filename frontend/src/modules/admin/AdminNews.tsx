@@ -17,7 +17,7 @@
  * Cần authority: NEWS_ARTICLE_READ (xem) / NEWS_ARTICLE_WRITE (ghi) /
  * NEWS_COMMENT_MODERATE (kiểm duyệt bình luận).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import {
   IconNote,
@@ -32,13 +32,18 @@ import {
   IconChat,
   IconUpload,
   IconCheckCircle,
+  IconHeart,
+  IconSend,
+  IconSort,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import Card from "../../components/Card";
 import Input from "../../components/Input";
+import ImagePicker from "../../components/ImagePicker";
 import { useToast } from "../../components/Toast";
 import { newsApi } from "../../api/endpoints/news";
+import { resolveMediaUrl } from "../../api/media";
 import { hasTokenAuthority } from "../../api/session";
 import type {
   NewsArticleResponse,
@@ -46,10 +51,26 @@ import type {
   NewsCategoryResponse,
   NewsCommentResponse,
 } from "../../api/types";
+import type { NewsCommentSort } from "../../api/endpoints/news";
+
+/** Các lựa chọn sắp xếp bình luận trong modal quản lý. */
+const COMMENT_SORT_OPTIONS: { value: NewsCommentSort; label: string }[] = [
+  { value: "newest", label: "Mới nhất" },
+  { value: "oldest", label: "Cũ nhất" },
+  { value: "mostLiked", label: "Nhiều lượt thích" },
+];
 
 // =========================
 // AdminNews
 // =========================
+
+/**
+ * Trình soạn thảo rich-text (TipTap) được lazy-load.
+ *
+ * Lý do: thư viện TipTap khá nặng (~700 KB) và chỉ cần cho màn hình quản lý
+ * bài viết — không nên kéo vào bundle của trang tin tức công khai.
+ */
+const RichTextEditor = lazy(() => import("../../components/RichTextEditor"));
 
 const STATUS_LABEL: Record<NewsArticleStatus, string> = {
   DRAFT: "Bản nháp",
@@ -102,9 +123,18 @@ export default function AdminNews() {
   );
   const [comments, setComments] = useState<NewsCommentResponse[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  /** Thứ tự sắp xếp bình luận trong modal quản lý. */
+  const [commentSort, setCommentSort] = useState<NewsCommentSort>("newest");
+  /** Bình luận đang được trả lời trong modal quản lý. */
+  const [replyTarget, setReplyTarget] = useState<NewsCommentResponse | null>(
+    null,
+  );
+  const [replyText, setReplyText] = useState("");
+  const [replySending, setReplySending] = useState(false);
 
   const canWrite = hasTokenAuthority("NEWS_ARTICLE_WRITE");
   const canModerate = hasTokenAuthority("NEWS_COMMENT_MODERATE");
+  const canComment = hasTokenAuthority("NEWS_COMMENT_CREATE");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -275,10 +305,12 @@ export default function AdminNews() {
     async (a: NewsArticleResponse) => {
       setCommentsFor(a);
       setCommentsLoading(true);
+      setReplyTarget(null);
+      setReplyText("");
       try {
         const list = canModerate
-          ? await newsApi.listAllComments(a.id)
-          : await newsApi.listComments(a.id);
+          ? await newsApi.listAllComments(a.id, commentSort)
+          : await newsApi.listComments(a.id, commentSort);
         setComments(list ?? []);
       } catch (err) {
         setComments([]);
@@ -289,8 +321,50 @@ export default function AdminNews() {
         setCommentsLoading(false);
       }
     },
-    [canModerate, t],
+    [canModerate, commentSort, t],
   );
+
+  /** Đổi thứ tự sắp xếp bình luận trong modal quản lý. */
+  const changeCommentSort = useCallback(
+    async (next: NewsCommentSort) => {
+      setCommentSort(next);
+      if (!commentsFor) return;
+      try {
+        const list = canModerate
+          ? await newsApi.listAllComments(commentsFor.id, next)
+          : await newsApi.listComments(commentsFor.id, next);
+        setComments(list ?? []);
+      } catch {
+        // Giữ nguyên danh sách cũ nếu tải lại thất bại.
+      }
+    },
+    [commentsFor, canModerate],
+  );
+
+  /** Quản trị trả lời bình luận của người dùng. */
+  const sendReply = useCallback(async () => {
+    if (!commentsFor || !replyTarget) return;
+    const content = replyText.trim();
+    if (!content) {
+      t.error("Vui lòng nhập nội dung trả lời");
+      return;
+    }
+    setReplySending(true);
+    try {
+      const saved = await newsApi.createComment(commentsFor.id, {
+        content,
+        parentId: replyTarget.id,
+      });
+      setComments((prev) => [saved, ...prev]);
+      setReplyTarget(null);
+      setReplyText("");
+      t.success("Đã gửi trả lời");
+    } catch (err) {
+      t.error(err instanceof Error ? err.message : "Không gửi được trả lời");
+    } finally {
+      setReplySending(false);
+    }
+  }, [commentsFor, replyTarget, replyText, t]);
 
   const toggleComment = useCallback(
     async (c: NewsCommentResponse) => {
@@ -443,7 +517,7 @@ export default function AdminNews() {
                         <div className="w-12 h-12 rounded-lg overflow-hidden bg-bgsoft shrink-0">
                           {a.thumbnailUrl && (
                             <img
-                              src={a.thumbnailUrl}
+                              src={resolveMediaUrl(a.thumbnailUrl)}
                               alt={a.title}
                               className="w-full h-full object-cover"
                             />
@@ -667,14 +741,13 @@ export default function AdminNews() {
 
               <div>
                 <label className="text-sm font-medium text-ink mb-1.5 block">
-                  Ảnh đại diện (URL)
+                  Ảnh đại diện
                 </label>
-                <Input
+                <ImagePicker
                   value={form.thumbnailUrl}
-                  onChange={(e) =>
-                    setForm({ ...form, thumbnailUrl: e.target.value })
-                  }
-                  placeholder="https://..."
+                  onChange={(url) => setForm({ ...form, thumbnailUrl: url })}
+                  onClear={() => setForm({ ...form, thumbnailUrl: "" })}
+                  label="Chọn ảnh đại diện"
                 />
               </div>
 
@@ -697,18 +770,25 @@ export default function AdminNews() {
                 <label className="text-sm font-medium text-ink mb-1.5 block">
                   Nội dung bài viết
                 </label>
-                <textarea
-                  value={form.content}
-                  onChange={(e) =>
-                    setForm({ ...form, content: e.target.value })
+                <Suspense
+                  fallback={
+                    <div
+                      className="rounded-xl border border-ink/15 bg-white flex items-center justify-center text-sm text-ink-muted"
+                      style={{ minHeight: 320 }}
+                    >
+                      Đang tải trình soạn thảo...
+                    </div>
                   }
-                  rows={10}
-                  placeholder="Nội dung bài viết (hỗ trợ HTML: <p>, <h2>, <ul>, <strong>...)"
-                  className="w-full px-3 py-2 rounded-xl border border-ink/15 bg-white text-sm font-mono focus:border-primary focus:outline-none"
-                />
+                >
+                  <RichTextEditor
+                    value={form.content}
+                    onChange={(html) => setForm({ ...form, content: html })}
+                    placeholder="Viết nội dung bài viết của bạn... Bạn có thể bôi đen chữ để in đậm, in nghiêng, chèn ảnh và liên kết."
+                  />
+                </Suspense>
                 <span className="text-xs text-ink-muted">
-                  Nội dung được hiển thị trực tiếp trên trang đọc bài — hỗ trợ
-                  thẻ HTML cơ bản.
+                  Soạn văn bản trực tiếp như Facebook — không cần biết HTML.
+                  Nội dung hiển thị trên trang đọc bài đúng như bạn thấy ở đây.
                 </span>
               </div>
 
@@ -769,6 +849,70 @@ export default function AdminNews() {
             </div>
 
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* Thanh sắp xếp */}
+              {comments.length > 0 && (
+                <div className="flex items-center justify-end gap-2">
+                  <IconSort size={14} className="text-ink-muted" />
+                  <span className="text-xs text-ink-muted">Sắp xếp:</span>
+                  <div className="inline-flex items-center gap-1 rounded-lg bg-bgsoft p-0.5">
+                    {COMMENT_SORT_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => void changeCommentSort(option.value)}
+                        className={[
+                          "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                          commentSort === option.value
+                            ? "bg-white text-primary shadow-sm"
+                            : "text-ink-muted hover:text-ink",
+                        ].join(" ")}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ô trả lời */}
+              {replyTarget && (
+                <div className="rounded-xl border border-primary/30 bg-bgsoft p-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs text-ink-muted">
+                      Đang trả lời{" "}
+                      <strong>{replyTarget.userName ?? "Người dùng"}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplyTarget(null);
+                        setReplyText("");
+                      }}
+                      className="text-xs text-ink-muted hover:text-ink"
+                    >
+                      Huỷ
+                    </button>
+                  </div>
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    rows={2}
+                    placeholder="Nhập nội dung trả lời..."
+                    className="w-full px-3 py-2 rounded-lg border border-ink/15 bg-white text-sm focus:border-primary focus:outline-none"
+                  />
+                  <div className="flex justify-end mt-2">
+                    <Button
+                      size="sm"
+                      onClick={() => void sendReply()}
+                      disabled={replySending}
+                    >
+                      <IconSend size={14} />
+                      {replySending ? "Đang gửi..." : "Gửi trả lời"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {commentsLoading ? (
                 <p className="text-sm text-ink-muted text-center py-6">
                   Đang tải bình luận...
@@ -799,6 +943,32 @@ export default function AdminNews() {
                         <p className="text-sm text-ink-light mt-1 whitespace-pre-wrap">
                           {c.content}
                         </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span
+                            className={[
+                              "inline-flex items-center gap-1 text-xs",
+                              c.likedByMe
+                                ? "text-red-500"
+                                : "text-ink-muted",
+                            ].join(" ")}
+                            title={`${c.likeCount ?? 0} lượt thích`}
+                          >
+                            <IconHeart size={13} filled={c.likedByMe} />
+                            {c.likeCount ?? 0}
+                          </span>
+                          {canComment && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReplyTarget(c);
+                                setReplyText("");
+                              }}
+                              className="text-xs text-primary hover:underline"
+                            >
+                              Trả lời
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {canModerate && (
                         <div className="inline-flex items-center gap-1 shrink-0">

@@ -12,6 +12,9 @@ import org.mapstruct.Mapping;
  * {@code @ManyToOne} nên phải map tay sang {@code articleId} /
  * {@code articleTitle}. Bản ghi bình luận không có bài viết thì trả
  * {@code null}.
+ *
+ * <p>{@code likedByMe} không suy ra được từ entity nên được đặt sau khi map
+ * (xem {@code NewsCommentServiceImpl}).
  */
 @Mapper(componentModel = "spring", unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface NewsCommentMapper {

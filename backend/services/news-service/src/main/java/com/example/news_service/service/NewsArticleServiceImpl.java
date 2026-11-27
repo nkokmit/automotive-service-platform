@@ -24,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -37,6 +39,8 @@ public class NewsArticleServiceImpl implements NewsArticleService {
     private final NewsCategoryRepository newsCategoryRepository;
     private final NewsArticleMapper newsArticleMapper;
     private final CurrentActorIdProvider currentActorIdProvider;
+    private final NewsHtmlSanitizer newsHtmlSanitizer;
+    private final NewsImageStorageService newsImageStorageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -118,8 +122,8 @@ public class NewsArticleServiceImpl implements NewsArticleService {
                 .slug(slug)
                 .title(request.title().trim())
                 .summary(TextUtils.trimToNull(request.summary()))
-                .content(TextUtils.trimToNull(request.content()))
-                .thumbnailUrl(TextUtils.trimToNull(request.thumbnailUrl()))
+                .content(newsHtmlSanitizer.sanitize(request.content()))
+                .thumbnailUrl(resolveThumbnailUrl(request.thumbnailUrl()))
                 .authorName(resolveAuthorName(request.authorName()))
                 .authorId(resolveAuthorId())
                 .status(request.status() == null ? NewsArticleStatus.DRAFT : request.status())
@@ -144,8 +148,8 @@ public class NewsArticleServiceImpl implements NewsArticleService {
         article.setSlug(slug);
         article.setTitle(request.title().trim());
         article.setSummary(TextUtils.trimToNull(request.summary()));
-        article.setContent(TextUtils.trimToNull(request.content()));
-        article.setThumbnailUrl(TextUtils.trimToNull(request.thumbnailUrl()));
+        article.setContent(newsHtmlSanitizer.sanitize(request.content()));
+        article.setThumbnailUrl(resolveThumbnailUrl(request.thumbnailUrl()));
         if (TextUtils.trimToNull(request.authorName()) != null) {
             article.setAuthorName(request.authorName().trim());
         }
@@ -205,8 +209,23 @@ public class NewsArticleServiceImpl implements NewsArticleService {
     @Override
     public void deleteArticle(UUID id) {
         NewsArticle article = findArticle(id);
+
+        // Thu ảnh nội bộ mà bài viết đang dùng trước khi xoá bản ghi.
+        // Chỉ xoá ảnh thuộc kho của news-service (`/api/news-images/...`) —
+        // ảnh từ nguồn ngoài (Unsplash…) không do service này quản lý.
+        Set<String> imageUrls = new LinkedHashSet<>(
+                newsHtmlSanitizer.extractInternalImageUrls(article.getContent()));
+        if (article.getThumbnailUrl() != null
+                && newsHtmlSanitizer.isInternalImageUrl(article.getThumbnailUrl())) {
+            imageUrls.add(article.getThumbnailUrl());
+        }
+        imageUrls.forEach(url -> {
+            String filename = url.substring(url.lastIndexOf('/') + 1);
+            newsImageStorageService.delete(filename);
+        });
+
         newsArticleRepository.delete(article);
-        log.info("Đã xóa bài viết: id={}", id);
+        log.info("Đã xóa bài viết: id={}, ảnh đã dọn={}", id, imageUrls.size());
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -299,5 +318,29 @@ public class NewsArticleServiceImpl implements NewsArticleService {
         if (status == NewsArticleStatus.PUBLISHED && article.getPublishedAt() == null) {
             article.setPublishedAt(Instant.now());
         }
+    }
+
+    /**
+     * Chuẩn hoá URL ảnh đại diện.
+     *
+     * <p>Chỉ chấp nhận URL http/https hoặc đường dẫn nội bộ bắt đầu bằng
+     * {@code /} — chặn {@code javascript:}, {@code data:} và các scheme
+     * nguy hiểm khác (ảnh đại diện được render trong thẻ {@code <img>} nên
+     * scheme nguy hiểm vẫn có thể gây XSS).
+     */
+    private String resolveThumbnailUrl(String requestedUrl) {
+        String url = TextUtils.trimToNull(requestedUrl);
+        if (url == null) {
+            return null;
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("/")) {
+            return url;
+        }
+        if (lower.startsWith("http://") || lower.startsWith("https://")) {
+            return url;
+        }
+        throw new ApiException(ErrorCode.INVALID_REQUEST,
+                "Đường dẫn ảnh đại diện không hợp lệ. Chỉ chấp nhận URL http(s) hoặc đường dẫn nội bộ.");
     }
 }

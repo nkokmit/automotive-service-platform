@@ -53,7 +53,10 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET,
                                 "/api/news-articles/**",
                                 "/api/news-categories/**",
-                                "/api/news-comments/**"
+                                "/api/news-comments/**",
+                                // Ảnh bài viết là tài nguyên tĩnh, hiển thị
+                                // trong bài cho cả khách chưa đăng nhập.
+                                "/api/news-images/**"
                         ).permitAll()
 
                         // Only health is public; other Actuator endpoints stay protected.

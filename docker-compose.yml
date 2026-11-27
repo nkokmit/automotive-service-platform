@@ -495,8 +495,14 @@ services:
       EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
       JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
+      NEWS_IMAGE_STORAGE_DIR: ${NEWS_IMAGE_STORAGE_DIR:-/app/uploads}
+      NEWS_IMAGE_MAX_SIZE_BYTES: ${NEWS_IMAGE_MAX_SIZE_BYTES:-5242880}
     ports:
       - "${NEWS_SERVICE_PORT:-8089}:8089"
+    volumes:
+      # Kho ảnh bài viết — volume riêng để ảnh còn tồn tại sau khi
+      # container news-service được rebuild/restart.
+      - news-uploads:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -622,3 +628,4 @@ volumes:
   kafka-data:
   qdrant-data:
   onnx-models:
+  news-uploads:

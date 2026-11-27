@@ -1286,6 +1286,10 @@ export interface NewsCommentResponse {
   content: string;
   parentId: string | null;
   isActive: boolean;
+  /** Tổng số lượt thích của bình luận. */
+  likeCount: number;
+  /** Người đang đăng nhập đã thích bình luận này chưa. */
+  likedByMe: boolean;
   createdAt: string;
   updatedAt: string;
 }
