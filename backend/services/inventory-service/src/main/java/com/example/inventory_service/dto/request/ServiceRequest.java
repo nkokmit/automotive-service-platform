@@ -24,6 +24,10 @@ public record ServiceRequest(
         @Size(max = 150, message = "Tên dịch vụ tối đa 150 ký tự")
         String name,
 
+        /** Mô tả dịch vụ — tuỳ chọn, hiển thị cho khách ở trang chi tiết. */
+        @Size(max = 2000, message = "Mô tả dịch vụ tối đa 2000 ký tự")
+        String description,
+
         @NotNull(message = "Thời lượng dịch vụ không được để trống")
         @Min(value = 1, message = "Thời lượng dịch vụ phải lớn hơn 0")
         @JsonProperty("duration_minutes")

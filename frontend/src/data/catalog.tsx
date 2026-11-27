@@ -32,11 +32,13 @@ import { GARAGE, SERVICE_IMAGE_FALLBACK, partImageFor } from "../config/garage";
 import { mockParts, mockServices } from "./mock";
 import {
   makeSlug,
+  displayDescription,
   type CatalogPart,
   type CatalogService,
 } from "./catalogTypes";
 
 export type { CatalogPart, CatalogService };
+export { displayDescription };
 
 export interface CatalogState {
   services: CatalogService[];
@@ -54,22 +56,6 @@ export interface CatalogState {
 // Mapping: DTO → UI model
 // =========================
 
-/** Mô tả dịch vụ mặc định theo nhóm — backend `services` chưa có cột mô tả. */
-const CATEGORY_DESCRIPTION: Record<string, string> = {
-  "Bảo dưỡng": "Bảo dưỡng định kỳ theo khuyến cáo của nhà sản xuất xe.",
-  "Sửa chữa": "Sửa chữa, khắc phục hư hỏng kỹ thuật bằng linh kiện chính hãng.",
-  "Sơn & thân vỏ": "Sơn, đánh bóng và phục hồi thân vỏ trong phòng sơn kín.",
-  "Điện - Điều hòa": "Chăm sóc hệ thống điện, ắc quy và điều hòa.",
-  "Lốp & phanh": "Thay lốp, kiểm tra hệ thống phanh và cân chỉnh độ chụm.",
-};
-
-function describeService(dto: ServiceResponse): string {
-  const base =
-    CATEGORY_DESCRIPTION[dto.categoryName] ??
-    "Dịch vụ chuyên nghiệp tại AutoCare Workshop, thực hiện bởi kỹ thuật viên có thâm niên.";
-  return `${base} Thời gian dự kiến ${dto.duration_minutes} phút với ${dto.required_techs} kỹ thuật viên.`;
-}
-
 export function mapService(dto: ServiceResponse): CatalogService {
   const price = Number(dto.baseLaborPrice ?? 0);
   return {
@@ -77,7 +63,10 @@ export function mapService(dto: ServiceResponse): CatalogService {
     slug: makeSlug(dto.name, dto.id),
     code: dto.code,
     name: dto.name,
-    description: describeService(dto),
+    // Mô tả THÔ (có thể rỗng) — UI hiển thị dùng `displayDescription()` để
+    // fallback về mô tả theo nhóm. Giữ thô ở đây để form admin edit không
+    // lưu đè mô tả thật bằng chuỗi fallback.
+    description: dto.description?.trim() ?? "",
     category: dto.categoryName,
     categoryId: dto.categoryId,
     durationMin: dto.duration_minutes ?? 30,

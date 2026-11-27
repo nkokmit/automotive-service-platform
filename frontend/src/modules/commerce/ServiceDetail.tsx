@@ -19,7 +19,7 @@ import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { useToast } from "../../components/Toast";
 import { GARAGE } from "../../config/garage";
-import { useCatalog } from "../../data/catalog";
+import { useCatalog, displayDescription } from "../../data/catalog";
 import { bookingApi } from "../../api/endpoints/booking";
 import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
 import { inventoryApi } from "../../api/endpoints/inventory";
@@ -454,8 +454,8 @@ export default function ServiceDetail() {
           {/* Tab content */}
           {tab === "description" && (
             <div className="prose prose-sm max-w-none">
-              <p className="text-ink-light leading-relaxed">
-                {service.description}
+              <p className="text-ink-light leading-relaxed whitespace-pre-line">
+                {displayDescription(service)}
               </p>
             </div>
           )}

@@ -75,6 +75,7 @@ public class ServiceCatalogServiceImpl implements ServiceCatalogService {
                 .category(findCategory(request.categoryId()))
                 .code(code)
                 .name(request.name().trim())
+                .description(TextUtils.trimToNull(request.description()))
                 .durationMinutes(request.durationMinutes())
                 .requiredTechs(request.requiredTechs())
                 .baseLaborPrice(request.baseLaborPrice())
@@ -96,6 +97,7 @@ public class ServiceCatalogServiceImpl implements ServiceCatalogService {
         }
         service.setCode(code);
         service.setName(request.name().trim());
+        service.setDescription(TextUtils.trimToNull(request.description()));
         service.setDurationMinutes(request.durationMinutes());
         service.setRequiredTechs(request.requiredTechs());
         service.setBaseLaborPrice(request.baseLaborPrice());

@@ -304,6 +304,8 @@ export interface ServiceResponse {
   categoryName: string;
   code: string;
   name: string;
+  /** Mô tả dịch vụ — có thể null nếu dịch vụ chưa được admin nhập mô tả. */
+  description?: string | null;
   duration_minutes: number;
   required_techs: number;
   /** BigDecimal — serialize thành number. */

@@ -33,6 +33,10 @@ public class Service {
     @Column(name = "name", length = 150, nullable = false)
     private String name;
 
+    /** Mô tả dịch vụ — hiển thị cho khách ở trang chi tiết dịch vụ. */
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "duration_minutes", nullable = false)
     @Builder.Default
     private Integer durationMinutes = 30;

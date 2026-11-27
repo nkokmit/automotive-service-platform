@@ -78,3 +78,41 @@ export function makeSlug(name: string, id: string): string {
   const suffix = id.replace(/-/g, "").slice(0, 6);
   return base ? `${base}-${suffix}` : suffix;
 }
+
+/**
+ * Mô tả dựng sẵn theo nhóm dịch vụ — dùng khi admin CHƯA nhập mô tả.
+ *
+ * <p>Đặt ở đây (thay vì `catalog.tsx`) vì `search.ts` cũng dùng và phải tránh
+ * import vòng.
+ */
+const CATEGORY_DESCRIPTION: Record<string, string> = {
+  "Bảo dưỡng": "Bảo dưỡng định kỳ theo khuyến cáo của nhà sản xuất xe.",
+  "Sửa chữa": "Sửa chữa, khắc phục hư hỏng kỹ thuật bằng linh kiện chính hãng.",
+  "Sơn & thân vỏ": "Sơn, đánh bóng và phục hồi thân vỏ trong phòng sơn kín.",
+  "Điện - Điều hòa": "Chăm sóc hệ thống điện, ắc quy và điều hòa.",
+  "Lốp & phanh": "Thay lốp, kiểm tra hệ thống phanh và cân chỉnh độ chụm.",
+};
+
+/** Mô tả fallback theo nhóm dịch vụ. */
+export function fallbackDescription(categoryName: string): string {
+  return (
+    CATEGORY_DESCRIPTION[categoryName] ??
+    "Dịch vụ chuyên nghiệp tại AutoCare Workshop, thực hiện bởi kỹ thuật viên có thâm niên."
+  );
+}
+
+/**
+ * Mô tả để HIỂN THỊ cho khách.
+ *
+ * <p>Ưu tiên mô tả thật do admin nhập; khi rỗng thì dựng từ nhóm dịch vụ +
+ * thông tin thời lượng / số kỹ thuật viên.
+ */
+export function displayDescription(service: CatalogService): string {
+  const real = service.description?.trim();
+  if (real) return real;
+  return (
+    `${fallbackDescription(service.category)} ` +
+    `Thời gian dự kiến ${service.durationMin} phút ` +
+    `với ${service.requiredTechs} kỹ thuật viên.`
+  );
+}
