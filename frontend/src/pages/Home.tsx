@@ -19,6 +19,8 @@ import Card from "../components/Card";
 import Badge from "../components/Badge";
 import { useCatalog } from "../data/catalog";
 import { GARAGE } from "../config/garage";
+import HomeReviewsSection from "../modules/review/HomeReviewsSection";
+import { useHomepageReviewSummary } from "../modules/review/useHomepageReviewSummary";
 
 /** Số dịch vụ tối đa hiển thị ở trang chủ. */
 const HOME_SERVICE_LIMIT = 8;
@@ -32,6 +34,7 @@ const compactVND = (n: number) => {
 
 export default function Home() {
   const { services } = useCatalog();
+  const { summary } = useHomepageReviewSummary(5);
 
   /** Danh mục dịch vụ đang chọn — "Tất cả" hoặc tên nhóm. */
   const [activeCategory, setActiveCategory] = useState("Tất cả");
@@ -139,7 +142,7 @@ export default function Home() {
                 ))}
               </div>
               <span>
-                <strong className="text-ink">10.000+</strong> chủ xe tin dùng
+                <strong className="text-ink">Nhiều</strong> chủ xe tin dùng
               </span>
             </div>
           </div>
@@ -171,10 +174,11 @@ export default function Home() {
               </div>
               <div>
                 <div className="text-sm font-semibold">
-                  {GARAGE.rating} / 5 đánh giá
+                  {(summary?.averageRating ?? GARAGE.rating).toFixed(1)} / 5
+                  đánh giá
                 </div>
                 <div className="text-xs text-ink-muted">
-                  {GARAGE.reviewsCount} lượt
+                  {summary?.reviewCount ?? GARAGE.reviewsCount} lượt
                 </div>
               </div>
             </div>
@@ -421,6 +425,9 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      {/* ============ ĐÁNH GIÁ KHÁCH HÀNG (GET /api/work-orders/reviews/summary) ============ */}
+      <HomeReviewsSection />
 
       {/* ============== VALUE PROP / TRUST ============== */}
       <section className="container-page py-8 md:py-12">

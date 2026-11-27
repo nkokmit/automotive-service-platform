@@ -36,6 +36,8 @@ export interface ServiceWriteRequest {
   categoryId: string;
   code: string;
   name: string;
+  /** Mô tả dịch vụ — tuỳ chọn. */
+  description?: string | null;
   duration_minutes: number;
   required_techs: number;
   baseLaborPrice: number;

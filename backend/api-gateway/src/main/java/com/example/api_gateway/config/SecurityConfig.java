@@ -45,6 +45,29 @@ public class SecurityConfig {
                                 "/api/part-categories/**"
                         ).permitAll()
 
+                        // ── Tin tức công khai ─────────────────────────────────────────
+                        // Khách chưa đăng nhập vẫn đọc được tin tức, danh mục bài
+                        // viết và bình luận. Chỉ GET — mọi thao tác ghi (đăng bài,
+                        // quản lý danh mục, kiểm duyệt bình luận) đi qua xác thực
+                        // và phân quyền ở news-service.
+                        .pathMatchers(HttpMethod.GET,
+                                "/api/news-articles/**",
+                                "/api/news-categories/**",
+                                "/api/news-comments/**",
+                                // Ảnh bài viết là tài nguyên tĩnh, hiển thị
+                                // trong bài cho cả khách chưa đăng nhập.
+                                "/api/news-images/**"
+                        ).permitAll()
+
+                        // ── Đánh giá sửa chữa công khai ─────────────────────────────
+                        // Trang chủ hiển thị điểm đánh giá trung bình và nhận xét
+                        // mới nhất cho khách CHƯA đăng nhập. Chỉ GET — mọi thao
+                        // tác ghi (gửi đánh giá) đi qua xác thực và kiểm tra sở
+                        // hữu ở work-order-service.
+                        .pathMatchers(HttpMethod.GET,
+                                "/api/work-orders/reviews/summary"
+                        ).permitAll()
+
                         // Only health is public; other Actuator endpoints stay protected.
                         .pathMatchers("/actuator/health/**").permitAll()
 

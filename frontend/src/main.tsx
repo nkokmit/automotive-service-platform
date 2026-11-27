@@ -27,18 +27,22 @@ import {
 // Search module
 import SearchPage from "./modules/search/SearchPage";
 
+// News module (tin tức — public)
+import NewsList from "./modules/news/NewsList";
+import NewsDetail from "./modules/news/NewsDetail";
+
 import { ErrorBoundary, NotFoundPage } from "./components/ErrorBoundary";
 import RequireAuth from "./components/RequireAuth";
+import RequireAdmin from "./components/RequireAdmin";
 import AdminLayout from "./components/AdminLayout";
 import { ToastProvider } from "./components/Toast";
 import Card from "./components/Card";
 import Button from "./components/Button";
 import { Link } from "react-router-dom";
-import { IconArrowLeft, IconSparkles, IconSettings } from "./components/icons";
+import { IconArrowLeft, IconSettings } from "./components/icons";
 import "./styles/globals.css";
 
 import AdminDashboard from "./modules/admin/AdminDashboard";
-import AdminGarageProfile from "./modules/admin/AdminGarageProfile";
 import AdminServices from "./modules/admin/AdminServices";
 import AdminParts from "./modules/admin/AdminParts";
 import AdminSuppliers from "./modules/admin/AdminSuppliers";
@@ -59,6 +63,10 @@ import TechnicianWorkOrders from "./modules/admin/TechnicianWorkOrders";
 import AdminPermissions from "./modules/admin/AdminPermissions";
 import AdminRoles from "./modules/admin/AdminRoles";
 import AdminNotificationTemplates from "./modules/admin/AdminNotificationTemplates";
+import AdminNews from "./modules/admin/AdminNews";
+import AdminNewsCategories from "./modules/admin/AdminNewsCategories";
+import AdminReviews from "./modules/admin/AdminReviews";
+import AdminReports from "./modules/admin/AdminReports";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
@@ -101,6 +109,10 @@ hydrateUser().finally(() => {
               {/* ============ SEARCH ============ */}
               <Route path="search" element={<SearchPage />} />
 
+              {/* ============ NEWS module (tin tức) ============ */}
+              <Route path="news" element={<NewsList />} />
+              <Route path="news/:slug" element={<NewsDetail />} />
+
               {/* ============ Trang tĩnh ============ */}
               <Route path="help" element={<HelpPage />} />
               <Route path="terms" element={<TermsPage />} />
@@ -118,53 +130,213 @@ hydrateUser().finally(() => {
                 </ToastProvider>
               }
             >
-              <Route index element={<AdminDashboard />} />
-              <Route path="garage" element={<AdminGarageProfile />} />
-              <Route path="services" element={<AdminServices />} />
-              <Route path="services/bom/:serviceId" element={<AdminServiceBom />} />
-              <Route path="categories" element={<AdminCategories />} />
-              <Route path="parts" element={<AdminParts />} />
-              <Route path="suppliers" element={<AdminSuppliers />} />
-              <Route path="purchase-orders" element={<AdminPurchaseOrders />} />
+              {/*
+                Moi route con deu boc `RequireAdmin`:
+                  1. `RequireAuth` — bat buoc dang nhap.
+                  2. Kiem tra authority theo `config/adminAccess.ts` — hien
+                     trang 403 neu role khong duoc phan quyen man hinh nay.
+
+                Luu y: `AdminLayout` KHONG boc RequireAuth de no hien thi
+                sidebar/topbar ngay; cac route con tu lo phan bao ve.
+              */}
+              <Route
+                index
+                element={
+                  <RequireAdmin>
+                    <AdminDashboard />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="services"
+                element={
+                  <RequireAdmin>
+                    <AdminServices />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="services/bom/:serviceId"
+                element={
+                  <RequireAdmin>
+                    <AdminServiceBom />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="categories"
+                element={
+                  <RequireAdmin>
+                    <AdminCategories />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="parts"
+                element={
+                  <RequireAdmin>
+                    <AdminParts />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="suppliers"
+                element={
+                  <RequireAdmin>
+                    <AdminSuppliers />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="purchase-orders"
+                element={
+                  <RequireAdmin>
+                    <AdminPurchaseOrders />
+                  </RequireAdmin>
+                }
+              />
               <Route
                 path="inventory-transactions"
-                element={<AdminInventoryTransactions />}
+                element={
+                  <RequireAdmin>
+                    <AdminInventoryTransactions />
+                  </RequireAdmin>
+                }
               />
-              <Route path="bookings" element={<AdminBookings />} />
-              <Route path="invoices" element={<AdminBilling />} />
-              <Route path="staff" element={<AdminStaff />} />
+              <Route
+                path="bookings"
+                element={
+                  <RequireAdmin>
+                    <AdminBookings />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="invoices"
+                element={
+                  <RequireAdmin>
+                    <AdminBilling />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="staff"
+                element={
+                  <RequireAdmin>
+                    <AdminStaff />
+                  </RequireAdmin>
+                }
+              />
               <Route
                 path="staff/:staffId/schedule"
-                element={<AdminStaffSchedule />}
+                element={
+                  <RequireAdmin>
+                    <AdminStaffSchedule />
+                  </RequireAdmin>
+                }
               />
-              <Route path="work-shifts" element={<AdminWorkShifts />} />
-              <Route path="schedule" element={<AdminScheduleBoard />} />
-              <Route path="work-orders" element={<AdminWorkOrders />} />
-              <Route path="work-orders/mine" element={<TechnicianWorkOrders />} />
-              <Route path="vehicles" element={<AdminCustomerVehicles />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="permissions" element={<AdminPermissions />} />
-              <Route path="roles" element={<AdminRoles />} />
+              <Route
+                path="work-shifts"
+                element={
+                  <RequireAdmin>
+                    <AdminWorkShifts />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="schedule"
+                element={
+                  <RequireAdmin>
+                    <AdminScheduleBoard />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="work-orders"
+                element={
+                  <RequireAdmin>
+                    <AdminWorkOrders />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="work-orders/mine"
+                element={
+                  <RequireAdmin>
+                    <TechnicianWorkOrders />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="vehicles"
+                element={
+                  <RequireAdmin>
+                    <AdminCustomerVehicles />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="users"
+                element={
+                  <RequireAdmin>
+                    <AdminUsers />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="permissions"
+                element={
+                  <RequireAdmin>
+                    <AdminPermissions />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="roles"
+                element={
+                  <RequireAdmin>
+                    <AdminRoles />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="news"
+                element={
+                  <RequireAdmin>
+                    <AdminNews />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="news-categories"
+                element={
+                  <RequireAdmin>
+                    <AdminNewsCategories />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="reviews"
+                element={
+                  <RequireAdmin>
+                    <AdminReviews />
+                  </RequireAdmin>
+                }
+              />
               <Route
                 path="notification-templates"
-                element={<AdminNotificationTemplates />}
+                element={
+                  <RequireAdmin>
+                    <AdminNotificationTemplates />
+                  </RequireAdmin>
+                }
               />
               <Route
                 path="reports"
                 element={
-                  <ComingSoon
-                    title="Báo cáo & Thống kê"
-                    desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo dịch vụ, hiệu suất kỹ thuật viên, cohort khách hàng..."
-                  />
-                }
-              />
-              <Route
-                path="settings"
-                element={
-                  <ComingSoon
-                    title="Cài đặt hệ thống"
-                    desc="Cấu hình chung: thông tin công ty, email templates, payment gateway, backup..."
-                  />
+                  <RequireAdmin>
+                    <AdminReports />
+                  </RequireAdmin>
                 }
               />
               <Route path="*" element={<AdminNotFound />} />
@@ -179,28 +351,6 @@ hydrateUser().finally(() => {
 // =========================
 // Admin placeholder pages
 // =========================
-
-function ComingSoon({ title, desc }: { title: string; desc: string }) {
-  return (
-    <div className="max-w-2xl mx-auto">
-      <Card hover={false}>
-        <div className="p-10 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
-            <IconSparkles size={28} />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">{title}</h2>
-          <p className="text-sm text-ink-muted mb-6">{desc}</p>
-          <Link to="/admin">
-            <Button variant="outline">
-              <IconArrowLeft size={14} />
-              Quay lại Dashboard
-            </Button>
-          </Link>
-        </div>
-      </Card>
-    </div>
-  );
-}
 
 function AdminNotFound() {
   return (

@@ -18,6 +18,7 @@ import { GARAGE } from "../../config/garage";
 import {
   useCatalog,
   useServiceCategoryOptions,
+  displayDescription,
   type CatalogService,
 } from "../../data/catalog";
 
@@ -61,7 +62,9 @@ export default function ServicesList() {
       if (s.priceFrom > filters.maxPrice) return false;
       if (
         query &&
-        !`${s.name} ${s.description} ${s.category}`.toLowerCase().includes(query.toLowerCase())
+        !`${s.name} ${displayDescription(s)} ${s.category}`
+          .toLowerCase()
+          .includes(query.toLowerCase())
       )
         return false;
       return true;
@@ -286,7 +289,7 @@ function ServiceCard({ service }: { service: CatalogService }) {
             </div>
 
             <p className="text-sm text-ink-light line-clamp-2 mb-3">
-              {service.description}
+              {displayDescription(service)}
             </p>
 
             <div className="flex flex-wrap items-center gap-3 text-xs text-ink-light mb-3">

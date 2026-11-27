@@ -9,6 +9,7 @@
  * ô tìm kiếm trong Header (gợi ý tức thì).
  */
 import type { CatalogService } from "./catalogTypes";
+import { displayDescription } from "./catalogTypes";
 
 export type SearchKind = "service";
 
@@ -64,7 +65,7 @@ export function searchAll(query: string, options: SearchOptions): SearchResultGr
   const { services } = options;
 
   const serviceHits = services.filter((s) =>
-    matchQuery([s.name, s.category, s.description, s.code], query),
+    matchQuery([s.name, s.category, displayDescription(s), s.code], query),
   );
 
   return { services: serviceHits };

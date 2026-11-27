@@ -13,6 +13,7 @@ services:
       WORK_ORDER_MYSQL_DATABASE: ${WORK_ORDER_MYSQL_DATABASE:-work_order_service}
       BILLING_MYSQL_DATABASE: ${BILLING_MYSQL_DATABASE:-billing_service}
       NOTIFICATION_MYSQL_DATABASE: ${NOTIFICATION_MYSQL_DATABASE:-notification_service}
+      NEWS_MYSQL_DATABASE: ${NEWS_MYSQL_DATABASE:-news_service}
       MYSQL_USER: ${MYSQL_USER:-app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
     ports:
@@ -45,6 +46,7 @@ services:
       WORK_ORDER_MYSQL_DATABASE: ${WORK_ORDER_MYSQL_DATABASE:-work_order_service}
       BILLING_MYSQL_DATABASE: ${BILLING_MYSQL_DATABASE:-billing_service}
       NOTIFICATION_MYSQL_DATABASE: ${NOTIFICATION_MYSQL_DATABASE:-notification_service}
+      NEWS_MYSQL_DATABASE: ${NEWS_MYSQL_DATABASE:-news_service}
       MYSQL_USER: ${MYSQL_USER:-app}
       MYSQL_BOOTSTRAP_TCP: "true"
     volumes:
@@ -400,6 +402,7 @@ services:
       EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
       JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
       WORK_ORDER_SERVICE_URL: http://work-order-service:8086
+      INVENTORY_SERVICE_URL: http://inventory-service:8084
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS_CONTAINER:-kafka:19092}
     ports:
       - "${BILLING_SERVICE_PORT:-8087}:8087"
@@ -413,6 +416,8 @@ services:
       kafka:
         condition: service_healthy
       work-order-service:
+        condition: service_healthy
+      inventory-service:
         condition: service_healthy
     networks:
       - platform
@@ -475,6 +480,48 @@ services:
       retries: 12
       start_period: 90s
 
+  news-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE_PATH: services/news-service
+    restart: unless-stopped
+    init: true
+    environment:
+      SERVER_PORT: 8089
+      DB_URL: jdbc:mysql://mysql:3306/${NEWS_MYSQL_DATABASE:-news_service}
+      DB_USERNAME: ${MYSQL_USER:-app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set a Base64 JWT_SECRET (at least 32 decoded bytes) in .env}
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://discovery-server:8761/eureka/}
+      EUREKA_REGISTRY_FETCH_INTERVAL: ${EUREKA_REGISTRY_FETCH_INTERVAL:-10}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      API_GATEWAY_URL: ${API_GATEWAY_URL:-http://localhost:8000}
+      NEWS_IMAGE_STORAGE_DIR: ${NEWS_IMAGE_STORAGE_DIR:-/app/uploads}
+      NEWS_IMAGE_MAX_SIZE_BYTES: ${NEWS_IMAGE_MAX_SIZE_BYTES:-5242880}
+    ports:
+      - "${NEWS_SERVICE_PORT:-8089}:8089"
+    volumes:
+      # Kho ảnh bài viết — volume riêng để ảnh còn tồn tại sau khi
+      # container news-service được rebuild/restart.
+      - news-uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mysql-bootstrap:
+        condition: service_completed_successfully
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - platform
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://localhost:8089/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
   api-gateway:
     build:
       context: ./backend
@@ -507,6 +554,8 @@ services:
       work-order-service:
         condition: service_healthy
       billing-service:
+        condition: service_healthy
+      news-service:
         condition: service_healthy
     networks:
       - platform
@@ -582,3 +631,4 @@ volumes:
   kafka-data:
   qdrant-data:
   onnx-models:
+  news-uploads:

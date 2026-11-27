@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -53,6 +54,18 @@ public class GlobalExceptionHandler {
         log.error("Work Order persistence constraint failed", exception);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(ErrorCode.INVALID_REQUEST.getCode(), "Dữ liệu Work Order bị xung đột"));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException exception) {
+        // `@PreAuthorize` bị từ chối → trả 403 kèm code 1403.
+        //
+        // Bắt buộc phải có handler riêng: nếu không, exception sẽ rơi xuống
+        // `handleUnexpectedException` và trả 500 (9999) — client không phân biệt
+        // được "không đủ quyền" với "lỗi hệ thống".
+        log.warn("Access denied: {}", exception.getMessage());
+        return ResponseEntity.status(ErrorCode.UNAUTHORIZED.getHttpStatus())
+                .body(ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

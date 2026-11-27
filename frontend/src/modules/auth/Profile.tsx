@@ -40,6 +40,7 @@ import type {
 import { bookingApi } from "../../api/endpoints/booking";
 import { billingApi } from "../../api/endpoints/billing";
 import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
+import ReviewsTab from "../review/ReviewsTab";
 import { GARAGE } from "../../config/garage";
 import UnifiedProfileForm from "./UnifiedProfileForm";
 import {
@@ -60,6 +61,7 @@ type TabId =
   | "info"
   | "bookings"
   | "history"
+  | "reviews"
   | "invoices"
   | "vehicles";
 
@@ -67,6 +69,7 @@ const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "info", label: "Thông tin", icon: <IconUser size={18} /> },
   { id: "bookings", label: "Lịch hẹn", icon: <IconCalendar size={18} /> },
   { id: "history", label: "Bảo dưỡng", icon: <IconWrench size={18} /> },
+  { id: "reviews", label: "Đánh giá", icon: <IconStar size={18} /> },
   { id: "invoices", label: "Hóa đơn", icon: <IconCash size={18} /> },
   { id: "vehicles", label: "Xe của tôi", icon: <IconCar size={18} /> },
 ];
@@ -272,6 +275,7 @@ export default function Profile() {
         {activeTab === "info" && <InfoTab />}
         {activeTab === "bookings" && <BookingsTab />}
         {activeTab === "history" && <ServiceHistoryTab />}
+        {activeTab === "reviews" && <ReviewsTab />}
         {activeTab === "invoices" && <InvoicesTab />}
         {activeTab === "vehicles" && <VehiclesTab />}
       </div>

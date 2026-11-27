@@ -25,12 +25,9 @@ import {
   IconPackage,
   IconWarning,
   IconRefresh,
-  IconSearch,
 } from "../../components/icons";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
-import Card from "../../components/Card";
-import Input from "../../components/Input";
 import {
   AdminTable,
   type AdminTableColumn,
@@ -162,7 +159,9 @@ const columns: AdminTableColumn<PartResponse>[] = [
 ];
 
 const filters: AdminTableFilter<PartResponse>[] = [
-  { id: "low", label: "Sắp hết hàng", predicate: isLowStock },
+  // "Sắp hết hàng" KHÔNG khai ở đây — nó được render bằng `serverFilters` vì
+  // backend lọc ở server (`?lowStockOnly=true`). Thêm vào đây sẽ ra 2 chip
+  // trùng nhau.
   { id: "out", label: "Hết hàng", predicate: isOutOfStock },
   {
     id: "reserved",
@@ -193,10 +192,6 @@ export default function AdminParts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /** Ô tìm kiếm (chưa áp dụng). */
-  const [keywordInput, setKeywordInput] = useState("");
-  /** Từ khoá đã áp dụng lên backend (`keyword` của `/api/parts`). */
-  const [keyword, setKeyword] = useState("");
   /**
    * Chỉ xem phụ tùng sắp hết hàng — lọc ở **server** qua `?lowStockOnly=true`
    * (backend: `onHandStock <= minStockLevel`).
@@ -213,7 +208,6 @@ export default function AdminParts() {
         inventoryApi.listParts({
           size: 100,
           sortBy: "name",
-          keyword: keyword.trim() || undefined,
           lowStockOnly: lowStockOnly || undefined,
         }),
         inventoryApi.listPartCategories({ size: 100 }),
@@ -230,7 +224,7 @@ export default function AdminParts() {
     } finally {
       setLoading(false);
     }
-  }, [keyword, lowStockOnly]);
+  }, [lowStockOnly]);
 
   useEffect(() => {
     void load();
@@ -377,55 +371,6 @@ export default function AdminParts() {
         </div>
       )}
 
-      {/* Ô tìm kiếm gửi lên backend `keyword` */}
-      <Card hover={false}>
-        <div className="p-3 flex items-center gap-2">
-          <div className="flex-1 min-w-[200px]">
-            <Input
-              placeholder="Tìm phụ tùng theo tên, SKU, mã OEM..."
-              value={keywordInput}
-              onChange={(e) => setKeywordInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") setKeyword(keywordInput);
-              }}
-              leftIcon={<IconSearch size={16} />}
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setKeyword(keywordInput)}
-          >
-            <IconSearch size={14} />
-            Tìm
-          </Button>
-          {keyword !== keywordInput && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setKeywordInput("");
-                setKeyword("");
-              }}
-            >
-              Xoá
-            </Button>
-          )}
-          <button
-            onClick={() => setLowStockOnly((v) => !v)}
-            className={[
-              "text-xs font-medium px-2.5 py-1 rounded-full transition-colors whitespace-nowrap",
-              lowStockOnly
-                ? "bg-primary text-white"
-                : "bg-bgsoft text-ink-muted hover:bg-ink/10",
-            ].join(" ")}
-            title="Chỉ hiện phụ tùng sắp hết hàng (lọc ở server)"
-          >
-            Sắp hết hàng
-          </button>
-        </div>
-      </Card>
-
       <AdminTable
         title="Quản lý phụ tùng"
         subtitle={
@@ -440,7 +385,17 @@ export default function AdminParts() {
         onRowsChange={setParts}
         columns={columns}
         searchKey="name"
+        searchPlaceholder="Tìm phụ tùng theo tên..."
         filters={filters}
+        serverFilters={[
+          {
+            id: "low-stock",
+            label: "Sắp hết hàng",
+            active: lowStockOnly,
+            onToggle: () => setLowStockOnly((v) => !v),
+            title: "Chỉ hiện phụ tùng sắp hết hàng (lọc ở server)",
+          },
+        ]}
         addLabel="Thêm phụ tùng"
         form={form}
         onDelete={handleDelete}

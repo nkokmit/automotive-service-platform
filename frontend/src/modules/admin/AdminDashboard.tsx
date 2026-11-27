@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   IconShoppingBag,
-  IconBuilding,
   IconWrench,
   IconPackage,
   IconUsers,
@@ -16,10 +15,12 @@ import {
   IconCar,
   IconSparkles,
   IconRefresh,
+  IconNote,
 } from "../../components/icons";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
+import { hasTokenAuthority } from "../../api/session";
 import {
   useAdminDashboard,
   type DashboardKpi,
@@ -55,6 +56,28 @@ export default function AdminDashboard() {
     reload,
   } = useAdminDashboard();
 
+  /**
+   * Phan dashboard nao hien thi, tuy theo quyen doc cua role hien tai.
+   *
+   * <p>Vi du thu ngan (chi co INVOICE_READ) se thay KPI doanh thu + hoa don
+   * gan day, khong thay phan don gia hay tai khoan.
+   */
+  const canReadInvoices = hasTokenAuthority("INVOICE_READ");
+  const canReadWorkOrders = hasTokenAuthority("WORK_ORDER_READ");
+  const canReadBookings = hasTokenAuthority("BOOKING_READ");
+  const canReadUsers = hasTokenAuthority("USER_READ");
+  const canReadCatalog = hasTokenAuthority("SERVICE_READ");
+  const canReadInventory = hasTokenAuthority("PART_READ");
+  const canReadNews = hasTokenAuthority("NEWS_ARTICLE_READ");
+  /** Xem báo cáo & thống kê — cần cho link "Xem tất cả" sang /admin/reports. */
+  const canReadReports = hasTokenAuthority("REPORT_READ");
+
+  // Biểu đồ doanh thu hiển thị khi có quyền đọc hóa đơn HOẶC quyền xem báo cáo.
+  const canSeeRevenue = canReadInvoices || canReadReports;
+  const canSeeWorkOrders = canReadWorkOrders;
+  const canSeeBookings = canReadBookings;
+  const canSeeUsers = canReadUsers;
+
   const today = useMemo(
     () =>
       new Date().toLocaleDateString("vi-VN", {
@@ -84,11 +107,27 @@ export default function AdminDashboard() {
           </div>
           <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
           <p className="text-sm text-ink-light mt-1">
-            Hệ thống đang ghi nhận{" "}
-            <span className="font-semibold text-primary">
-              {newOrdersCount} phiếu sửa chữa
-            </span>{" "}
-            và {totals.bookings} lịch hẹn.
+            {canSeeWorkOrders && canSeeBookings ? (
+              <>
+                Hệ thống đang ghi nhận{" "}
+                <span className="font-semibold text-primary">
+                  {newOrdersCount} phiếu sửa chữa
+                </span>{" "}
+                và {totals.bookings} lịch hẹn.
+              </>
+            ) : canSeeWorkOrders ? (
+              <>
+                Hệ thống đang ghi nhận{" "}
+                <span className="font-semibold text-primary">
+                  {newOrdersCount} phiếu sửa chữa
+                </span>
+                .
+              </>
+            ) : canSeeBookings ? (
+              <>Hệ thống đang ghi nhận {totals.bookings} lịch hẹn.</>
+            ) : (
+              <>Tổng quan hoạt động của xưởng.</>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -96,12 +135,14 @@ export default function AdminDashboard() {
             <IconRefresh size={14} />
             {loading ? "Đang tải..." : "Làm mới"}
           </Button>
-          <Link to="/admin/work-orders">
-            <Button size="md">
-              <IconPlus size={14} />
-              Tạo phiếu sửa chữa
-            </Button>
-          </Link>
+          {canSeeWorkOrders && (
+            <Link to="/admin/work-orders">
+              <Button size="md">
+                <IconPlus size={14} />
+                Tạo phiếu sửa chữa
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -127,35 +168,43 @@ export default function AdminDashboard() {
       </div>
 
       {/* ============= Revenue chart ============= */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <Card hover={false}>
-            <div className="p-5">
-              <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
-                <div>
-                  <h2 className="font-semibold flex items-center gap-2">
-                    <IconChart size={18} className="text-primary" />
-                    Doanh thu 12 tháng gần nhất
-                  </h2>
-                  <p className="text-xs text-ink-muted mt-0.5">
-                    Tổng 12 tháng: {compactVND(totalRevenue)}
-                  </p>
+      {canSeeRevenue && (
+        <div className="grid lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <Card hover={false}>
+              <div className="p-5">
+                <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
+                  <div>
+                    <h2 className="font-semibold flex items-center gap-2">
+                      <IconChart size={18} className="text-primary" />
+                      Doanh thu 12 tháng gần nhất
+                    </h2>
+                    <p className="text-xs text-ink-muted mt-0.5">
+                      Tổng 12 tháng: {compactVND(totalRevenue)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {canReadReports && (
+                      <Link
+                        to="/admin/reports"
+                        className="text-xs text-primary font-medium hover:underline inline-flex items-center gap-0.5"
+                      >
+                        Xem tất cả
+                        <IconArrowRight size={11} />
+                      </Link>
+                    )}
+                  </div>
                 </div>
-                <Badge tone="accent">
-                  <IconArrowUpRight size={11} />
-                  Dữ liệu thật
-                </Badge>
+                {revenueByMonth.length > 0 ? (
+                  <RevenueChart data={revenueByMonth} />
+                ) : (
+                  <div className="h-44 flex items-center justify-center text-sm text-ink-muted">
+                    Chưa có dữ liệu doanh thu
+                  </div>
+                )}
               </div>
-              {revenueByMonth.length > 0 ? (
-                <RevenueChart data={revenueByMonth} />
-              ) : (
-                <div className="h-44 flex items-center justify-center text-sm text-ink-muted">
-                  Chưa có dữ liệu doanh thu
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
+            </Card>
+          </div>
 
         {/* Số liệu tổng quan */}
         <Card hover={false}>
@@ -165,34 +214,44 @@ export default function AdminDashboard() {
               Tổng quan hệ thống
             </h2>
             <ul className="space-y-3">
-              <SummaryRow
-                icon={<IconShoppingBag size={14} />}
-                label="Hóa đơn"
-                value={totals.invoices}
-              />
-              <SummaryRow
-                icon={<IconWrench size={14} />}
-                label="Phiếu sửa chữa"
-                value={totals.workOrders}
-              />
-              <SummaryRow
-                icon={<IconCalendar size={14} />}
-                label="Lịch hẹn"
-                value={totals.bookings}
-              />
-              <SummaryRow
-                icon={<IconUsers size={14} />}
-                label="Tài khoản"
-                value={totals.users}
-              />
+              {canSeeRevenue && (
+                <SummaryRow
+                  icon={<IconShoppingBag size={14} />}
+                  label="Hóa đơn"
+                  value={totals.invoices}
+                />
+              )}
+              {canSeeWorkOrders && (
+                <SummaryRow
+                  icon={<IconWrench size={14} />}
+                  label="Phiếu sửa chữa"
+                  value={totals.workOrders}
+                />
+              )}
+              {canSeeBookings && (
+                <SummaryRow
+                  icon={<IconCalendar size={14} />}
+                  label="Lịch hẹn"
+                  value={totals.bookings}
+                />
+              )}
+              {canSeeUsers && (
+                <SummaryRow
+                  icon={<IconUsers size={14} />}
+                  label="Tài khoản"
+                  value={totals.users}
+                />
+              )}
             </ul>
           </div>
         </Card>
       </div>
+      )}
 
       {/* ============= Recent orders + Recent activity ============= */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
+      {canSeeRevenue && (
+        <div className="grid lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
           <Card hover={false}>
             <div className="p-5">
               <div className="flex items-center justify-between mb-4">
@@ -293,6 +352,7 @@ export default function AdminDashboard() {
           </div>
         </Card>
       </div>
+      )}
 
       {/* ============= Quick links ============= */}
       <div className="grid lg:grid-cols-3 gap-4">
@@ -304,58 +364,80 @@ export default function AdminDashboard() {
                 Quản lý nhanh
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <QuickLink
-                  to="/admin/garage"
-                  icon={<IconBuilding size={18} />}
-                  label="Xưởng"
-                  desc="AutoCare Workshop"
-                  tone="primary"
-                />
-                <QuickLink
-                  to="/admin/services"
-                  icon={<IconWrench size={18} />}
-                  label="Dịch vụ"
-                  desc="Quản lý catalog"
-                  tone="accent"
-                />
-                <QuickLink
-                  to="/admin/parts"
-                  icon={<IconPackage size={18} />}
-                  label="Phụ tùng"
-                  desc="Quản lý kho"
-                  tone="success"
-                />
-                <QuickLink
-                  to="/admin/users"
-                  icon={<IconUsers size={18} />}
-                  label="Người dùng"
-                  desc={`${totals.users} tài khoản`}
-                  tone="warning"
-                />
+                {canReadCatalog && (
+                  <QuickLink
+                    to="/admin/services"
+                    icon={<IconWrench size={18} />}
+                    label="Dịch vụ"
+                    desc="Quản lý catalog"
+                    tone="accent"
+                  />
+                )}
+                {canReadInventory && (
+                  <QuickLink
+                    to="/admin/parts"
+                    icon={<IconPackage size={18} />}
+                    label="Phụ tùng"
+                    desc="Quản lý kho"
+                    tone="success"
+                  />
+                )}
+                {canSeeWorkOrders && (
+                  <QuickLink
+                    to="/admin/work-orders"
+                    icon={<IconShoppingBag size={18} />}
+                    label="Sửa chữa"
+                    desc="Phiếu sửa chữa"
+                    tone="primary"
+                  />
+                )}
+                {canSeeUsers && (
+                  <QuickLink
+                    to="/admin/users"
+                    icon={<IconUsers size={18} />}
+                    label="Người dùng"
+                    desc={`${totals.users} tài khoản`}
+                    tone="warning"
+                  />
+                )}
+                {canReadNews && (
+                  <QuickLink
+                    to="/admin/news"
+                    icon={<IconNote size={18} />}
+                    label="Tin tức"
+                    desc="Đăng & quản lý bài viết"
+                    tone="primary"
+                  />
+                )}
               </div>
             </div>
           </Card>
         </div>
 
-        <Card hover={false} className="bg-gradient-to-br from-primary to-primary-hover text-white border-0">
-          <div className="p-4">
-            <div className="flex items-center gap-2 mb-1.5">
-              <IconCar size={16} />
-              <span className="text-xs font-medium opacity-80 uppercase tracking-wider">
-                Lịch hẹn
-              </span>
+        {canSeeBookings && (
+          <Card
+            hover={false}
+            className="bg-gradient-to-br from-primary to-primary-hover text-white border-0"
+          >
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-1.5">
+                <IconCar size={16} />
+                <span className="text-xs font-medium opacity-80 uppercase tracking-wider">
+                  Lịch hẹn
+                </span>
+              </div>
+              <div className="text-2xl font-bold mb-1">{totals.bookings}</div>
+              <div className="text-xs opacity-80">Lịch hẹn đang chờ xử lý</div>
+              <Link
+                to="/admin/bookings"
+                className="mt-3 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+              >
+                Xem danh sách lịch hẹn
+                <IconArrowRight size={11} />
+              </Link>
             </div>
-            <div className="text-2xl font-bold mb-1">{totals.bookings}</div>
-            <div className="text-xs opacity-80">Lịch hẹn đang chờ xử lý</div>
-            <Link
-              to="/admin/bookings"
-              className="mt-3 inline-flex items-center gap-1 text-xs font-medium hover:underline"
-            >
-              Xem danh sách lịch hẹn
-              <IconArrowRight size={11} />
-            </Link>
-          </div>
-        </Card>
+          </Card>
+        )}
       </div>
     </div>
   );

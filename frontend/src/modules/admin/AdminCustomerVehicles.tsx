@@ -298,12 +298,8 @@ export default function AdminCustomerVehicles() {
             Hồ sơ Xe & Khách hàng (Customer-Vehicle Service)
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            Đồng bộ trực tiếp với MySQL{" "}
-            <code className="text-xs bg-bgsoft px-1.5 py-0.5 rounded">
-              customer_vehicle_service
-            </code>{" "}
-            ({vehicles.length} phương tiện · {customers.length} khách hàng ·{" "}
-            {histories.length} bản ghi bảo dưỡng)
+            {vehicles.length} phương tiện · {customers.length} khách hàng ·{" "}
+            {histories.length} bản ghi bảo dưỡng
           </p>
         </div>
         <div className="flex gap-2">

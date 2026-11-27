@@ -17,6 +17,7 @@ public record ServiceResponse(
         String categoryName,
         String code,
         String name,
+        String description,
         @JsonProperty("duration_minutes") @JsonAlias("durationMinutes") Integer durationMinutes,
         @JsonProperty("required_techs") @JsonAlias("requiredTechs") Integer requiredTechs,
         BigDecimal baseLaborPrice,

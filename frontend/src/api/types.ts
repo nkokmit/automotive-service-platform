@@ -304,6 +304,8 @@ export interface ServiceResponse {
   categoryName: string;
   code: string;
   name: string;
+  /** Mô tả dịch vụ — có thể null nếu dịch vụ chưa được admin nhập mô tả. */
+  description?: string | null;
   duration_minutes: number;
   required_techs: number;
   /** BigDecimal — serialize thành number. */
@@ -764,6 +766,88 @@ export interface WorkOrderBookingServiceSummary {
   sequenceNumber: number | null;
 }
 
+// ── Đánh giá sau sửa chữa (WorkOrderFeedback) ────────────────────────────────
+/**
+ * Khớp `FeedbackEligibleWorkOrderResponse.java`.
+ *
+ * Chỉ có `workOrderId` + `workOrderCode` — thiếu thông tin xe/dịch vụ. Xem
+ * `WorkOrderFeedbackServiceImpl#getEligibleWorkOrders`.
+ */
+export interface FeedbackEligibleWorkOrderResponse {
+  workOrderId: string;
+  workOrderCode: string;
+}
+
+/** Khớp `FeedbackEligiblePageResponse.java` — phân trang 0-based. */
+export interface FeedbackEligiblePageResponse {
+  items: FeedbackEligibleWorkOrderResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/** Khớp `WorkOrderFeedbackResponse.java` — phản hồi sau khi gửi đánh giá. */
+export interface WorkOrderFeedbackResponse {
+  id: string;
+  workOrderId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+/** Khớp `HomepageReviewResponse.java` — một đánh giá trong tổng hợp trang chủ. */
+export interface HomepageReviewResponse {
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  /** Tên các dịch vụ đã hoàn thành trong phiếu (snapshot lúc sửa chữa). */
+  completedServices: string[];
+}
+
+/** Khớp `HomepageReviewSummaryResponse.java`. */
+export interface HomepageReviewSummaryResponse {
+  /** Điểm trung bình, 2 chữ số thập phân. */
+  averageRating: number;
+  reviewCount: number;
+  recentReviews: HomepageReviewResponse[];
+}
+
+/**
+ * Một dòng đánh giá trong màn hình quản trị.
+ *
+ * Khớp `AdminFeedbackResponse.java` — bổ sung thông tin nhận diện (mã phiếu,
+ * tên khách, biển số) so với `WorkOrderFeedbackResponse` dùng cho chủ phiếu.
+ */
+export interface AdminFeedbackResponse {
+  id: string;
+  workOrderId: string;
+  workOrderCode: string;
+  customerId: string;
+  /** Tên khách hàng — null nếu hồ sơ khách đã bị xoá. */
+  customerName: string | null;
+  customerPhone: string | null;
+  /** Biển số xe — null nếu hồ sơ xe đã bị xoá. */
+  licensePlate: string | null;
+  rating: number;
+  comment: string | null;
+  completedServices: string[];
+  createdAt: string;
+}
+
+/** Khớp `AdminFeedbackPageResponse.java`. */
+export interface AdminFeedbackPageResponse {
+  items: AdminFeedbackResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  /** Điểm trung bình trên TOÀN BỘ đánh giá (không phụ thuộc bộ lọc). */
+  averageRating: number;
+  /** Số đánh giá theo mức sao, theo thứ tự 5 → 1 (luôn có đúng 5 phần tử). */
+  ratingCounts: number[];
+}
+
 // ── Estimate ──────────────────────────────────────────────────────────────────
 /** Khớp EstimateType.java */
 export type EstimateType = "INITIAL" | "SUPPLEMENTARY";
@@ -1061,6 +1145,87 @@ export interface PaymentRefundRequest {
   reason?: string | null;
 }
 
+// ── Section 5b: Báo cáo & thống kê (billing-service) ─────────────────────────
+
+/**
+ * Mức tổng hợp của chuỗi thời gian — khớp `ReportGranularity.java`.
+ *
+ * `DAY` → "2026-11-27", `WEEK` → "2026-W48", `MONTH` → "2026-11", `YEAR` → "2026".
+ */
+export type ReportGranularity = "DAY" | "WEEK" | "MONTH" | "YEAR";
+
+/** Loại dòng hàng trong báo cáo doanh thu — khớp `InvoiceItemType.java`. */
+export type ReportItemType = "SERVICE" | "PART";
+
+/**
+ * Khớp `RevenueOverviewResponse.java`.
+ *
+ * Lưu ý về hai mức doanh thu:
+ *  - `grossRevenue` = công lao động + phụ tùng, CHƯA trừ chiết khấu, CHƯA cộng thuế.
+ *  - `netRevenue`   = `grandTotal` của hóa đơn (đã trừ chiết khấu, đã cộng thuế).
+ */
+export interface RevenueOverviewResponse {
+  grossRevenue: number;
+  totalLabor: number;
+  totalParts: number;
+  totalDiscount: number;
+  totalTax: number;
+  netRevenue: number;
+  invoiceCount: number;
+  voidedInvoiceCount: number;
+  collectedRevenue: number;
+  refundedRevenue: number;
+  outstandingRevenue: number;
+  averageInvoiceValue: number;
+  /** Tỉ lệ công lao động trên gross (0..1). */
+  laborRatio: number;
+  /** Tỉ lệ phụ tùng trên gross (0..1). */
+  partsRatio: number;
+}
+
+/** Khớp `RevenuePeriodResponse.java`. */
+export interface RevenuePeriodResponse {
+  /** Nhãn kỳ đã định dạng sẵn theo `ReportGranularity`. */
+  period: string;
+  grossRevenue: number;
+  netRevenue: number;
+  laborRevenue: number;
+  partsRevenue: number;
+  invoiceCount: number;
+}
+
+/** Khớp `RevenueByItemResponse.java` — doanh thu theo dịch vụ / phụ tùng. */
+export interface RevenueByItemResponse {
+  catalogId: string;
+  itemType: ReportItemType;
+  code: string;
+  name: string;
+  quantity: number;
+  grossRevenue: number;
+  netRevenue: number;
+  /** Tỉ lệ trên tổng gross của kỳ (0..1). */
+  ratio: number;
+}
+
+/** Khớp `RevenueByCategoryResponse.java` — doanh thu theo nhóm dịch vụ. */
+export interface RevenueByCategoryResponse {
+  categoryId: string | null;
+  categoryName: string;
+  grossRevenue: number;
+  netRevenue: number;
+  itemCount: number;
+  ratio: number;
+}
+
+/** Khớp `PaymentBreakdownResponse.java` — phân bổ theo phương thức thanh toán. */
+export interface PaymentBreakdownResponse {
+  paymentMethod: PaymentMethod;
+  transactionCount: number;
+  collectedAmount: number;
+  refundedAmount: number;
+  ratio: number;
+}
+
 // ── Section 6: Notification service (notification-service) ────────────────────
 
 /** Khớp `NotificationCategory.java` */
@@ -1240,6 +1405,68 @@ export interface StaffBookingVehicleRequest {
   vehicleCondition?: string | null;
   /** Ghi chú của khách. */
   customerNote?: string | null;
+}
+
+// ── News service (news-service) ──────────────────────────────────────────────
+/** Khớp `NewsCategoryResponse.java`. */
+export interface NewsCategoryResponse {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+}
+
+/** Khớp `NewsArticleStatus.java`. */
+export type NewsArticleStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+
+/** Khớp `NewsArticleResponse.java`. */
+export interface NewsArticleResponse {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  categoryCode: string;
+  slug: string;
+  title: string;
+  summary: string | null;
+  content: string | null;
+  thumbnailUrl: string | null;
+  authorName: string | null;
+  authorId: string | null;
+  status: NewsArticleStatus;
+  isFeatured: boolean;
+  viewCount: number;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp `NewsCommentResponse.java`. */
+export interface NewsCommentResponse {
+  id: string;
+  articleId: string;
+  articleTitle: string | null;
+  userId: string | null;
+  userName: string | null;
+  content: string;
+  parentId: string | null;
+  isActive: boolean;
+  /** Tổng số lượt thích của bình luận. */
+  likeCount: number;
+  /** Người đang đăng nhập đã thích bình luận này chưa. */
+  likedByMe: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Khớp `NewsStatsResponse.java`. */
+export interface NewsStatsResponse {
+  totalArticles: number;
+  publishedArticles: number;
+  draftArticles: number;
+  archivedArticles: number;
+  totalCategories: number;
+  totalComments: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

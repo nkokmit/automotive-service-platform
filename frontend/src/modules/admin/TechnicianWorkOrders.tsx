@@ -170,11 +170,7 @@ export default function TechnicianWorkOrders() {
             Hạng mục được giao
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            Nguồn:{" "}
-            <code className="text-xs bg-bgsoft px-1.5 py-0.5 rounded">
-              GET /api/work-order-service-lines/me
-            </code>{" "}
-            · {lines.length} hạng mục
+            {lines.length} hạng mục
           </p>
         </div>
         <Button

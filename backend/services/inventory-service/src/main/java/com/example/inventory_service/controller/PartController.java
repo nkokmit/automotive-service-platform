@@ -55,10 +55,10 @@ public class PartController {
     private final PartSyncService partSyncService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PART_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Tìm kiếm phụ tùng",
             description = "Lọc theo keyword, SKU, mã OEM, hãng, nhóm phụ tùng, dòng xe tương thích "
-                    + "và trạng thái hoạt động.")
+                    + "và trạng thái hoạt động. Công khai.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về một trang kết quả phụ tùng.")
     public ApiResponse<PageResponse<PartResponse>> searchParts(
@@ -82,9 +82,9 @@ public class PartController {
     }
 
     @GetMapping("/{partId}")
-    @PreAuthorize("hasAuthority('PART_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Chi tiết phụ tùng",
-            description = "Trả về thông tin phụ tùng kèm tồn thực, tồn giữ chỗ và tồn khả dụng.")
+            description = "Trả về thông tin phụ tùng kèm tồn thực, tồn giữ chỗ và tồn khả dụng. Công khai.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về chi tiết phụ tùng.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
@@ -131,9 +131,9 @@ public class PartController {
     }
 
     @GetMapping("/{partId}/compatibilities")
-    @PreAuthorize("hasAuthority('PART_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Dòng xe tương thích",
-            description = "Liệt kê các dòng xe mà phụ tùng này lắp được.")
+            description = "Liệt kê các dòng xe mà phụ tùng này lắp được. Công khai.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về danh sách dòng xe tương thích.")
     public ApiResponse<List<PartCompatibilityResponse>> getCompatibilities(@PathVariable UUID partId) {

@@ -61,6 +61,14 @@ spring:
               predicates:
                 - Path=/api/work-orders,/api/work-orders/**
 
+            # API quản trị đánh giá sửa chữa.
+            # Phải khai báo TRƯỚC route work-orders? Không cần — path này khác
+            # hoàn toàn, nhưng đặt cạnh để dễ đọc.
+            - id: work-order-service-admin-feedbacks
+              uri: lb://work-order-service
+              predicates:
+                - Path=/api/admin/work-order-feedbacks,/api/admin/work-order-feedbacks/**
+
             - id: work-order-service-estimates
               uri: lb://work-order-service
               predicates:
@@ -80,6 +88,12 @@ spring:
               uri: lb://billing-service
               predicates:
                 - Path=/api/payments,/api/payments/**
+
+            # Module báo cáo & thống kê doanh thu.
+            - id: billing-service-reports
+              uri: lb://billing-service
+              predicates:
+                - Path=/api/reports,/api/reports/**
 
             - id: notification-service-notifications
               uri: lb://notification-service
@@ -141,6 +155,33 @@ spring:
               predicates:
                 - Path=/api/inventory-transactions/**
 
+            # Lưu ý: phải khai báo CẢ path gốc lẫn path con (`/api/news-articles`
+            # và `/api/news-articles/**`). Predicate `/**` KHÔNG khớp path gốc →
+            # request list bài viết sẽ rơi xuống static resource handler của
+            # gateway và trả về "No static resource api/news-articles".
+            - id: news-service-categories
+              uri: lb://news-service
+              predicates:
+                - Path=/api/news-categories,/api/news-categories/**
+
+            - id: news-service-articles
+              uri: lb://news-service
+              predicates:
+                - Path=/api/news-articles,/api/news-articles/**
+
+            - id: news-service-comments
+              uri: lb://news-service
+              predicates:
+                - Path=/api/news-comments,/api/news-comments/**
+
+            # Ảnh bài viết (upload + phục vụ ảnh).
+            # GET /api/news-images/{filename} là public vì ảnh xuất hiện trong
+            # bài viết mà khách chưa đăng nhập vẫn xem được.
+            - id: news-service-images
+              uri: lb://news-service
+              predicates:
+                - Path=/api/news-images,/api/news-images/**
+
 eureka:
   client:
     service-url:
@@ -197,6 +238,8 @@ springdoc:
         name: billing-service
       - url: /v3/api-docs/notification-service
         name: notification-service
+      - url: /v3/api-docs/news-service
+        name: news-service
     # Luôn render danh sách URL (không cố gắng tự fetch qua Eureka ở runtime)
     urls-primary-name: user-service
   # Không scan package nào vì gateway không có controller - tránh warning

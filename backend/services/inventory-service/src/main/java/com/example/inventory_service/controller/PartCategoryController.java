@@ -41,9 +41,9 @@ public class PartCategoryController {
     private final PartCategoryService partCategoryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PART_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Danh sách nhóm phụ tùng",
-            description = "Phân trang và lọc theo keyword trong mã hoặc tên nhóm.")
+            description = "Phân trang và lọc theo keyword trong mã hoặc tên nhóm. Công khai.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về một trang kết quả nhóm phụ tùng.")
     public ApiResponse<PageResponse<CategoryResponse>> getCategories(
@@ -58,10 +58,10 @@ public class PartCategoryController {
     }
 
     @GetMapping("/{categoryId}")
-    @PreAuthorize("hasAuthority('PART_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Chi tiết nhóm phụ tùng")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
-            description = "Trả về chi tiết nhóm phụ tùng.")
+            description = "Trả về chi tiết nhóm phụ tùng. Công khai.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
             description = "Không tìm thấy nhóm phụ tùng.")
     public ApiResponse<CategoryResponse> getCategory(@PathVariable UUID categoryId) {

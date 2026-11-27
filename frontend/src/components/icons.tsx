@@ -391,6 +391,17 @@ export const IconEdit = ({ size, ...p }: IconProps) => (
   </svg>
 );
 
+/** Trái tim — dùng cho nút thích bình luận. */
+export const IconHeart = ({ size, filled, ...p }: IconProps & { filled?: boolean }) => (
+  <svg
+    {...base(size)}
+    {...p}
+    fill={filled ? "currentColor" : "none"}
+  >
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+  </svg>
+);
+
 export const IconFilter = ({ size, ...p }: IconProps) => (
   <svg {...base(size)} {...p}>
     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -465,5 +476,31 @@ export const IconWarning = ({ size, ...p }: IconProps) => (
 export const IconActivity = ({ size, ...p }: IconProps) => (
   <svg {...base(size)} {...p}>
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);
+
+export const IconChevronDown = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+export const IconChevronRight = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
+export const IconFolder = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
+export const IconBox = ({ size, ...p }: IconProps) => (
+  <svg {...base(size)} {...p}>
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+    <line x1="12" y1="22.08" x2="12" y2="12" />
   </svg>
 );

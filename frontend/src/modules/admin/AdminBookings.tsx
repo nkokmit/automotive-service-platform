@@ -220,11 +220,7 @@ export default function AdminBookings() {
             Lịch hẹn xưởng
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            Nguồn:{" "}
-            <code className="text-xs bg-bgsoft px-1.5 py-0.5 rounded">
-              GET /api/staff/bookings
-            </code>{" "}
-            · {bookings.length} lịch hẹn · {workOrders.length} work order
+            {bookings.length} lịch hẹn · {workOrders.length} work order
           </p>
         </div>
         <Button

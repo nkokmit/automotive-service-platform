@@ -93,6 +93,14 @@ public class SwaggerRouteConfig {
                                 "/v3/api-docs/notification-service(?<segment>/.*)?",
                                 "/v3/api-docs${segment}"))
                         .uri("lb://notification-service"))
+                // news-service OpenAPI
+                .route("openapi-news-service", r -> r
+                        .path("/v3/api-docs/news-service",
+                                "/v3/api-docs/news-service/**")
+                        .filters(f -> f.rewritePath(
+                                "/v3/api-docs/news-service(?<segment>/.*)?",
+                                "/v3/api-docs${segment}"))
+                        .uri("lb://news-service"))
                 .build();
     }
 }

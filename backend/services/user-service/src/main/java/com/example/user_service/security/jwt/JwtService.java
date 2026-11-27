@@ -51,6 +51,14 @@ public class JwtService {
             claims.put("userId", user.getId().toString());
         }
 
+        // fullName: tên hiển thị cho các service khác (VD news-service hiển thị
+        // tên người bình luận). JWT chỉ mang `sub` (username) nên không đủ để
+        // hiển thị "Nguyễn Văn A" thay vì "admin".
+        if (userDetails instanceof User user && user.getFullName() != null
+                && !user.getFullName().isBlank()) {
+            claims.put("fullName", user.getFullName());
+        }
+
         return createToken(
                 claims,
                 userDetails.getUsername()

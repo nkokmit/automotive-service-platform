@@ -5,6 +5,7 @@ import com.example.inventory_service.dto.request.ServiceBomRequest;
 import com.example.inventory_service.dto.request.ServiceBomUpdateRequest;
 import com.example.inventory_service.dto.request.ServiceRequest;
 import com.example.inventory_service.dto.response.InternalServiceBomResponse;
+import com.example.inventory_service.dto.response.InternalServiceCatalogBatchResponse;
 import com.example.inventory_service.dto.response.ServiceBomResponse;
 import com.example.inventory_service.dto.response.ServiceResponse;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,14 @@ public interface ServiceCatalogService {
     List<ServiceBomResponse> getBom(UUID serviceId);
 
     List<InternalServiceBomResponse> getInternalBom(UUID serviceId);
+
+    /**
+     * Lấy danh mục dịch vụ + nhóm dịch vụ cho NHIỀU dịch vụ trong một lần gọi.
+     *
+     * <p>Dùng cho báo cáo doanh thu theo nhóm dịch vụ — gọi từng dịch vụ sẽ tạo
+     * N+1 request liên service.
+     */
+    List<InternalServiceCatalogBatchResponse> getInternalCatalogBatch(java.util.Collection<UUID> serviceIds);
 
     ServiceBomResponse addBomItem(UUID serviceId, ServiceBomRequest request);
 

@@ -286,11 +286,7 @@ export default function AdminRoles() {
             Quản lý vai trò
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            Nguồn:{" "}
-            <code className="text-xs bg-bgsoft px-1.5 py-0.5 rounded">
-              GET /api/roles
-            </code>{" "}
-            · {stats.total} vai trò · {stats.permissions} quyền trong hệ thống
+            {stats.total} vai trò · {stats.permissions} quyền trong hệ thống
           </p>
         </div>
         <div className="flex items-center gap-2">

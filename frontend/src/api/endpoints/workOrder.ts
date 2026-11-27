@@ -22,6 +22,12 @@
  *  - `PART_ISSUE`                 → POST /api/work-orders/{id}/parts/{partLineId}/issue
  *  - `PART_RELEASE`               → POST /api/work-orders/{id}/parts/{partLineId}/release
  *
+ * Đánh giá sau sửa chữa (`WorkOrderFeedbackController`) — KHÔNG dùng authority,
+ * chỉ cần đã đăng nhập:
+ *  - `GET  /api/work-orders/me/feedback-eligible` → phiếu CLOSED chưa đánh giá
+ *  - `POST /api/work-orders/{id}/feedback`         → gửi đánh giá (rating 1..5)
+ *  - `GET  /api/work-orders/reviews/summary`        → tổng hợp công khai (permitAll)
+ *
  * Lưu ý hợp đồng quan trọng (đã đối chiếu với source backend):
  *  1. Phân công mechanic là **PATCH** `/assign` (không phải POST như ghi trong
  *     tài liệu cũ).
@@ -32,18 +38,24 @@
  *  4. Xoá service line / part line trả HTTP 204 (body rỗng).
  *  5. `POST /api/work-orders` là idempotent theo `bookingId`: nếu booking đã có
  *     Work Order thì trả HTTP 200 kèm phiếu cũ thay vì 201.
+ *  6. Mỗi Work Order chỉ được đánh giá **một lần** (unique key ở DB). Lần
+ *     đánh giá thứ hai → HTTP 409 với code 6003.
  */
 import client from "../client";
 import type {
   AddPartToEstimateRequest,
   AddServiceToEstimateRequest,
+  AdminFeedbackPageResponse,
   AssignedServiceLineResponse,
   CreateEstimateRequest,
   CreateWorkOrderRequest,
   EstimateDecisionRequest,
   EstimateResponse,
   EstimateSummaryResponse,
+  FeedbackEligiblePageResponse,
+  HomepageReviewSummaryResponse,
   PartQuantityRequest,
+  WorkOrderFeedbackResponse,
   WorkOrderPageResponse,
   WorkOrderPartLineResponse,
   WorkOrderResponse,
@@ -310,5 +322,109 @@ export const workOrderPartApi = {
       `/api/work-orders/${workOrderId}/parts/${partLineId}/release`,
       { method: "POST", body: { quantity } satisfies PartQuantityRequest },
     );
+  },
+};
+
+// =========================
+// Đánh giá sau sửa chữa (Work Order Feedback)
+// =========================
+//
+// Nguồn: `work-order-service/WorkOrderFeedbackController`.
+//
+// Cả 3 endpoint này dùng `@PreAuthorize("isAuthenticated()")` (hoặc
+// `permitAll()` cho summary) — KHÔNG cần authority riêng. Backend tự ánh xạ
+// `userId` trong JWT → customer id qua customer-vehicle-service, rồi chỉ cho
+// khách đánh giá đúng phiếu của mình.
+
+export interface CreateWorkOrderFeedbackRequest {
+  /** 1..5. */
+  rating: number;
+  /** Tối đa 1000 ký tự. */
+  comment?: string | null;
+}
+
+export const workOrderFeedbackApi = {
+  /**
+   * Các Work Order của chính khách đã CLOSED mà CHƯA được đánh giá.
+   *
+   * Chỉ trả `workOrderId` + `workOrderCode` — không có thông tin xe/dịch vụ.
+   * Trang 0-based, size tối đa 100.
+   */
+  getEligibleWorkOrders: async (
+    page = 0,
+    size = 20,
+  ): Promise<FeedbackEligiblePageResponse> => {
+    return client.requestPage<FeedbackEligiblePageResponse>(
+      "/api/work-orders/me/feedback-eligible",
+      { page, size },
+    );
+  },
+
+  /**
+   * Gửi đánh giá cho một Work Order đã CLOSED.
+   *
+   * Mỗi phiếu chỉ đánh giá được một lần → gọi lần hai sẽ nhận HTTP 409
+   * (ErrorCode 6003 `WORK_ORDER_FEEDBACK_ALREADY_EXISTS`).
+   */
+  submitFeedback: async (
+    workOrderId: string,
+    data: CreateWorkOrderFeedbackRequest,
+  ): Promise<WorkOrderFeedbackResponse> => {
+    return client.request<WorkOrderFeedbackResponse>(
+      `/api/work-orders/${workOrderId}/feedback`,
+      { method: "POST", body: data },
+    );
+  },
+
+  /**
+   * Tổng hợp đánh giá công khai cho trang chủ.
+   *
+   * Endpoint này `permitAll()` — khách chưa đăng nhập vẫn xem được.
+   * `limit` 1..10 (backend chặn ngoài khoảng này → 400).
+   */
+  getHomepageSummary: async (
+    limit = 5,
+  ): Promise<HomepageReviewSummaryResponse> => {
+    return client.request<HomepageReviewSummaryResponse>(
+      `/api/work-orders/reviews/summary?limit=${limit}`,
+    );
+  },
+};
+
+// ── API quản trị đánh giá ────────────────────────────────────────────────────
+//
+// Nguồn: `work-order-service/AdminWorkOrderFeedbackController`.
+//
+// Yêu cầu authority:
+//  - `WORK_ORDER_FEEDBACK_READ`   → GET    /api/admin/work-order-feedbacks
+//  - `WORK_ORDER_FEEDBACK_DELETE` → DELETE /api/admin/work-order-feedbacks/{id}
+export const adminWorkOrderFeedbackApi = {
+  /**
+   * Danh sách đánh giá của toàn cửa hàng, có phân trang.
+   *
+   * @param rating lọc theo mức sao cụ thể (1..5). Bỏ qua để xem tất cả.
+   */
+  list: async (
+    params: { rating?: number; page?: number; size?: number } = {},
+  ): Promise<AdminFeedbackPageResponse> => {
+    return client.requestPage<AdminFeedbackPageResponse>(
+      "/api/admin/work-order-feedbacks",
+      {
+        rating: params.rating,
+        page: params.page ?? 0,
+        size: params.size ?? 20,
+      },
+    );
+  },
+
+  /**
+   * Xoá một đánh giá (vd: nhận xét vi phạm).
+   *
+   * Xoá xong thì khách có thể đánh giá lại phiếu sửa chữa đó.
+   */
+  delete: async (feedbackId: string): Promise<void> => {
+    await client.request<void>(`/api/admin/work-order-feedbacks/${feedbackId}`, {
+      method: "DELETE",
+    });
   },
 };

@@ -295,7 +295,6 @@ export default function AdminServices() {
           type: "textarea",
           rows: 3,
           placeholder: "Mô tả dịch vụ...",
-          hint: "Chỉ dùng để hiển thị tạm thời — backend chưa lưu trường này.",
         },
       ],
       onSubmit: async (values, initial) => {
@@ -316,6 +315,7 @@ export default function AdminServices() {
           categoryId,
           code: initial?.code || generateCode(name),
           name,
+          description: String(values.description ?? "").trim() || null,
           duration_minutes: Number(values.durationMin) || 30,
           required_techs: Number(values.requiredTechs) || 1,
           baseLaborPrice: Number(values.priceFrom) || 0,
@@ -355,6 +355,7 @@ export default function AdminServices() {
         categoryId: row.categoryId,
         code,
         name,
+        description: row.description || null,
         duration_minutes: row.durationMin,
         required_techs: row.requiredTechs,
         baseLaborPrice: row.priceFrom,

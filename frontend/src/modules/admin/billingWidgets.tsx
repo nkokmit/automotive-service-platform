@@ -40,11 +40,7 @@ export function BillingHeader({
           Hóa đơn & Thanh toán
         </h1>
         <p className="text-sm text-ink-muted mt-1">
-          Nguồn:{" "}
-          <code className="text-xs bg-bgsoft px-1.5 py-0.5 rounded">
-            GET /api/invoices
-          </code>{" "}
-          · {count} hóa đơn
+          {count} hóa đơn
         </p>
       </div>
       <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>

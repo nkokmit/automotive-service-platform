@@ -2,7 +2,8 @@
  * Dữ liệu dashboard cho admin — gom từ nhiều service thật.
  *
  * Backend KHÔNG có endpoint "dashboard" nên ta tổng hợp từ các API có sẵn:
- *  - GET /api/invoices       (billing-service)      → doanh thu, đơn gần đây
+ *  - GET /api/invoices       (billing-service)      → đơn gần đây
+ *  - GET /api/reports/...    (billing-service)      → doanh thu 12 tháng
  *  - GET /api/work-orders    (work-order-service)   → số phiếu sửa chữa
  *  - GET /api/staff/bookings (booking-service)      → lịch hẹn sắp tới
  *  - GET /api/users          (user-service)         → tổng tài khoản
@@ -12,11 +13,13 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { billingApi } from "../../api/endpoints/billing";
+import { reportApi } from "../../api/endpoints/report";
 import { workOrderApi } from "../../api/endpoints/workOrder";
 import { staffBookingApi } from "../../api/endpoints/booking";
 import { adminUserApi } from "../../api/endpoints/user";
+import { hasTokenAuthority } from "../../api/session";
 import type {
-  InvoiceSummaryResponse,
+    InvoiceSummaryResponse,
   WorkOrderListItemResponse,
 } from "../../api/types";
 
@@ -80,6 +83,26 @@ const MONTH_LABEL = [
   "T12",
 ];
 
+/**
+ * Đầu ngày theo múi giờ Việt Nam → ISO-8601 instant (UTC).
+ *
+ * Backend lọc theo `Asia/Ho_Chi_Minh`, nên phải gửi đúng nửa đêm giờ VN —
+ * `new Date("yyyy-MM-dd")` sẽ bị JS hiểu là UTC và lệch 7 tiếng.
+ */
+function vnStartOfDay(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00+07:00`).toISOString();
+}
+
+/** Ngày hôm nay ở giờ Việt Nam, dạng `yyyy-MM-dd`. */
+function todayVN(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 function fmtVND(n: number): string {
   if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + " tỷ";
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "tr";
@@ -130,6 +153,19 @@ export function useAdminDashboard(): DashboardState {
   const [errors, setErrors] = useState<string[]>([]);
   const [nonce, setNonce] = useState(0);
 
+  /**
+   * Chi goi API ma role hien tai duoc phep doc.
+   *
+   * <p>Khong goi → khong duoc goi → khong co loi 403. Voi vai tro thu hep
+   * (VD thu ngan chi duoc xem hoa don) thi dashboard chi hien phan doc duoc.
+   */
+  const canReadInvoices = hasTokenAuthority("INVOICE_READ");
+  const canReadWorkOrders = hasTokenAuthority("WORK_ORDER_READ");
+  const canReadBookings = hasTokenAuthority("BOOKING_READ");
+  const canReadUsers = hasTokenAuthority("USER_READ");
+  /** Báo cáo doanh thu — nguồn chính xác cho biểu đồ 12 tháng. */
+  const canReadReports = hasTokenAuthority("REPORT_READ");
+
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
@@ -140,101 +176,180 @@ export function useAdminDashboard(): DashboardState {
     (async () => {
       const errs: string[] = [];
 
-      // ── Hóa đơn (doanh thu + đơn gần đây) ────────────────────────────────
+      // ── Hóa đơn (đơn gần đây) ────────────────────────────────────────────
       let invoices: InvoiceSummaryResponse[] = [];
-      try {
-        const page = await billingApi.listInvoices({ size: 100 });
-        invoices = page.items ?? [];
-      } catch (err) {
-        errs.push(
-          err instanceof Error
-            ? `Hóa đơn: ${err.message}`
-            : "Không tải được danh sách hóa đơn",
-        );
+      let invoiceTotal = 0;
+      if (canReadInvoices) {
+        try {
+          const page = await billingApi.listInvoices({ size: 100 });
+          invoices = page.items ?? [];
+          invoiceTotal = page.totalElements ?? invoices.length;
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Hóa đơn: ${err.message}`
+              : "Không tải được danh sách hóa đơn",
+          );
+        }
       }
 
       // ── Work Order ───────────────────────────────────────────────────────
       let workOrders: WorkOrderListItemResponse[] = [];
       let workOrderTotal = 0;
-      try {
-        const page = await workOrderApi.listWorkOrders({ size: 100 });
-        workOrders = page.items ?? [];
-        workOrderTotal = page.totalElements ?? workOrders.length;
-      } catch (err) {
-        errs.push(
-          err instanceof Error
-            ? `Phiếu sửa chữa: ${err.message}`
-            : "Không tải được danh sách phiếu sửa chữa",
-        );
+      if (canReadWorkOrders) {
+        try {
+          const page = await workOrderApi.listWorkOrders({ size: 100 });
+          workOrders = page.items ?? [];
+          workOrderTotal = page.totalElements ?? workOrders.length;
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Phiếu sửa chữa: ${err.message}`
+              : "Không tải được danh sách phiếu sửa chữa",
+          );
+        }
       }
 
       // ── Lịch hẹn ─────────────────────────────────────────────────────────
       let bookingTotal = 0;
-      try {
-        const page = await staffBookingApi.listBookings({ size: 1 });
-        bookingTotal = page.totalElements ?? 0;
-      } catch (err) {
-        errs.push(
-          err instanceof Error
-            ? `Lịch hẹn: ${err.message}`
-            : "Không tải được danh sách lịch hẹn",
-        );
+      if (canReadBookings) {
+        try {
+          const page = await staffBookingApi.listBookings({ size: 1 });
+          bookingTotal = page.totalElements ?? 0;
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Lịch hẹn: ${err.message}`
+              : "Không tải được danh sách lịch hẹn",
+          );
+        }
       }
 
       // ── Người dùng ───────────────────────────────────────────────────────
       let userTotal = 0;
-      try {
-        const page = await adminUserApi.listUsers({ size: 1 });
-        userTotal = page.totalElements ?? 0;
-      } catch (err) {
-        errs.push(
-          err instanceof Error
-            ? `Người dùng: ${err.message}`
-            : "Không tải được danh sách người dùng",
-        );
+      if (canReadUsers) {
+        try {
+          const page = await adminUserApi.listUsers({ size: 1 });
+          userTotal = page.totalElements ?? 0;
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Người dùng: ${err.message}`
+              : "Không tải được danh sách người dùng",
+          );
+        }
       }
 
       if (cancelled) return;
 
       // ── Tính doanh thu theo tháng (12 tháng gần nhất) ────────────────────
-      const now = new Date();
-      const buckets = new Map<string, { revenue: number; orders: number }>();
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        buckets.set(`${d.getFullYear()}-${d.getMonth()}`, {
-          revenue: 0,
-          orders: 0,
-        });
-      }
+      //
+      // ƯU TIÊN: gọi `/api/reports/revenue/by-period` (billing-service) — đây là
+      // query tổng hợp trên DB nên KHÔNG bị giới hạn bởi `size` của phân trang.
+      //
+      // FALLBACK: nếu không có `REPORT_READ` (hoặc API lỗi) → tự gom từ danh sách
+      // hóa đơn đã tải. Fallback này CHỈ ĐÚNG khi tổng số hóa đơn ≤ trang đã
+      // tải — nếu vượt quá thì biểu đồ sẽ thiếu (ghi chú trong `errors`).
+      let revenueChart: {
+        month: string;
+        revenue: number;
+        orders: number;
+      }[] = [];
       let revenueThisMonth = 0;
       let revenuePrevMonth = 0;
-      const prevKey = `${now.getFullYear()}-${now.getMonth() - 1}`;
-      const thisKey = `${now.getFullYear()}-${now.getMonth()}`;
+      let revenueFromReports = false;
 
-      for (const inv of invoices) {
-        const d = toDate(inv.issuedAt);
-        if (!d) continue;
-        const key = `${d.getFullYear()}-${d.getMonth()}`;
-        const bucket = buckets.get(key);
-        // Hóa đơn VOID không tính doanh thu.
-        if (inv.status !== "VOID") {
-          if (bucket) {
-            bucket.revenue += Number(inv.grandTotal ?? 0);
-            bucket.orders += 1;
+      if (canReadReports) {
+        try {
+          const today = todayVN();
+          const [y, m] = today.split("-").map(Number);
+          // 12 tháng gần nhất: từ đầu tháng (m-11) tới đầu tháng kế tiếp.
+          const start = new Date(Date.UTC(y, m - 1 - 11, 1));
+          const end = new Date(Date.UTC(y, m, 1));
+
+          const periods = await reportApi.revenueByPeriod({
+            from: vnStartOfDay(start.toISOString().slice(0, 10)),
+            to: vnStartOfDay(end.toISOString().slice(0, 10)),
+            granularity: "MONTH",
+          });
+
+          revenueChart = (periods ?? []).map((p) => {
+            const [py, pm] = p.period.split("-").map(Number);
+            return {
+              month: `${MONTH_LABEL[pm - 1]}/${String(py).slice(2)}`,
+              // `revenue` tính theo đơn vị triệu (khớp cách hiển thị cũ).
+              revenue: Math.round(p.netRevenue / 1_000_000),
+              orders: p.invoiceCount,
+            };
+          });
+          revenueFromReports = true;
+
+          // KPI doanh thu tháng này / tháng trước — lấy từ cùng nguồn.
+          const thisKey = `${y}-${String(m).padStart(2, "0")}`;
+          const prevDate = new Date(Date.UTC(y, m - 2, 1));
+          const prevKey = `${prevDate.getUTCFullYear()}-${String(
+            prevDate.getUTCMonth() + 1,
+          ).padStart(2, "0")}`;
+          for (const p of periods ?? []) {
+            if (p.period === thisKey) revenueThisMonth = p.netRevenue;
+            if (p.period === prevKey) revenuePrevMonth = p.netRevenue;
           }
-          if (key === thisKey) revenueThisMonth += Number(inv.grandTotal ?? 0);
-          if (key === prevKey) revenuePrevMonth += Number(inv.grandTotal ?? 0);
+        } catch (err) {
+          errs.push(
+            err instanceof Error
+              ? `Doanh thu 12 tháng: ${err.message}`
+              : "Không tải được doanh thu 12 tháng",
+          );
         }
       }
 
-      const revenueChart = Array.from(buckets.entries()).map(([key, v]) => {
-        const [y, m] = key.split("-").map(Number);
-        return {
-          month: `${MONTH_LABEL[m]}/${String(y).slice(2)}`,
-          revenue: Math.round(v.revenue / 1_000_000),
-          orders: v.orders,
-        };
-      });
+      if (!revenueFromReports) {
+        // ── Fallback: gom tay từ danh sách hóa đơn đã tải ────────────────
+        const now = new Date();
+        const buckets = new Map<string, { revenue: number; orders: number }>();
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          buckets.set(`${d.getFullYear()}-${d.getMonth()}`, {
+            revenue: 0,
+            orders: 0,
+          });
+        }
+        const prevKey = `${now.getFullYear()}-${now.getMonth() - 1}`;
+        const thisKey = `${now.getFullYear()}-${now.getMonth()}`;
+
+        for (const inv of invoices) {
+          const d = toDate(inv.issuedAt);
+          if (!d) continue;
+          const key = `${d.getFullYear()}-${d.getMonth()}`;
+          const bucket = buckets.get(key);
+          // Hóa đơn VOID không tính doanh thu.
+          if (inv.status !== "VOID") {
+            if (bucket) {
+              bucket.revenue += Number(inv.grandTotal ?? 0);
+              bucket.orders += 1;
+            }
+            if (key === thisKey) revenueThisMonth += Number(inv.grandTotal ?? 0);
+            if (key === prevKey) revenuePrevMonth += Number(inv.grandTotal ?? 0);
+          }
+        }
+
+        revenueChart = Array.from(buckets.entries()).map(([key, v]) => {
+          const [yy, mm] = key.split("-").map(Number);
+          return {
+            month: `${MONTH_LABEL[mm]}/${String(yy).slice(2)}`,
+            revenue: Math.round(v.revenue / 1_000_000),
+            orders: v.orders,
+          };
+        });
+
+        if (canReadInvoices && invoiceTotal > invoices.length) {
+          errs.push(
+            "Doanh thu 12 tháng chỉ tính trên " +
+              `${invoices.length}/${invoiceTotal} hóa đơn gần nhất — ` +
+              "cần quyền xem báo cáo để có số liệu đầy đủ.",
+          );
+        }
+      }
 
       // ── Đơn gần đây (từ hóa đơn mới nhất) ───────────────────────────────
       const sortedInvoices = [...invoices].sort((a, b) =>
@@ -337,7 +452,14 @@ export function useAdminDashboard(): DashboardState {
     return () => {
       cancelled = true;
     };
-  }, [nonce]);
+  }, [
+    nonce,
+    canReadInvoices,
+    canReadReports,
+    canReadWorkOrders,
+    canReadBookings,
+    canReadUsers,
+  ]);
 
   return {
     kpis,

@@ -9,6 +9,7 @@ public enum ErrorCode {
     WORK_ORDER_NOT_FOUND(6001, "Không tìm thấy Work Order", HttpStatus.NOT_FOUND),
     INVALID_WORK_ORDER_STATUS_TRANSITION(6002, "Chuyển trạng thái Work Order không hợp lệ", HttpStatus.CONFLICT),
     WORK_ORDER_FEEDBACK_ALREADY_EXISTS(6003, "Work Order đã được đánh giá", HttpStatus.CONFLICT),
+    FEEDBACK_NOT_FOUND(6004, "Không tìm thấy đánh giá", HttpStatus.NOT_FOUND),
 
     // Estimate và các dòng báo giá (61xx)
     ESTIMATE_NOT_FOUND(6101, "Không tìm thấy Estimate", HttpStatus.NOT_FOUND),

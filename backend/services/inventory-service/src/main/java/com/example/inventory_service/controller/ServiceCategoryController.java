@@ -43,9 +43,9 @@ public class ServiceCategoryController {
     private final ServiceCategoryService serviceCategoryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Danh sách nhóm dịch vụ",
-            description = "Phân trang và lọc theo keyword trong mã hoặc tên nhóm.")
+            description = "Phân trang và lọc theo keyword trong mã hoặc tên nhóm. Công khai.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về một trang kết quả nhóm dịch vụ.")
     public ApiResponse<PageResponse<CategoryResponse>> getCategories(
@@ -60,10 +60,10 @@ public class ServiceCategoryController {
     }
 
     @GetMapping("/{categoryId}")
-    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Chi tiết nhóm dịch vụ")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
-            description = "Trả về chi tiết nhóm dịch vụ.")
+            description = "Trả về chi tiết nhóm dịch vụ. Công khai.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
             description = "Không tìm thấy nhóm dịch vụ.")
     public ApiResponse<CategoryResponse> getCategory(@PathVariable UUID categoryId) {
@@ -71,10 +71,10 @@ public class ServiceCategoryController {
     }
 
     @GetMapping("/{categoryId}/services")
-    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Dịch vụ thuộc nhóm",
             description = "Trả về danh sách dịch vụ thuộc nhóm, dịch vụ đang hoạt động "
-                    + "xếp trước. Dùng cho admin xem nhanh nhóm đang chứa dịch vụ nào.")
+                    + "xếp trước. Công khai.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về danh sách dịch vụ thuộc nhóm.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",

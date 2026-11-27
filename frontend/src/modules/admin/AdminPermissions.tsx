@@ -242,11 +242,7 @@ export default function AdminPermissions() {
             Quản lý quyền
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            Nguồn:{" "}
-            <code className="text-xs bg-bgsoft px-1.5 py-0.5 rounded">
-              GET /api/permissions
-            </code>{" "}
-            · {stats.total} quyền · {stats.domains} nhóm
+            {stats.total} quyền · {stats.domains} nhóm
           </p>
         </div>
         <div className="flex items-center gap-2">

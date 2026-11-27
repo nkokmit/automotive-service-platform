@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   IconDashboard,
   IconBuilding,
@@ -7,7 +13,6 @@ import {
   IconPackage,
   IconUsers,
   IconChart,
-  IconSettings,
   IconBell,
   IconSearch,
   IconMenu,
@@ -23,6 +28,10 @@ import {
   IconTruck,
   IconList,
   IconClock,
+  IconChevronDown,
+  IconBox,
+  IconNote,
+  IconStar,
 } from "./icons";
 import { useAuth } from "../data/authStore";
 import { roleLabel } from "../api/types";
@@ -30,6 +39,31 @@ import { useToast } from "./Toast";
 import Avatar from "./Avatar";
 import SearchBox from "./SearchBox";
 import NotificationBell from "./NotificationBell";
+import { hasTokenAuthority } from "../api/session";
+import {
+  ASSIGNED_LINE_READ,
+  BOOKING_READ,
+  CATALOG_READ,
+  CUSTOMER_READ,
+  INVENTORY_READ,
+  INVOICE_READ,
+  LEDGER_READ,
+  NOTIFICATION_TEMPLATE_READ,
+      NEWS_ARTICLE_READ,
+      NEWS_CATEGORY_READ,
+      PERMISSION_READ,
+      PURCHASE_ORDER_READ,
+      ROLE_READ,
+      STAFF_READ,
+      STAFF_SCHEDULE_READ,
+      SUPPLIER_READ,
+      USER_READ,
+      VEHICLE_READ,
+      WORK_ORDER_READ,
+      WORK_SHIFT_READ,
+      FEEDBACK_READ,
+      REPORT_READ,
+} from "../config/adminAccess";
 
 // =========================
 // AdminLayout — shell chung cho /admin/*
@@ -38,7 +72,7 @@ import NotificationBell from "./NotificationBell";
 
 interface NavGroup {
   label?: string;
-  items: NavItem[];
+  items: (NavItem | NavFolder)[];
 }
 
 interface NavItem {
@@ -46,8 +80,62 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   badge?: string;
+  /**
+   * Authority can co de thay muc nay trong sidebar.
+   *
+   * <p>`undefined` = khong gioi han (muc doanh nghiep chung). Khac rong = can
+   * it nhat MOT authority trong danh sach. Danh sach lay tu ma tran
+   * `config/adminAccess.ts` — cung chinh la authority ma backend kiem tra.
+   */
+  authority?: string[];
 }
 
+/**
+ * Một mục trong sidebar. Có thể là:
+ *  - `NavItem`  — trang đơn lẻ (mở trực tiếp, không kéo xuống)
+ *  - `NavFolder` — nhóm các trang liên quan, bấm vào để kéo xuống (accordion)
+ */
+interface NavFolder {
+  kind: "folder";
+  /** id ổn định để lưu trạng thái mở/đóng trong localStorage. */
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  items: NavItem[];
+}
+
+/** Một mục trong sidebar: hoặc trang đơn lẻ, hoặc folder kéo xuống. */
+type NavEntry = NavItem | NavFolder;
+
+/** Type guard: phân biệt folder với link đơn lẻ. */
+function isFolder(entry: NavEntry): entry is NavFolder {
+  return "kind" in entry && entry.kind === "folder";
+}
+
+/**
+ * Muc nay co duoc hien thi voi nguoi dung hien tai khong.
+ *
+ * <p>Muc khong khai bao `authority` = luon hien (muc doanh nghiep chung).
+ * Muc co khai bao = can it nhat MOT authority trong danh sach.
+ */
+function isItemVisible(
+  item: NavItem,
+  can: (authority: string) => boolean,
+): boolean {
+  if (!item.authority || item.authority.length === 0) return true;
+  return item.authority.some((authority) => can(authority));
+}
+
+/**
+ * Cấu trúc menu admin gom theo nghiệp vụ.
+ *
+ * Gộp các mục có liên quan vào cùng một "quản lý ..." để sidebar bớt dài:
+ *  - Quản lý dịch vụ   : Dịch vụ + Nhóm danh mục (danh mục là cha của dịch vụ)
+ *  - Quản lý kho      : Phụ tùng + Nhà cung cấp + Đơn nhập hàng + Sổ kho
+ *                        (nhập hàng → tồn kho → phụ tùng là một dòng chảy)
+ *  - Quản lý vận hành : Lịch hẹn + Phiếu sửa chữa + Việc của tôi + Lịch trình
+ *  - Quản lý nhân sự  : Kỹ thuật viên + Ca làm việc
+ */
 const navGroups: NavGroup[] = [
   {
     items: [
@@ -57,57 +145,326 @@ const navGroups: NavGroup[] = [
   {
     label: "Quản lý",
     items: [
-      { to: "/admin/bookings", label: "Lịch hẹn xưởng", icon: IconCalendar },
-      { to: "/admin/invoices", label: "Hóa đơn", icon: IconCash },
-      { to: "/admin/work-orders", label: "Phiếu sửa chữa", icon: IconWrench },
       {
-        to: "/admin/work-orders/mine",
-        label: "Việc của tôi",
-        icon: IconCheck,
+        kind: "folder",
+        id: "catalog",
+        label: "Dịch vụ & danh mục",
+        icon: IconWrench,
+        items: [
+          {
+            to: "/admin/services",
+            label: "Dịch vụ",
+            icon: IconWrench,
+            authority: [CATALOG_READ],
+          },
+          {
+            to: "/admin/categories",
+            label: "Nhóm danh mục",
+            icon: IconList,
+            authority: [CATALOG_READ],
+          },
+        ],
       },
-      { to: "/admin/staff", label: "Kỹ thuật viên", icon: IconUsers },
-      { to: "/admin/work-shifts", label: "Ca làm việc", icon: IconClock },
-      { to: "/admin/schedule", label: "Lịch trình xưởng", icon: IconCalendar },
-      { to: "/admin/vehicles", label: "Hồ sơ Xe & KH", icon: IconCar },
-      { to: "/admin/parts", label: "Phụ tùng", icon: IconPackage },
-      { to: "/admin/suppliers", label: "Nhà cung cấp", icon: IconBuilding },
       {
-        to: "/admin/purchase-orders",
-        label: "Đơn nhập hàng",
-        icon: IconTruck,
+        kind: "folder",
+        id: "inventory",
+        label: "Kho & phụ tùng",
+        icon: IconBox,
+        items: [
+          {
+            to: "/admin/parts",
+            label: "Phụ tùng",
+            icon: IconPackage,
+            authority: [INVENTORY_READ],
+          },
+          {
+            to: "/admin/suppliers",
+            label: "Nhà cung cấp",
+            icon: IconBuilding,
+            authority: [SUPPLIER_READ],
+          },
+          {
+            to: "/admin/purchase-orders",
+            label: "Đơn nhập hàng",
+            icon: IconTruck,
+            authority: [PURCHASE_ORDER_READ],
+          },
+          {
+            to: "/admin/inventory-transactions",
+            label: "Sổ kho",
+            icon: IconActivity,
+            authority: [LEDGER_READ],
+          },
+        ],
       },
       {
-        to: "/admin/inventory-transactions",
-        label: "Sổ kho",
-        icon: IconActivity,
+        kind: "folder",
+        id: "operations",
+        label: "Vận hành xưởng",
+        icon: IconCar,
+        items: [
+          {
+            to: "/admin/bookings",
+            label: "Lịch hẹn xưởng",
+            icon: IconCalendar,
+            authority: [BOOKING_READ],
+          },
+          {
+            to: "/admin/work-orders",
+            label: "Phiếu sửa chữa",
+            icon: IconWrench,
+            authority: [WORK_ORDER_READ],
+          },
+          {
+            to: "/admin/work-orders/mine",
+            label: "Việc của tôi",
+            icon: IconCheck,
+            authority: [ASSIGNED_LINE_READ],
+          },
+          {
+            to: "/admin/reviews",
+            label: "Đánh giá sửa chữa",
+            icon: IconStar,
+            authority: [FEEDBACK_READ],
+          },
+          {
+            to: "/admin/schedule",
+            label: "Lịch trình xưởng",
+            icon: IconCalendar,
+            authority: [STAFF_SCHEDULE_READ],
+          },
+        ],
       },
-      { to: "/admin/services", label: "Dịch vụ", icon: IconWrench },
-      { to: "/admin/categories", label: "Nhóm danh mục", icon: IconList },
-      { to: "/admin/garage", label: "Hồ sơ xưởng", icon: IconBuilding },
-      { to: "/admin/users", label: "Người dùng", icon: IconUsers },
+      {
+        kind: "folder",
+        id: "people",
+        label: "Nhân sự",
+        icon: IconUsers,
+        items: [
+          {
+            to: "/admin/staff",
+            label: "Kỹ thuật viên",
+            icon: IconUsers,
+            authority: [STAFF_READ],
+          },
+          {
+            to: "/admin/work-shifts",
+            label: "Ca làm việc",
+            icon: IconClock,
+            authority: [WORK_SHIFT_READ],
+          },
+        ],
+      },
+      {
+        kind: "folder",
+        id: "news",
+        label: "Tin tức",
+        icon: IconNote,
+        items: [
+          {
+            to: "/admin/news",
+            label: "Bài viết",
+            icon: IconNote,
+            authority: [NEWS_ARTICLE_READ],
+          },
+          {
+            to: "/admin/news-categories",
+            label: "Danh mục bài viết",
+            icon: IconList,
+            authority: [NEWS_CATEGORY_READ],
+          },
+        ],
+      },
+      {
+        to: "/admin/invoices",
+        label: "Hóa đơn",
+        icon: IconCash,
+        authority: [INVOICE_READ],
+      },
+      {
+        to: "/admin/vehicles",
+        label: "Hồ sơ Xe & KH",
+        icon: IconCar,
+        authority: [CUSTOMER_READ, VEHICLE_READ],
+      },
+      {
+        to: "/admin/users",
+        label: "Người dùng",
+        icon: IconUsers,
+        authority: [USER_READ],
+      },
     ],
   },
   {
     label: "Hệ thống",
     items: [
-      { to: "/admin/permissions", label: "Quyền", icon: IconShield },
-      { to: "/admin/roles", label: "Vai trò", icon: IconShield },
+      {
+        to: "/admin/permissions",
+        label: "Quyền",
+        icon: IconShield,
+        authority: [PERMISSION_READ],
+      },
+      {
+        to: "/admin/roles",
+        label: "Vai trò",
+        icon: IconShield,
+        authority: [ROLE_READ],
+      },
       {
         to: "/admin/notification-templates",
         label: "Template thông báo",
         icon: IconBell,
+        authority: [NOTIFICATION_TEMPLATE_READ],
       },
-      { to: "/admin/reports", label: "Báo cáo", icon: IconChart },
-      { to: "/admin/settings", label: "Cài đặt", icon: IconSettings },
+      { to: "/admin/reports", label: "Báo cáo", icon: IconChart, authority: [REPORT_READ] },
     ],
   },
 ];
+
+/** Key lưu trạng thái mở/đóng của các folder trong localStorage. */
+const OPEN_FOLDERS_KEY = "autocare.admin.openFolders";
+
+/** Ghi trạng thái folder ra localStorage (bỏ qua nếu bị chặn). */
+function persistOpenFolders(ids: string[]): void {
+  try {
+    window.localStorage.setItem(OPEN_FOLDERS_KEY, JSON.stringify(ids));
+  } catch {
+    // localStorage bị chặn (private mode) — bỏ qua, chỉ mất trạng thái.
+  }
+}
+
+/**
+ * Kiểm tra một route có đang active hay không.
+ *
+ * Route cha (`/admin/work-orders`) được coi là active khi đang ở route con
+ * (`/admin/work-orders/mine`) — trừ khi chính route con cũng nằm trong danh
+ * sách, khi đó route cha dùng `end` để không bị highlight nhầm.
+ */
+function isRouteActive(to: string, pathname: string): boolean {
+  if (to === "/admin") return pathname === "/admin";
+  if (pathname === to) return true;
+  if (!pathname.startsWith(to + "/")) return false;
+  // Route con nằm trong cùng nhóm với route cha → cha không active.
+  return !NESTED_ROUTE_PARENTS.has(to);
+}
+
+/** Các route cha có route con riêng trong menu (dùng `end` khi render). */
+const NESTED_ROUTE_PARENTS = new Set(["/admin/work-orders"]);
+
+function readOpenFolders(): string[] {
+  try {
+    const raw = window.localStorage.getItem(OPEN_FOLDERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const t = useToast();
+
+  /**
+   * Kiem tra quyen cua nguoi dung hien tai.
+   *
+   * <p>Lay tu claim `authorities` cua access token — cung nguon voi backend
+   * dung de kiem tra `@PreAuthorize`, nen menu khong bao gio "co quyen" ma
+   * API lai tra 403.
+   */
+  const can = useCallback(
+    (authority: string) => hasTokenAuthority(authority),
+    [],
+  );
+
+  /**
+   * Trạng thái mở/đóng của các folder trong sidebar.
+   *
+   * <p>Được lưu vào localStorage để giữ nguyên sau khi tải lại trang.
+   *
+   * <p>Quy tắc hiển thị (accordion): khi điều hướng sang tab/trang khác, chỉ
+   * folder chứa route hiện tại được mở — các folder khác tự rút gọn lại.
+   * Vì vậy `openFolders` được đồng bộ lại mỗi khi `location.pathname` đổi,
+   * thay vì cộng dồn (accumulative) như trước.
+   */
+  const [openFolders, setOpenFolders] = useState<string[]>(readOpenFolders);
+  const location = useLocation();
+
+  const toggleFolder = useCallback((id: string) => {
+    setOpenFolders((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id];
+      persistOpenFolders(next);
+      return next;
+    });
+  }, []);
+
+  /** Các folder có chứa route đang xem. */
+  const activeFolderIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const group of navGroups) {
+      for (const entry of group.items) {
+        if (!isFolder(entry)) continue;
+        if (entry.items.some((i) => isRouteActive(i.to, location.pathname))) {
+          ids.add(entry.id);
+        }
+      }
+    }
+    return ids;
+  }, [location.pathname]);
+
+  /**
+   * Folder có đang mở hay không.
+   *
+   * <p>Chỉ những folder người dùng tự bấm mở (`openFolders`) mới được tính
+   * là đang mở. Folder chứa route hiện tại KHÔNG bị ép mở — nếu ép thì nút
+   * đóng của người dùng sẽ không bao giờ có tác dụng.
+   */
+  const isFolderOpen = useCallback(
+    (id: string) => openFolders.includes(id),
+    [openFolders],
+  );
+
+  /**
+   * Đồng bộ folder mở theo route hiện tại.
+   *
+   * <p>- Đang ở trong một folder  → mở đúng folder đó, đóng các folder khác.
+   * <p>- Sang trang top-level (vd `/admin/invoices`) → đóng hết các folder,
+   *      vì trang đó không thuộc folder nào.
+   *
+   * <p>Lần mount đầu: chỉ bổ sung folder chứa route hiện tại vào danh sách
+   * đang mở (để mục đang xem không bị ẩn), giữ nguyên lựa chọn đã lưu.
+   *
+   * <p>Các lần sau chỉ chạy khi `pathname` thực sự đổi, để không ghi đè
+   * lựa chọn của người dùng khi vừa bấm đóng một folder.
+   */
+  const prevPathnameRef = useRef<string | null>(null);
+  useEffect(() => {
+    const isFirstRun = prevPathnameRef.current === null;
+    prevPathnameRef.current = location.pathname;
+
+    if (isFirstRun) {
+      // Lần đầu: giữ lựa chọn đã lưu, và bổ sung folder chứa route hiện tại
+      // (để mục đang xem không bị ẩn).
+      setOpenFolders((prev) => {
+        const next = [...prev];
+        for (const id of activeFolderIds) {
+          if (!next.includes(id)) next.push(id);
+        }
+        persistOpenFolders(next);
+        return next;
+      });
+      return;
+    }
+
+    const next = [...activeFolderIds];
+    setOpenFolders(next);
+    persistOpenFolders(next);
+  }, [location.pathname, activeFolderIds]);
 
   // Panel thông báo — dùng chung component NotificationBell.
 
@@ -223,6 +580,30 @@ export default function AdminLayout() {
       ],
     },
     {
+      match: /tin tức|tin tuc|bài viết|bai viet|news|danh mục bài viết/,
+      to: "/admin/news",
+      routeWords: [
+        "tin tức",
+        "tin tuc",
+        "bài viết",
+        "bai viet",
+        "news",
+        "danh mục bài viết",
+      ],
+    },
+    {
+      match: /đánh giá|danh gia|review|nhận xét|nhan xet/,
+      to: "/admin/reviews",
+      routeWords: [
+        "đánh giá",
+        "danh gia",
+        "review",
+        "reviews",
+        "nhận xét",
+        "nhan xet",
+      ],
+    },
+    {
       match: /dịch vụ|service/,
       to: "/admin/services",
       routeWords: ["dịch vụ", "service", "services"],
@@ -275,7 +656,12 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-bgsoft/50 flex">
       {/* ============= SIDEBAR (desktop) ============= */}
       <aside className="hidden lg:flex w-60 shrink-0 flex-col bg-white border-r border-ink/8 sticky top-0 h-screen">
-        <SidebarContent onNavigate={() => {}} />
+        <SidebarContent
+          onNavigate={() => {}}
+          isFolderOpen={isFolderOpen}
+          toggleFolder={toggleFolder}
+          can={can}
+        />
       </aside>
 
       {/* ============= SIDEBAR (mobile drawer) ============= */}
@@ -288,7 +674,12 @@ export default function AdminLayout() {
             className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+            <SidebarContent
+              onNavigate={() => setMobileOpen(false)}
+              isFolderOpen={isFolderOpen}
+              toggleFolder={toggleFolder}
+              can={can}
+            />
           </div>
         </div>
       )}
@@ -316,10 +707,11 @@ export default function AdminLayout() {
             />
           </div>
 
-          <div className="flex-1 md:flex-none" />
-
-          {/* Right actions */}
-          <div className="flex items-center gap-2">
+          {/* Right actions — `ml-auto` đẩy cụm này sát mép phải viewport, giống
+              header giao diện khách hàng. Trước đây có spacer `flex-1` nhưng
+              bị `md:flex-none` vô hiệu hoá nên avatar nằm lệch, cách mép phải
+              một khoảng trống. */}
+          <div className="flex items-center gap-2 ml-auto lg:ml-2">
             <Link
               to="/"
               className="hidden sm:inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-primary px-2 py-1.5 rounded-lg hover:bg-bgsoft"
@@ -366,7 +758,160 @@ export default function AdminLayout() {
 // Sidebar content
 // =========================
 
-function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
+/**
+ * Một "quản lý ..." trong sidebar — bấm vào để kéo xuống danh sách bên trong.
+ *
+ * Folder luôn hiển thị chevron xuống/xuống phải để người dùng biết có thể
+ * mở ra. Trạng thái mở/đóng do parent quản lý (lưu localStorage).
+ */
+function NavFolderBlock({
+  folder,
+  open,
+  onToggle,
+  onNavigate,
+}: {
+  folder: NavFolder;
+  open: boolean;
+  onToggle: () => void;
+  onNavigate: () => void;
+}) {
+  const [mounted, setMounted] = useState(open);
+
+  // Giữ nội dung trong DOM sau khi đóng để có hiệu ứng kéo xuống mượt.
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setMounted(false), 200);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={[
+          "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors group",
+          open ? "text-ink" : "text-ink hover:bg-bgsoft",
+        ].join(" ")}
+      >
+        <folder.icon
+          size={16}
+          className={
+            open ? "text-primary" : "text-ink-muted group-hover:text-ink"
+          }
+        />
+        <span className="flex-1 truncate text-left">{folder.label}</span>
+        <IconChevronDown
+          size={14}
+          className={[
+            "text-ink-muted transition-transform duration-200 shrink-0",
+            open ? "rotate-0" : "-rotate-90",
+          ].join(" ")}
+        />
+      </button>
+
+      {/* Danh sách con — kéo xuống (accordion) */}
+      <div
+        className={[
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        ].join(" ")}
+      >
+        <div className="overflow-hidden">
+          <ul className="mt-0.5 mb-1 ml-3 pl-3 border-l border-ink/10 space-y-0.5">
+            {folder.items.map((item) => (
+              <li key={item.to}>
+                <NavLink
+                  to={item.to}
+                  end={
+                    item.to === "/admin/work-orders" ||
+                    item.to === "/admin/work-orders/mine"
+                  }
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    [
+                      "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors group",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-ink-muted hover:text-ink hover:bg-bgsoft",
+                    ].join(" ")
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <item.icon
+                        size={14}
+                        className={
+                          isActive ? "text-primary" : "text-ink-muted group-hover:text-ink"
+                        }
+                      />
+                      <span className="flex-1 truncate">{item.label}</span>
+                      {item.badge && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-bgsoft text-ink-muted">
+                          {item.badge}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SidebarContent({
+  onNavigate,
+  isFolderOpen,
+  toggleFolder,
+  can,
+}: {
+  onNavigate: () => void;
+  isFolderOpen: (id: string) => boolean;
+  toggleFolder: (id: string) => void;
+  /** Kiem tra nguoi dung co authority hay khong. */
+  can: (authority: string) => boolean;
+}) {
+  /**
+   * Loc cac muc theo quyen.
+   *
+   * <p>- Muc link don le: an neu khong co quyen nao trong `authority`.
+   * <p>- Folder: loc TUNG muc ben trong; an folder neu khong con muc nao.
+   *
+   * <p>Quan trong: phai loc ca `folder.items`, khong chi kiem tra folder co
+   * "it nhat mot muc hien" hay khong — neu khong loc thi cac muc khong du
+   * quyen van xuat hien ben trong folder.
+   */
+  const visibleGroups = useMemo(
+    () =>
+      navGroups
+        .map((group): NavGroup => {
+          const items: NavEntry[] = [];
+          for (const entry of group.items) {
+            if (!isFolder(entry)) {
+              if (isItemVisible(entry, can)) items.push(entry);
+              continue;
+            }
+            // Loc cac muc con hop le.
+            const childItems = entry.items.filter((i) => isItemVisible(i, can));
+            // Folder khong con muc nao → an folder.
+            if (childItems.length === 0) continue;
+            items.push({ ...entry, items: childItems });
+          }
+          return { ...group, items };
+        })
+        // Nhom rong (khong con muc nao) → bo qua, tranh heading "Quản lý" rong.
+        .filter((group) => group.items.length > 0),
+    [can],
+  );
+
   return (
     <>
       {/* Logo */}
@@ -397,7 +942,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-4">
-        {navGroups.map((group, gi) => (
+        {visibleGroups.map((group, gi) => (
           <div key={gi}>
             {group.label && (
               <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-1.5 px-2">
@@ -405,53 +950,64 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
               </div>
             )}
             <ul className="space-y-0.5">
-              {group.items.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    end={
-                      item.to === "/admin" ||
-                      // Route con của "Phiếu sửa chữa" — `end` để trang cha
-                      // không bị highlight khi đang ở trang con.
-                      item.to === "/admin/work-orders" ||
-                      item.to === "/admin/work-orders/mine"
-                    }
-                    onClick={onNavigate}
-                    className={({ isActive }) =>
-                      [
-                        "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors group",
-                        isActive
-                          ? "bg-primary/10 text-primary"
-                          : "text-ink hover:bg-bgsoft",
-                      ].join(" ")
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <item.icon
-                          size={16}
-                          className={
-                            isActive ? "text-primary" : "text-ink-muted group-hover:text-ink"
-                          }
-                        />
-                        <span className="flex-1 truncate">{item.label}</span>
-                        {item.badge && (
-                          <span
-                            className={[
-                              "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
-                              isActive
-                                ? "bg-primary text-white"
-                                : "bg-bgsoft text-ink-muted",
-                            ].join(" ")}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </NavLink>
-                </li>
-              ))}
+              {group.items.map((item) =>
+                isFolder(item) ? (
+                  <li key={item.id}>
+                    <NavFolderBlock
+                      folder={item}
+                      open={isFolderOpen(item.id)}
+                      onToggle={() => toggleFolder(item.id)}
+                      onNavigate={onNavigate}
+                    />
+                  </li>
+                ) : (
+                  <li key={item.to}>
+                    <NavLink
+                      to={item.to}
+                      end={
+                        item.to === "/admin" ||
+                        // Route con của "Phiếu sửa chữa" — `end` để trang cha
+                        // không bị highlight khi đang ở trang con.
+                        item.to === "/admin/work-orders" ||
+                        item.to === "/admin/work-orders/mine"
+                      }
+                      onClick={onNavigate}
+                      className={({ isActive }) =>
+                        [
+                          "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors group",
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-ink hover:bg-bgsoft",
+                        ].join(" ")
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <item.icon
+                            size={16}
+                            className={
+                              isActive ? "text-primary" : "text-ink-muted group-hover:text-ink"
+                            }
+                          />
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {item.badge && (
+                            <span
+                              className={[
+                                "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                                isActive
+                                  ? "bg-primary text-white"
+                                  : "bg-bgsoft text-ink-muted",
+                              ].join(" ")}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </NavLink>
+                  </li>
+                ),
+              )}
             </ul>
           </div>
         ))}
