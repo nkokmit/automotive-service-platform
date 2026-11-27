@@ -153,11 +153,7 @@ export default function AdminWorkOrders() {
             Phiếu sửa chữa (Work Order)
           </h1>
           <p className="text-sm text-ink-muted mt-1">
-            Nguồn:{" "}
-            <code className="text-xs bg-bgsoft px-1.5 py-0.5 rounded">
-              GET /api/work-orders
-            </code>{" "}
-            · {items.length} phiếu
+            {items.length} phiếu
           </p>
         </div>
         <div className="flex gap-2">

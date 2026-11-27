@@ -5,6 +5,8 @@ import Input from "../../components/Input";
 import { useToast } from "../../components/Toast";
 import { IconCar, IconCheck } from "../../components/icons";
 import { useAuth } from "../../data/authStore";
+import { useCatalog } from "../../data/catalog";
+import { resolveServiceSlug } from "../../data/catalogTypes";
 import { GARAGE } from "../../config/garage";
 
 export default function Login() {
@@ -26,10 +28,30 @@ export default function Login() {
   const location = useLocation();
   const t = useToast();
   const { login, register } = useAuth();
+  const { services } = useCatalog();
 
   // Trang user định quay lại sau khi đăng nhập (do RequireAuth / các màn hình
   // "mua" / "đặt lịch" truyền vào). Mặc định là /profile.
   const from = (location.state as { from?: string } | null)?.from ?? "/profile";
+
+  /**
+   * URL quay lại sau khi đăng nhập.
+   *
+   * <p>Trang chi tiết dịch vụ dùng slug, mà slug khác nhau giữa dữ liệu mẫu và
+   * dữ liệu thật: dữ liệu mẫu có slug trần (`thay-dau-dong-co`), dữ liệu thật
+   * có hậu tố id (`thay-dau-dong-c4dfea`). Khách xem trang dịch vụ lúc
+   * CHƯA đăng nhập sẽ có URL chứa slug mẫu → sau khi đăng nhập, catalog đổi
+   * sang dữ liệu thật và URL đó 404.
+   *
+   * <p>Vì vậy: nếu `from` là URL dịch vụ, tra catalog để lấy slug THẬT của
+   * dịch vụ tương ứng rồi dùng slug đó.
+   */
+  const resolveFrom = (): string => {
+    const m = /^\/services\/([^/?#]+)/.exec(from);
+    if (!m) return from;
+    const real = resolveServiceSlug(services, m[1]);
+    return real ? `/services/${real}` : from;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +74,7 @@ export default function Login() {
               fullName: form.fullName || undefined,
             });
       t.success(`Chào mừng ${session.user.name} quay lại!`);
-      navigate(from, { replace: true });
+      navigate(resolveFrom(), { replace: true });
     } catch (err) {
       // message đã là tiếng Việt từ GlobalExceptionHandler phía backend
       const message = err instanceof Error ? err.message : (mode === "login" ? "Đăng nhập thất bại" : "Đăng ký thất bại");
@@ -212,23 +234,6 @@ export default function Login() {
                   : "Tạo tài khoản"}
             </Button>
 
-            <div className="relative my-2">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-ink/10" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="bg-white px-3 text-xs text-ink-muted">hoặc</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" type="button">
-                Google
-              </Button>
-              <Button variant="outline" type="button">
-                Facebook
-              </Button>
-            </div>
           </form>
 
           <p className="mt-6 text-sm text-ink-light text-center">

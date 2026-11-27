@@ -4,6 +4,7 @@ import com.example.inventory_service.exception.CustomAccessDeniedHandler;
 import com.example.inventory_service.exception.CustomAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -30,6 +31,20 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        // ── Catalog công khai ──────────────────────────────────────
+                        // Trang /services và /parts của storefront là trang PUBLIC:
+                        // khách chưa đăng nhập vẫn phải xem được danh mục dịch vụ
+                        // và phụ tùng (kèm định mức BOM) để chọn rồi mới đăng nhập
+                        // để đặt lịch.
+                        //
+                        // Chỉ GET — mọi thao tác ghi vẫn đi qua xác thực và phân
+                        // quyền ở tầng method (@PreAuthorize).
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/services/**",
+                                "/api/service-categories/**",
+                                "/api/parts/**",
+                                "/api/part-categories/**"
+                        ).permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated())

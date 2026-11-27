@@ -20,6 +20,7 @@ import Button from "../../components/Button";
 import { useToast } from "../../components/Toast";
 import { GARAGE } from "../../config/garage";
 import { useCatalog, displayDescription } from "../../data/catalog";
+import { findServiceBySlug } from "../../data/catalogTypes";
 import { bookingApi } from "../../api/endpoints/booking";
 import { customerVehicleApi } from "../../api/endpoints/customerVehicle";
 import { inventoryApi } from "../../api/endpoints/inventory";
@@ -109,8 +110,15 @@ export default function ServiceDetail() {
   const { user } = useAuth();
   const { services, loading: catalogLoading, usingFallback } = useCatalog();
 
+  /**
+   * Tìm dịch vụ theo slug trong URL.
+   *
+   * <p>Dùng `findServiceBySlug` để chịu được việc slug mẫu (khi chưa đăng
+   * nhập) khác slug thật (sau khi đăng nhập) — xem giải thích trong
+   * `data/catalogTypes.ts`.
+   */
   const service = useMemo(
-    () => services.find((s) => s.slug === slug) ?? null,
+    () => (slug ? findServiceBySlug(services, slug) : null),
     [services, slug],
   );
 
@@ -170,6 +178,16 @@ export default function ServiceDetail() {
   const loadSlots = useCallback(
     async (date: string) => {
       if (!service || !date) return;
+      // Chưa đăng nhập → endpoint `GET /api/bookings/availability` cần token
+      // (gateway chặn 401) → trả về lỗi kỹ thuật "Chưa đăng nhập hoặc token
+      // không hợp lệ" cho khách. Bỏ qua request và hiển thị lời nhắc đăng
+      // nhập kèm nút bấm thay vì để lỗi kỹ thuật lộ ra.
+      if (!user) {
+        setSlots([]);
+        setSlotsError(null);
+        setSlotsLoading(false);
+        return;
+      }
       // `service.id` phải là UUID mới gọi được API: backend nhận
       // `@RequestParam("serviceIds") List<UUID>`, và khi catalog rơi về dữ liệu
       // mẫu thì `service.id` là chuỗi kiểu "sv1" — Spring không bind được và
@@ -203,7 +221,7 @@ export default function ServiceDetail() {
         setSlotsLoading(false);
       }
     },
-    [service, usingFallback],
+    [service, usingFallback, user],
   );
 
   useEffect(() => {
@@ -491,9 +509,6 @@ export default function ServiceDetail() {
                     <IconPackage size={15} className="text-primary" />
                     Định mức phụ tùng đi kèm
                   </h4>
-                  <span className="text-[11px] text-ink-muted">
-                    Nguồn: GET /api/services/{service.id.slice(0, 8)}…/bom
-                  </span>
                 </div>
 
                 {bomLoading ? (
@@ -685,6 +700,24 @@ export default function ServiceDetail() {
                         className="py-2 rounded-lg bg-bgsoft animate-pulse h-9"
                       />
                     ))}
+                  </div>
+                ) : !user ? (
+                  /* Chưa đăng nhập → không gọi được API lịch trống.
+                     Hiện lời nhắc + nút đăng nhập thay vì lỗi kỹ thuật. */
+                  <div className="p-3 bg-bgsoft rounded-lg flex items-center justify-between gap-3">
+                    <span className="text-sm text-ink-muted">
+                      Hãy đăng nhập để xem khung giờ trống và đặt lịch.
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        navigate("/login", {
+                          state: { from: `/services/${slug}` },
+                        })
+                      }
+                    >
+                      Đăng nhập
+                    </Button>
                   </div>
                 ) : slotsError ? (
                   <div className="text-sm text-ink-muted p-3 bg-bgsoft rounded-lg flex items-start gap-2">

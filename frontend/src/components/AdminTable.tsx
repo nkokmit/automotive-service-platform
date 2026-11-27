@@ -44,8 +44,29 @@ export interface AdminTableProps<T extends { id: string }> {
   columns: AdminTableColumn<T>[];
   /** Tên trường dùng cho tìm kiếm (VD: "name") */
   searchKey?: keyof T;
+  /**
+   * Placeholder của ô tìm kiếm trong bảng.
+   *
+   * <p>Mặc định `Tìm {title.toLowerCase()}...`. Dùng khi tiêu đề bảng không
+   * phải tên đối tượng (VD: bảng "Quản lý phụ tùng" nhưng ô tìm kiếm nên
+   * ghi "Tìm phụ tùng theo tên").
+   */
+  searchPlaceholder?: string;
   /** Filter chips (nhãn + predicate) */
   filters?: AdminTableFilter<T>[];
+  /**
+   * Filter chip do page cha điều khiển (VD: lọc "Sắp hết hàng" ở **server**
+   * qua `?lowStockOnly=true` — không thể diễn bằng predicate client-side).
+   *
+   * <p>Chip sẽ hiện bên cạnh các filter mặc định.
+   */
+  serverFilters?: {
+    id: string;
+    label: string;
+    active: boolean;
+    onToggle: () => void;
+    title?: string;
+  }[];
   /** Add button label + handler */
   addLabel?: string;
   /**
@@ -112,7 +133,9 @@ export function AdminTable<T extends { id: string }>({
   data,
   columns,
   searchKey,
+  searchPlaceholder,
   filters = [],
+  serverFilters = [],
   addLabel = "Thêm mới",
   initialValues,
   openAddSignal,
@@ -327,30 +350,49 @@ export function AdminTable<T extends { id: string }>({
         <div className="p-3 flex items-center gap-2 flex-wrap">
           <div className="flex-1 min-w-[200px]">
             <Input
-              placeholder={`Tìm ${title.toLowerCase()}...`}
+              placeholder={searchPlaceholder ?? `Tìm ${title.toLowerCase()}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               leftIcon={<IconSearch size={16} />}
             />
           </div>
-          {filters.length > 0 && (
+          {(filters.length > 0 || serverFilters.length > 0) && (
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs text-ink-muted inline-flex items-center gap-1 px-2">
                 <IconFilter size={12} />
                 Lọc:
               </span>
-              <FilterChip
-                active={activeFilter === "all"}
-                onClick={() => setActiveFilter("all")}
-                label="Tất cả"
-              />
-              {filters.map((f) => (
-                <FilterChip
+              {filters.length > 0 && (
+                <>
+                  <FilterChip
+                    active={activeFilter === "all"}
+                    onClick={() => setActiveFilter("all")}
+                    label="Tất cả"
+                  />
+                  {filters.map((f) => (
+                    <FilterChip
+                      key={f.id}
+                      active={activeFilter === f.id}
+                      onClick={() => setActiveFilter(f.id)}
+                      label={f.label}
+                    />
+                  ))}
+                </>
+              )}
+              {serverFilters.map((f) => (
+                <button
                   key={f.id}
-                  active={activeFilter === f.id}
-                  onClick={() => setActiveFilter(f.id)}
-                  label={f.label}
-                />
+                  onClick={f.onToggle}
+                  title={f.title}
+                  className={[
+                    "text-xs font-medium px-2.5 py-1 rounded-full transition-colors whitespace-nowrap",
+                    f.active
+                      ? "bg-primary text-white"
+                      : "bg-bgsoft text-ink-muted hover:bg-ink/10",
+                  ].join(" ")}
+                >
+                  {f.label}
+                </button>
               ))}
             </div>
           )}

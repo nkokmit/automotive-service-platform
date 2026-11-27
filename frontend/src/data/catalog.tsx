@@ -23,6 +23,7 @@ import {
   type ReactNode,
 } from "react";
 import { inventoryApi } from "../api/endpoints/inventory";
+import { AUTH_EVENT } from "./authStore";
 import type {
   CategoryResponse,
   PartResponse,
@@ -164,6 +165,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     window.addEventListener(CATALOG_CHANGED_EVENT, reload);
     return () => window.removeEventListener(CATALOG_CHANGED_EVENT, reload);
+  }, [reload]);
+
+  // Vừa đăng nhập / đăng xuất → token đổi nên quyền đọc catalog cũng đổi.
+  // Không reload thì khách vừa đăng nhập vẫn thấy dữ liệu mẫu (fallback)
+  // cho tới lần F5 sau — đặt lịch lúc đó sẽ hỏng vì id không phải UUID.
+  useEffect(() => {
+    window.addEventListener(AUTH_EVENT, reload);
+    return () => window.removeEventListener(AUTH_EVENT, reload);
   }, [reload]);
 
   useEffect(() => {

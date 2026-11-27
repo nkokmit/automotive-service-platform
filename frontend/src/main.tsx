@@ -39,7 +39,7 @@ import { ToastProvider } from "./components/Toast";
 import Card from "./components/Card";
 import Button from "./components/Button";
 import { Link } from "react-router-dom";
-import { IconArrowLeft, IconSparkles, IconSettings } from "./components/icons";
+import { IconArrowLeft, IconSettings } from "./components/icons";
 import "./styles/globals.css";
 
 import AdminDashboard from "./modules/admin/AdminDashboard";
@@ -339,17 +339,6 @@ hydrateUser().finally(() => {
                   </RequireAdmin>
                 }
               />
-              <Route
-                path="settings"
-                element={
-                  <RequireAdmin>
-                    <ComingSoon
-                      title="Cài đặt hệ thống"
-                      desc="Cấu hình chung: thông tin công ty, email templates, payment gateway, backup..."
-                    />
-                  </RequireAdmin>
-                }
-              />
               <Route path="*" element={<AdminNotFound />} />
             </Route>
           </Routes>
@@ -362,28 +351,6 @@ hydrateUser().finally(() => {
 // =========================
 // Admin placeholder pages
 // =========================
-
-function ComingSoon({ title, desc }: { title: string; desc: string }) {
-  return (
-    <div className="max-w-2xl mx-auto">
-      <Card hover={false}>
-        <div className="p-10 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
-            <IconSparkles size={28} />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">{title}</h2>
-          <p className="text-sm text-ink-muted mb-6">{desc}</p>
-          <Link to="/admin">
-            <Button variant="outline">
-              <IconArrowLeft size={14} />
-              Quay lại Dashboard
-            </Button>
-          </Link>
-        </div>
-      </Card>
-    </div>
-  );
-}
 
 function AdminNotFound() {
   return (

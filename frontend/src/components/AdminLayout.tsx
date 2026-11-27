@@ -13,7 +13,6 @@ import {
   IconPackage,
   IconUsers,
   IconChart,
-  IconSettings,
   IconBell,
   IconSearch,
   IconMenu,
@@ -318,7 +317,6 @@ const navGroups: NavGroup[] = [
         authority: [NOTIFICATION_TEMPLATE_READ],
       },
       { to: "/admin/reports", label: "Báo cáo", icon: IconChart, authority: [REPORT_READ] },
-      { to: "/admin/settings", label: "Cài đặt", icon: IconSettings },
     ],
   },
 ];
@@ -709,10 +707,11 @@ export default function AdminLayout() {
             />
           </div>
 
-          <div className="flex-1 md:flex-none" />
-
-          {/* Right actions */}
-          <div className="flex items-center gap-2">
+          {/* Right actions — `ml-auto` đẩy cụm này sát mép phải viewport, giống
+              header giao diện khách hàng. Trước đây có spacer `flex-1` nhưng
+              bị `md:flex-none` vô hiệu hoá nên avatar nằm lệch, cách mép phải
+              một khoảng trống. */}
+          <div className="flex items-center gap-2 ml-auto lg:ml-2">
             <Link
               to="/"
               className="hidden sm:inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-primary px-2 py-1.5 rounded-lg hover:bg-bgsoft"

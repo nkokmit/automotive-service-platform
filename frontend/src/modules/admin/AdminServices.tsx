@@ -295,7 +295,6 @@ export default function AdminServices() {
           type: "textarea",
           rows: 3,
           placeholder: "Mô tả dịch vụ...",
-          hint: "Hiển thị ở tab “Mô tả” trên trang chi tiết dịch vụ và trong danh sách dịch vụ.",
         },
       ],
       onSubmit: async (values, initial) => {

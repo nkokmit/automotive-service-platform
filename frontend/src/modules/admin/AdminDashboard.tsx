@@ -193,10 +193,6 @@ export default function AdminDashboard() {
                         <IconArrowRight size={11} />
                       </Link>
                     )}
-                    <Badge tone="accent">
-                      <IconArrowUpRight size={11} />
-                      Dữ liệu thật
-                    </Badge>
                   </div>
                 </div>
                 {revenueByMonth.length > 0 ? (

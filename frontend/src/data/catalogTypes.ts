@@ -116,3 +116,55 @@ export function displayDescription(service: CatalogService): string {
     `với ${service.requiredTechs} kỹ thuật viên.`
   );
 }
+
+/** Bỏ hậu tố id 6 ký tự mà `makeSlug` gắn vào slug thật. */
+function slugBase(slug: string): string {
+  return slug.replace(/-[a-f0-9]{6}$/i, "");
+}
+
+/**
+ * Tìm dịch vụ theo slug trong URL — chịu được việc slug mẫu ≠ slug thật.
+ *
+ * <p>Slug thật do backend sinh: `{tên-slug}-{6 ký tự đầu id}`. Slug trong dữ
+ * liệu mẫu (`data/mock.ts`) thì trần, không có hậu tố, và TÊN KHÁC (dữ liệu mẫu
+ * là "Thay dầu động cơ", dữ liệu thật là "Thay dau dong").
+ *
+ * <p>Khách xem trang dịch vụ lúc CHƯA đăng nhập sẽ có URL chứa slug mẫu. Sau
+ * khi đăng nhập, catalog đổi sang dữ liệu thật → URL đó không còn khớp
+ * chính xác. Vì vậy cần khớp "mềm": so slug gốc, và nếu một slug là tiền tố
+ * của slug kia thì coi như cùng một dịch vụ (slug mẫu thường DÀI hơn vì
+ * tên đầy đủ hơn — VD `thay-dau-dong-co` vs `thay-dau-dong-c4dfea`).
+ *
+ * @param services danh sách dịch vụ hiện có (thật hoặc mẫu)
+ * @param slug slug lấy từ URL
+ */
+export function findServiceBySlug(
+  services: CatalogService[],
+  slug: string,
+): CatalogService | null {
+  const exact = services.find((s) => s.slug === slug);
+  if (exact) return exact;
+
+  const wanted = slugBase(slug);
+  const sameBase = services.find((s) => slugBase(s.slug) === wanted);
+  if (sameBase) return sameBase;
+
+  // Slug mẫu là tiền tố của slug thật (hoặc ngược lại).
+  const prefix = services.find(
+    (s) => slugBase(s.slug).startsWith(wanted) || wanted.startsWith(slugBase(s.slug)),
+  );
+  return prefix ?? null;
+}
+
+/**
+ * Trả về URL `/services/{slug}` đúng cho dịch vụ tương ứng với `slug` đã cho.
+ *
+ * <p>Dùng sau khi đăng nhập: URL cũ có slug mẫu cần được đổi sang slug thật
+ * để không rơi vào trang 404. Trả về `null` khi không khớp được.
+ */
+export function resolveServiceSlug(
+  services: CatalogService[],
+  slug: string,
+): string | null {
+  return findServiceBySlug(services, slug)?.slug ?? null;
+}
