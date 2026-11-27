@@ -89,6 +89,12 @@ spring:
               predicates:
                 - Path=/api/payments,/api/payments/**
 
+            # Module báo cáo & thống kê doanh thu.
+            - id: billing-service-reports
+              uri: lb://billing-service
+              predicates:
+                - Path=/api/reports,/api/reports/**
+
             - id: notification-service-notifications
               uri: lb://notification-service
               predicates:

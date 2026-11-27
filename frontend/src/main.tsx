@@ -66,6 +66,7 @@ import AdminNotificationTemplates from "./modules/admin/AdminNotificationTemplat
 import AdminNews from "./modules/admin/AdminNews";
 import AdminNewsCategories from "./modules/admin/AdminNewsCategories";
 import AdminReviews from "./modules/admin/AdminReviews";
+import AdminReports from "./modules/admin/AdminReports";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
@@ -334,10 +335,7 @@ hydrateUser().finally(() => {
                 path="reports"
                 element={
                   <RequireAdmin>
-                    <ComingSoon
-                      title="Báo cáo & Thống kê"
-                      desc="Module báo cáo đang được phát triển. Sẽ bao gồm: doanh thu theo dịch vụ, hiệu suất kỹ thuật viên, cohort khách hàng..."
-                    />
+                    <AdminReports />
                   </RequireAdmin>
                 }
               />

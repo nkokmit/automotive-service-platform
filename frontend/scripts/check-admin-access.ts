@@ -68,6 +68,10 @@ for (const file of readdirSync(MIGRATION_DIR).filter((f) => f.endsWith(".sql")))
   }
 
   // Khối `INSERT INTO role_permissions ... WHERE r.name IN (...)`.
+  //
+  // Có 2 dạng trong các migration:
+  //   1. `JOIN permissions p ON p.name IN ('A', 'B')` + `WHERE r.name IN (...)`
+  //   2. `JOIN permissions p ON p.name = 'A'`        + `WHERE r.name IN (...)` hoặc `= 'A'`
   for (const block of sql.matchAll(
     /INSERT INTO role_permissions[\s\S]*?JOIN permissions p ON p\.name IN \(([\s\S]*?)\)\s*\nWHERE r\.name (?:IN \(([^)]*)\)|= '([A-Z_]+)')/g,
   )) {
@@ -82,6 +86,21 @@ for (const file of readdirSync(MIGRATION_DIR).filter((f) => f.endsWith(".sql")))
     for (const role of roles) {
       rolePermissions[role] ??= new Set();
       for (const p of perms) rolePermissions[role].add(p);
+    }
+  }
+
+  // Dạng 2: một permission duy nhất, `p.name = 'X'`.
+  for (const block of sql.matchAll(
+    /INSERT INTO role_permissions[\s\S]*?JOIN permissions p ON p\.name = '([A-Z_]+)'[\s\S]*?WHERE r\.name (?:IN \(([^)]*)\)|= '([A-Z_]+)')/g,
+  )) {
+    const perm = block[1];
+    const roles = (block[2] ?? block[3] ?? "")
+      .split(",")
+      .map((s) => s.trim().replace(/^'|'$/g, ""))
+      .filter(Boolean);
+    for (const role of roles) {
+      rolePermissions[role] ??= new Set();
+      rolePermissions[role].add(perm);
     }
   }
 }

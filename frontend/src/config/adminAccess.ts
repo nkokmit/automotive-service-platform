@@ -56,6 +56,9 @@ export const PAYMENT_READ = "PAYMENT_READ";
 export const PAYMENT_WRITE = "PAYMENT_WRITE";
 export const PAYMENT_REFUND = "PAYMENT_REFUND";
 
+/** Bao cao & thong ke doanh thu (module chi doc). */
+export const REPORT_READ = "REPORT_READ";
+
 /** Khach hang, xe, lich su bao duong. */
 export const CUSTOMER_READ = "CUSTOMER_READ";
 export const VEHICLE_READ = "VEHICLE_READ";
@@ -126,6 +129,9 @@ export const ADMIN_ACCESS_RULES: AccessRule[] = [
   // ── Hoa don / thanh toan ───────────────────────────────────────────────────
   { path: "/admin/invoices", anyOf: [INVOICE_READ] },
 
+  // ── Bao cao & thong ke ─────────────────────────────────────────────────────
+  { path: "/admin/reports", anyOf: [REPORT_READ] },
+
   // ── Vat hanh xuong ─────────────────────────────────────────────────────────
   { path: "/admin/bookings", anyOf: [BOOKING_READ] },
   {
@@ -183,6 +189,7 @@ export const ADMIN_ACCESS_RULES: AccessRule[] = [
       INVENTORY_READ,
       CATALOG_READ,
       NEWS_ARTICLE_READ,
+      REPORT_READ,
     ],
   },
 ];
@@ -204,6 +211,7 @@ export const ADMIN_ENTRY_AUTHORITIES = [
   USER_READ,
   NEWS_ARTICLE_READ,
   FEEDBACK_READ,
+  REPORT_READ,
 ];
 
 /**

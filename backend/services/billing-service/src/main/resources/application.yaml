@@ -4,6 +4,7 @@ server:
 app:
   integration:
     work-order-service-url: ${WORK_ORDER_SERVICE_URL:http://localhost:8086}
+    inventory-service-url: ${INVENTORY_SERVICE_URL:http://localhost:8084}
   kafka:
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP:billing-service}

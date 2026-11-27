@@ -63,6 +63,7 @@ import {
       WORK_ORDER_READ,
       WORK_SHIFT_READ,
       FEEDBACK_READ,
+      REPORT_READ,
 } from "../config/adminAccess";
 
 // =========================
@@ -316,7 +317,7 @@ const navGroups: NavGroup[] = [
         icon: IconBell,
         authority: [NOTIFICATION_TEMPLATE_READ],
       },
-      { to: "/admin/reports", label: "Báo cáo", icon: IconChart },
+      { to: "/admin/reports", label: "Báo cáo", icon: IconChart, authority: [REPORT_READ] },
       { to: "/admin/settings", label: "Cài đặt", icon: IconSettings },
     ],
   },

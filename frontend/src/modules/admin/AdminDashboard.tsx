@@ -69,8 +69,11 @@ export default function AdminDashboard() {
   const canReadCatalog = hasTokenAuthority("SERVICE_READ");
   const canReadInventory = hasTokenAuthority("PART_READ");
   const canReadNews = hasTokenAuthority("NEWS_ARTICLE_READ");
+  /** Xem báo cáo & thống kê — cần cho link "Xem tất cả" sang /admin/reports. */
+  const canReadReports = hasTokenAuthority("REPORT_READ");
 
-  const canSeeRevenue = canReadInvoices;
+  // Biểu đồ doanh thu hiển thị khi có quyền đọc hóa đơn HOẶC quyền xem báo cáo.
+  const canSeeRevenue = canReadInvoices || canReadReports;
   const canSeeWorkOrders = canReadWorkOrders;
   const canSeeBookings = canReadBookings;
   const canSeeUsers = canReadUsers;
@@ -180,10 +183,21 @@ export default function AdminDashboard() {
                       Tổng 12 tháng: {compactVND(totalRevenue)}
                     </p>
                   </div>
-                  <Badge tone="accent">
-                    <IconArrowUpRight size={11} />
-                    Dữ liệu thật
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {canReadReports && (
+                      <Link
+                        to="/admin/reports"
+                        className="text-xs text-primary font-medium hover:underline inline-flex items-center gap-0.5"
+                      >
+                        Xem tất cả
+                        <IconArrowRight size={11} />
+                      </Link>
+                    )}
+                    <Badge tone="accent">
+                      <IconArrowUpRight size={11} />
+                      Dữ liệu thật
+                    </Badge>
+                  </div>
                 </div>
                 {revenueByMonth.length > 0 ? (
                   <RevenueChart data={revenueByMonth} />

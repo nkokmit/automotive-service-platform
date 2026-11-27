@@ -2,6 +2,7 @@ package com.example.inventory_service.controller;
 
 import com.example.inventory_service.common.ApiResponse;
 import com.example.inventory_service.dto.response.InternalServiceBomResponse;
+import com.example.inventory_service.dto.response.InternalServiceCatalogBatchResponse;
 import com.example.inventory_service.dto.response.InternalServiceCatalogResponse;
 import com.example.inventory_service.dto.response.InternalPartCatalogResponse;
 import com.example.inventory_service.dto.response.ServiceResponse;
@@ -12,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -49,5 +51,18 @@ public class InternalServiceCatalogController {
         var part = partService.getPartById(partId);
         return ApiResponse.success(new InternalPartCatalogResponse(
                 part.id(), part.sku(), part.name(), part.unit(), part.sellingPrice(), part.isActive()));
+    }
+
+    /**
+     * Lấy danh mục dịch vụ + nhóm dịch vụ cho NHIỀU dịch vụ trong một lần gọi.
+     *
+     * <p>Phục vụ báo cáo doanh thu theo nhóm dịch vụ của {@code billing-service} —
+     * gọi từng dịch vụ sẽ tạo N+1 request liên service.
+     */
+    @GetMapping("/services/catalog/batch")
+    @PreAuthorize("hasAuthority('INTERNAL_SERVICE_CATALOG_READ')")
+    public ApiResponse<List<InternalServiceCatalogBatchResponse>> getServiceCatalogBatch(
+            @RequestParam List<UUID> ids) {
+        return ApiResponse.success(serviceCatalogService.getInternalCatalogBatch(ids));
     }
 }
