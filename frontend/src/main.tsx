@@ -65,6 +65,7 @@ import AdminRoles from "./modules/admin/AdminRoles";
 import AdminNotificationTemplates from "./modules/admin/AdminNotificationTemplates";
 import AdminNews from "./modules/admin/AdminNews";
 import AdminNewsCategories from "./modules/admin/AdminNewsCategories";
+import AdminReviews from "./modules/admin/AdminReviews";
 
 // Đồng bộ phiên từ token lưu sẵn ở localStorage trước khi render.
 // Nếu token đã hết hạn, `client.ts` tự refresh; nếu refresh hỏng thì phiên bị xoá
@@ -310,6 +311,14 @@ hydrateUser().finally(() => {
                 element={
                   <RequireAdmin>
                     <AdminNewsCategories />
+                  </RequireAdmin>
+                }
+              />
+              <Route
+                path="reviews"
+                element={
+                  <RequireAdmin>
+                    <AdminReviews />
                   </RequireAdmin>
                 }
               />

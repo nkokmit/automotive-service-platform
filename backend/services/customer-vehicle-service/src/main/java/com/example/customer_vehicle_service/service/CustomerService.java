@@ -4,9 +4,12 @@ import com.example.customer_vehicle_service.dto.request.CustomerCreateRequest;
 import com.example.customer_vehicle_service.dto.request.CustomerUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
 import com.example.customer_vehicle_service.dto.response.CustomerIdentityResponse;
+import com.example.customer_vehicle_service.dto.response.CustomerSummaryResponse;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -29,6 +32,14 @@ public interface CustomerService {
     CustomerResponse getCustomerById(UUID id);
 
     CustomerIdentityResponse getCustomerIdentityByUserId(UUID userId);
+
+    /**
+     * Tóm tắt hồ sơ nhiều khách hàng theo id.
+     *
+     * <p>Dùng cho danh sách quản trị cần tra nhiều khách trong một lần gọi.
+     * Khách không tồn tại (hoặc đã xoá mềm) sẽ không có trong kết quả.
+     */
+    List<CustomerSummaryResponse> getCustomerSummaries(Collection<UUID> ids);
 
     CustomerResponse createCustomer(CustomerCreateRequest request);
 

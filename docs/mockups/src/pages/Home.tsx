@@ -123,7 +123,7 @@ export default function Home() {
                 ))}
               </div>
               <span>
-                <strong className="text-ink">10.000+</strong> chủ xe tin dùng
+                <strong className="text-ink">Nhiều</strong> chủ xe tin dùng
               </span>
             </div>
           </div>

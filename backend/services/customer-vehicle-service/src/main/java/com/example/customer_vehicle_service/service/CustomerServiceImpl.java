@@ -4,6 +4,7 @@ import com.example.customer_vehicle_service.dto.request.CustomerCreateRequest;
 import com.example.customer_vehicle_service.dto.request.CustomerUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.CustomerResponse;
 import com.example.customer_vehicle_service.dto.response.CustomerIdentityResponse;
+import com.example.customer_vehicle_service.dto.response.CustomerSummaryResponse;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.entity.Customer;
 import com.example.customer_vehicle_service.exception.CustomerAlreadyExistsException;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -53,6 +56,21 @@ public class CustomerServiceImpl implements CustomerService {
                 .orElseThrow(() -> new CustomerNotFoundException(
                         "Không tìm thấy hồ sơ khách hàng cho tài khoản"));
         return new CustomerIdentityResponse(customer.getId(), customer.getIsActive());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CustomerSummaryResponse> getCustomerSummaries(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return customerRepository.findAllByIdIn(ids).stream()
+                .map(customer -> new CustomerSummaryResponse(
+                        customer.getId(),
+                        customer.getFullName(),
+                        customer.getPhone(),
+                        customer.getIsActive()))
+                .toList();
     }
 
     @Override

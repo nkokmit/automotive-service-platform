@@ -9,17 +9,22 @@ import com.example.work_order_service.integration.client.InventoryServiceClient;
 import com.example.work_order_service.integration.contract.BookingContract;
 import com.example.work_order_service.integration.contract.CustomerContract;
 import com.example.work_order_service.integration.contract.CustomerIdentityContract;
+import com.example.work_order_service.integration.contract.CustomerSummaryContract;
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
 import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
 import com.example.work_order_service.integration.contract.ServiceApiResponse;
 import com.example.work_order_service.integration.contract.VehicleContract;
+import com.example.work_order_service.integration.contract.VehicleSummaryContract;
 import com.example.work_order_service.integration.ServiceEstimateCatalog;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -49,6 +54,69 @@ public class WorkOrderIntegrationService {
             throw new ApiException(ErrorCode.UNAUTHORIZED, "Hồ sơ khách hàng hiện không hoạt động");
         }
         return customer;
+    }
+
+    /**
+     * Lấy hồ sơ nhiều khách hàng trong MỘT lần gọi.
+     *
+     * <p>Dùng cho danh sách quản trị — gọi từng khách sẽ tạo N+1 request giữa
+     * các service. Khách không tồn tại (hoặc đã xoá mềm) sẽ không có trong kết
+     * quả; response lỗi thì ném {@link ApiException} để admin không bị hiển thị
+     * danh sách sai lệch.
+     */
+    public Map<UUID, CustomerSummaryContract> getCustomersBatch(Collection<UUID> customerIds) {
+        if (customerIds == null || customerIds.isEmpty()) {
+            return Map.of();
+        }
+        ServiceApiResponse<List<CustomerSummaryContract>> response;
+        try {
+            response = customerVehicleClient.getCustomersBatch(List.copyOf(customerIds));
+        } catch (FeignException exception) {
+            throw new ApiException(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE,
+                    "Không thể lấy hồ sơ khách hàng từ Customer-Vehicle Service");
+        }
+        List<CustomerSummaryContract> customers = response == null ? null : response.result();
+        if (response == null || response.code() != 0 || customers == null) {
+            throw invalidIntegrationResponse(
+                    "Customer-Vehicle Service trả về danh sách khách hàng không hợp lệ");
+        }
+        Map<UUID, CustomerSummaryContract> byId = new HashMap<>();
+        for (CustomerSummaryContract customer : customers) {
+            if (customer != null && customer.id() != null) {
+                byId.put(customer.id(), customer);
+            }
+        }
+        return byId;
+    }
+
+    /**
+     * Lấy hồ sơ nhiều xe trong MỘT lần gọi.
+     *
+     * <p>Xem {@link #getCustomersBatch(Collection)} — cùng lý do tránh N+1 request.
+     */
+    public Map<UUID, VehicleSummaryContract> getVehiclesBatch(Collection<UUID> vehicleIds) {
+        if (vehicleIds == null || vehicleIds.isEmpty()) {
+            return Map.of();
+        }
+        ServiceApiResponse<List<VehicleSummaryContract>> response;
+        try {
+            response = customerVehicleClient.getVehiclesBatch(List.copyOf(vehicleIds));
+        } catch (FeignException exception) {
+            throw new ApiException(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE,
+                    "Không thể lấy hồ sơ xe từ Customer-Vehicle Service");
+        }
+        List<VehicleSummaryContract> vehicles = response == null ? null : response.result();
+        if (response == null || response.code() != 0 || vehicles == null) {
+            throw invalidIntegrationResponse(
+                    "Customer-Vehicle Service trả về danh sách xe không hợp lệ");
+        }
+        Map<UUID, VehicleSummaryContract> byId = new HashMap<>();
+        for (VehicleSummaryContract vehicle : vehicles) {
+            if (vehicle != null && vehicle.id() != null) {
+                byId.put(vehicle.id(), vehicle);
+            }
+        }
+        return byId;
     }
 
     public ServiceEstimateCatalog getServiceEstimateCatalog(UUID serviceId) {

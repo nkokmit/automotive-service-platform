@@ -764,6 +764,88 @@ export interface WorkOrderBookingServiceSummary {
   sequenceNumber: number | null;
 }
 
+// ── Đánh giá sau sửa chữa (WorkOrderFeedback) ────────────────────────────────
+/**
+ * Khớp `FeedbackEligibleWorkOrderResponse.java`.
+ *
+ * Chỉ có `workOrderId` + `workOrderCode` — thiếu thông tin xe/dịch vụ. Xem
+ * `WorkOrderFeedbackServiceImpl#getEligibleWorkOrders`.
+ */
+export interface FeedbackEligibleWorkOrderResponse {
+  workOrderId: string;
+  workOrderCode: string;
+}
+
+/** Khớp `FeedbackEligiblePageResponse.java` — phân trang 0-based. */
+export interface FeedbackEligiblePageResponse {
+  items: FeedbackEligibleWorkOrderResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/** Khớp `WorkOrderFeedbackResponse.java` — phản hồi sau khi gửi đánh giá. */
+export interface WorkOrderFeedbackResponse {
+  id: string;
+  workOrderId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+/** Khớp `HomepageReviewResponse.java` — một đánh giá trong tổng hợp trang chủ. */
+export interface HomepageReviewResponse {
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  /** Tên các dịch vụ đã hoàn thành trong phiếu (snapshot lúc sửa chữa). */
+  completedServices: string[];
+}
+
+/** Khớp `HomepageReviewSummaryResponse.java`. */
+export interface HomepageReviewSummaryResponse {
+  /** Điểm trung bình, 2 chữ số thập phân. */
+  averageRating: number;
+  reviewCount: number;
+  recentReviews: HomepageReviewResponse[];
+}
+
+/**
+ * Một dòng đánh giá trong màn hình quản trị.
+ *
+ * Khớp `AdminFeedbackResponse.java` — bổ sung thông tin nhận diện (mã phiếu,
+ * tên khách, biển số) so với `WorkOrderFeedbackResponse` dùng cho chủ phiếu.
+ */
+export interface AdminFeedbackResponse {
+  id: string;
+  workOrderId: string;
+  workOrderCode: string;
+  customerId: string;
+  /** Tên khách hàng — null nếu hồ sơ khách đã bị xoá. */
+  customerName: string | null;
+  customerPhone: string | null;
+  /** Biển số xe — null nếu hồ sơ xe đã bị xoá. */
+  licensePlate: string | null;
+  rating: number;
+  comment: string | null;
+  completedServices: string[];
+  createdAt: string;
+}
+
+/** Khớp `AdminFeedbackPageResponse.java`. */
+export interface AdminFeedbackPageResponse {
+  items: AdminFeedbackResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  /** Điểm trung bình trên TOÀN BỘ đánh giá (không phụ thuộc bộ lọc). */
+  averageRating: number;
+  /** Số đánh giá theo mức sao, theo thứ tự 5 → 1 (luôn có đúng 5 phần tử). */
+  ratingCounts: number[];
+}
+
 // ── Estimate ──────────────────────────────────────────────────────────────────
 /** Khớp EstimateType.java */
 export type EstimateType = "INITIAL" | "SUPPLEMENTARY";

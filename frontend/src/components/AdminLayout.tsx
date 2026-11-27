@@ -32,6 +32,7 @@ import {
   IconChevronDown,
   IconBox,
   IconNote,
+  IconStar,
 } from "./icons";
 import { useAuth } from "../data/authStore";
 import { roleLabel } from "../api/types";
@@ -49,18 +50,19 @@ import {
   INVOICE_READ,
   LEDGER_READ,
   NOTIFICATION_TEMPLATE_READ,
-  NEWS_ARTICLE_READ,
-  NEWS_CATEGORY_READ,
-  PERMISSION_READ,
-  PURCHASE_ORDER_READ,
-  ROLE_READ,
-  STAFF_READ,
-  STAFF_SCHEDULE_READ,
-  SUPPLIER_READ,
-  USER_READ,
-  VEHICLE_READ,
-  WORK_ORDER_READ,
-  WORK_SHIFT_READ,
+      NEWS_ARTICLE_READ,
+      NEWS_CATEGORY_READ,
+      PERMISSION_READ,
+      PURCHASE_ORDER_READ,
+      ROLE_READ,
+      STAFF_READ,
+      STAFF_SCHEDULE_READ,
+      SUPPLIER_READ,
+      USER_READ,
+      VEHICLE_READ,
+      WORK_ORDER_READ,
+      WORK_SHIFT_READ,
+      FEEDBACK_READ,
 } from "../config/adminAccess";
 
 // =========================
@@ -218,6 +220,12 @@ const navGroups: NavGroup[] = [
             label: "Việc của tôi",
             icon: IconCheck,
             authority: [ASSIGNED_LINE_READ],
+          },
+          {
+            to: "/admin/reviews",
+            label: "Đánh giá sửa chữa",
+            icon: IconStar,
+            authority: [FEEDBACK_READ],
           },
           {
             to: "/admin/schedule",
@@ -582,6 +590,18 @@ export default function AdminLayout() {
         "bai viet",
         "news",
         "danh mục bài viết",
+      ],
+    },
+    {
+      match: /đánh giá|danh gia|review|nhận xét|nhan xet/,
+      to: "/admin/reviews",
+      routeWords: [
+        "đánh giá",
+        "danh gia",
+        "review",
+        "reviews",
+        "nhận xét",
+        "nhan xet",
       ],
     },
     {

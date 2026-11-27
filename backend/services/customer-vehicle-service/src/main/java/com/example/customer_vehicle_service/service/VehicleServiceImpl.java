@@ -4,6 +4,7 @@ import com.example.customer_vehicle_service.dto.request.VehicleCreateRequest;
 import com.example.customer_vehicle_service.dto.request.VehicleUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
+import com.example.customer_vehicle_service.dto.response.VehicleSummaryResponse;
 import com.example.customer_vehicle_service.entity.Vehicle;
 import com.example.customer_vehicle_service.exception.VehicleNotFoundException;
 import com.example.customer_vehicle_service.exception.VehicleVinAlreadyExistsException;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -64,6 +67,22 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new VehicleNotFoundException("Không tìm thấy xe với id: " + id));
         return vehicleMapper.toVehicleResponse(vehicle);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VehicleSummaryResponse> getVehicleSummaries(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return vehicleRepository.findAllByIdIn(ids).stream()
+                .map(vehicle -> new VehicleSummaryResponse(
+                        vehicle.getId(),
+                        vehicle.getLicensePlate(),
+                        vehicle.getMake(),
+                        vehicle.getModel(),
+                        vehicle.getIsActive()))
+                .toList();
     }
 
     @Override

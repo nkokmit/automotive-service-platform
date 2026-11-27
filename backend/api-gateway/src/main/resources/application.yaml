@@ -61,6 +61,14 @@ spring:
               predicates:
                 - Path=/api/work-orders,/api/work-orders/**
 
+            # API quản trị đánh giá sửa chữa.
+            # Phải khai báo TRƯỚC route work-orders? Không cần — path này khác
+            # hoàn toàn, nhưng đặt cạnh để dễ đọc.
+            - id: work-order-service-admin-feedbacks
+              uri: lb://work-order-service
+              predicates:
+                - Path=/api/admin/work-order-feedbacks,/api/admin/work-order-feedbacks/**
+
             - id: work-order-service-estimates
               uri: lb://work-order-service
               predicates:

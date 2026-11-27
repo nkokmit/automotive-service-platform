@@ -4,8 +4,11 @@ import com.example.customer_vehicle_service.dto.request.VehicleCreateRequest;
 import com.example.customer_vehicle_service.dto.request.VehicleUpdateRequest;
 import com.example.customer_vehicle_service.dto.response.PageResponse;
 import com.example.customer_vehicle_service.dto.response.VehicleResponse;
+import com.example.customer_vehicle_service.dto.response.VehicleSummaryResponse;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -38,6 +41,14 @@ public interface VehicleService {
      * Chi tiết một xe. Xe đã xoá mềm không trả về.
      */
     VehicleResponse getVehicleById(UUID id);
+
+    /**
+     * Tóm tắt nhiều xe theo id.
+     *
+     * <p>Dùng cho danh sách quản trị cần tra nhiều xe trong một lần gọi. Xe
+     * không tồn tại (hoặc đã xoá mềm) sẽ không có trong kết quả.
+     */
+    List<VehicleSummaryResponse> getVehicleSummaries(Collection<UUID> ids);
 
     /**
      * Tạo xe. VIN không được trùng với bất kỳ xe nào, kể cả xe đã xoá mềm.

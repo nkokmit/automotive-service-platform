@@ -38,6 +38,10 @@ export const ESTIMATE_READ = "ESTIMATE_READ";
 export const ESTIMATE_CREATE = "ESTIMATE_CREATE";
 export const ESTIMATE_DECISION = "ESTIMATE_DECISION_RECORD";
 
+/** Danh sach danh gia sua chua (man hinh quan tri). */
+export const FEEDBACK_READ = "WORK_ORDER_FEEDBACK_READ";
+export const FEEDBACK_DELETE = "WORK_ORDER_FEEDBACK_DELETE";
+
 /** Nhan su. */
 export const STAFF_READ = "STAFF_READ";
 export const STAFF_WRITE = "STAFF_CREATE";
@@ -130,6 +134,9 @@ export const ADMIN_ACCESS_RULES: AccessRule[] = [
   },
   { path: "/admin/work-orders", anyOf: [WORK_ORDER_READ] },
 
+  // ── Đánh giá sửa chữa ─────────────────────────────────────────────────────
+  { path: "/admin/reviews", anyOf: [FEEDBACK_READ] },
+
   // ── Kho & phu tung ─────────────────────────────────────────────────────────
   { path: "/admin/parts", anyOf: [INVENTORY_READ] },
   { path: "/admin/suppliers", anyOf: [SUPPLIER_READ] },
@@ -196,6 +203,7 @@ export const ADMIN_ENTRY_AUTHORITIES = [
   CATALOG_READ,
   USER_READ,
   NEWS_ARTICLE_READ,
+  FEEDBACK_READ,
 ];
 
 /**

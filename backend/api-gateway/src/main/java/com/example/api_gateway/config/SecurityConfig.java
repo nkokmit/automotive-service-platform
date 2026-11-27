@@ -59,6 +59,15 @@ public class SecurityConfig {
                                 "/api/news-images/**"
                         ).permitAll()
 
+                        // ── Đánh giá sửa chữa công khai ─────────────────────────────
+                        // Trang chủ hiển thị điểm đánh giá trung bình và nhận xét
+                        // mới nhất cho khách CHƯA đăng nhập. Chỉ GET — mọi thao
+                        // tác ghi (gửi đánh giá) đi qua xác thực và kiểm tra sở
+                        // hữu ở work-order-service.
+                        .pathMatchers(HttpMethod.GET,
+                                "/api/work-orders/reviews/summary"
+                        ).permitAll()
+
                         // Only health is public; other Actuator endpoints stay protected.
                         .pathMatchers("/actuator/health/**").permitAll()
 
