@@ -4,9 +4,12 @@ import com.example.inventory_service.common.PageResponse;
 import com.example.inventory_service.dto.request.ServiceBomRequest;
 import com.example.inventory_service.dto.request.ServiceBomUpdateRequest;
 import com.example.inventory_service.dto.request.ServiceRequest;
+import com.example.inventory_service.dto.request.ServiceVehiclePricingRequest;
 import com.example.inventory_service.dto.response.InternalServiceBomResponse;
 import com.example.inventory_service.dto.response.ServiceBomResponse;
+import com.example.inventory_service.dto.response.ServiceQuoteResponse;
 import com.example.inventory_service.dto.response.ServiceResponse;
+import com.example.inventory_service.dto.response.ServiceVehiclePricingResponse;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -27,9 +30,17 @@ public interface ServiceCatalogService {
      */
     void deleteService(UUID id);
 
-    List<ServiceBomResponse> getBom(UUID serviceId);
+    List<ServiceBomResponse> getBom(UUID serviceId, String brand, String model);
 
     List<InternalServiceBomResponse> getInternalBom(UUID serviceId);
+
+    ServiceQuoteResponse getQuote(UUID serviceId, String brand, String model);
+
+    List<ServiceVehiclePricingResponse> getVehiclePricings(UUID serviceId);
+
+    ServiceVehiclePricingResponse upsertVehiclePricing(UUID serviceId, ServiceVehiclePricingRequest request);
+
+    void deleteVehiclePricing(UUID serviceId, UUID pricingId);
 
     ServiceBomResponse addBomItem(UUID serviceId, ServiceBomRequest request);
 

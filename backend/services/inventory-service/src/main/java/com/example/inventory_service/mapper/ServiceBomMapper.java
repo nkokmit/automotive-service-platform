@@ -10,6 +10,8 @@ public interface ServiceBomMapper {
 
     @Mapping(target = "serviceId", source = "service.id")
     @Mapping(target = "partId", source = "part.id")
+    @Mapping(target = "brand", source = "brand")
+    @Mapping(target = "model", source = "model")
     @Mapping(target = "partSku", source = "part.sku")
     @Mapping(target = "partName", source = "part.name")
     @Mapping(target = "partUnit", source = "part.unit")

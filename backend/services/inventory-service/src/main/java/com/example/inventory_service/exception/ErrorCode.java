@@ -28,6 +28,7 @@ public enum ErrorCode {
     SERVICE_NOT_FOUND(4101, "Không tìm thấy dịch vụ"),
     SERVICE_BOM_NOT_FOUND(4103, "Không tìm thấy dòng định mức của dịch vụ"),
     SERVICE_BOM_ALREADY_EXISTS(4104, "Phụ tùng đã có trong định mức của dịch vụ"),
+    SERVICE_PRICING_NOT_FOUND(4105, "Không tìm thấy cấu hình giá dịch vụ"),
     SERVICE_ALREADY_EXISTS(4102, "Mã dịch vụ đã tồn tại"),
 
     // PartCategory (42xx)

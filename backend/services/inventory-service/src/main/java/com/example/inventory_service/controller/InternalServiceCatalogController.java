@@ -4,6 +4,7 @@ import com.example.inventory_service.common.ApiResponse;
 import com.example.inventory_service.dto.response.InternalServiceBomResponse;
 import com.example.inventory_service.dto.response.InternalServiceCatalogResponse;
 import com.example.inventory_service.dto.response.InternalPartCatalogResponse;
+import com.example.inventory_service.dto.response.ServiceQuoteResponse;
 import com.example.inventory_service.dto.response.ServiceResponse;
 import com.example.inventory_service.service.PartService;
 import com.example.inventory_service.service.ServiceCatalogService;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -41,6 +43,15 @@ public class InternalServiceCatalogController {
     @PreAuthorize("hasAuthority('INTERNAL_SERVICE_CATALOG_READ')")
     public ApiResponse<List<InternalServiceBomResponse>> getServiceBom(@PathVariable UUID serviceId) {
         return ApiResponse.success(serviceCatalogService.getInternalBom(serviceId));
+    }
+
+    @GetMapping("/services/{serviceId}/quote")
+    @PreAuthorize("hasAuthority('INTERNAL_SERVICE_CATALOG_READ')")
+    public ApiResponse<ServiceQuoteResponse> getServiceQuote(
+            @PathVariable UUID serviceId,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String model) {
+        return ApiResponse.success(serviceCatalogService.getQuote(serviceId, brand, model));
     }
 
     @GetMapping("/parts/{partId}")

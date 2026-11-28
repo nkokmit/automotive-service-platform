@@ -1,7 +1,6 @@
 package com.example.work_order_service.integration.client;
 
-import com.example.work_order_service.integration.contract.InternalServiceBomContract;
-import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
+import com.example.work_order_service.integration.contract.InternalServiceQuoteContract;
 import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
 import com.example.work_order_service.integration.contract.InternalPartStockCommand;
 import com.example.work_order_service.integration.contract.InternalInventoryTransactionContract;
@@ -11,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,11 +23,11 @@ import java.util.UUID;
 )
 public interface InventoryServiceClient {
 
-    @GetMapping("/internal/services/{serviceId}")
-    ServiceApiResponse<InternalServiceCatalogContract> getService(@PathVariable UUID serviceId);
-
-    @GetMapping("/internal/services/{serviceId}/bom")
-    ServiceApiResponse<List<InternalServiceBomContract>> getServiceBom(@PathVariable UUID serviceId);
+    @GetMapping("/internal/services/{serviceId}/quote")
+    ServiceApiResponse<InternalServiceQuoteContract> getServiceQuote(
+            @PathVariable UUID serviceId,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String model);
 
     @GetMapping("/internal/parts/{partId}")
     ServiceApiResponse<InternalPartCatalogContract> getPart(@PathVariable UUID partId);

@@ -6,8 +6,11 @@ import com.example.inventory_service.common.PageableFactory;
 import com.example.inventory_service.dto.request.ServiceBomRequest;
 import com.example.inventory_service.dto.request.ServiceBomUpdateRequest;
 import com.example.inventory_service.dto.request.ServiceRequest;
+import com.example.inventory_service.dto.request.ServiceVehiclePricingRequest;
 import com.example.inventory_service.dto.response.ServiceBomResponse;
+import com.example.inventory_service.dto.response.ServiceQuoteResponse;
 import com.example.inventory_service.dto.response.ServiceResponse;
+import com.example.inventory_service.dto.response.ServiceVehiclePricingResponse;
 import com.example.inventory_service.service.ServiceCatalogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -113,17 +116,56 @@ public class ServiceController {
         serviceCatalogService.deleteService(serviceId);
     }
 
-    @GetMapping("/{serviceId}/bom")
+    @GetMapping({"/{serviceId}/bom", "/{serviceId}/boms"})
     @PreAuthorize("hasAuthority('SERVICE_READ')")
     @Operation(summary = "Định mức phụ tùng của dịch vụ",
-            description = "Trả về danh sách phụ tùng mặc định kèm theo dịch vụ (BOM).")
+            description = "Trả về danh sách phụ tùng theo cấu hình hãng xe và dòng xe (BOM).")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
             description = "Trả về danh sách định mức phụ tùng.")
-    public ApiResponse<List<ServiceBomResponse>> getBom(@PathVariable UUID serviceId) {
-        return ApiResponse.success(serviceCatalogService.getBom(serviceId));
+    public ApiResponse<List<ServiceBomResponse>> getBom(
+            @PathVariable UUID serviceId,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String model) {
+        return ApiResponse.success(serviceCatalogService.getBom(serviceId, brand, model));
     }
 
-    @PostMapping("/{serviceId}/bom")
+    @GetMapping("/{serviceId}/quote")
+    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @Operation(summary = "Báo giá dịch vụ theo dòng xe",
+            description = "Tra giá, thời lượng và BOM theo ưu tiên cấu hình xe; trả kèm tồn kho khả dụng.")
+    public ApiResponse<ServiceQuoteResponse> getQuote(
+            @PathVariable UUID serviceId,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String model) {
+        return ApiResponse.success(serviceCatalogService.getQuote(serviceId, brand, model));
+    }
+
+    @GetMapping("/{serviceId}/pricings")
+    @PreAuthorize("hasAuthority('SERVICE_READ')")
+    @Operation(summary = "Danh sách cấu hình giá theo xe")
+    public ApiResponse<List<ServiceVehiclePricingResponse>> getVehiclePricings(@PathVariable UUID serviceId) {
+        return ApiResponse.success(serviceCatalogService.getVehiclePricings(serviceId));
+    }
+
+    @PutMapping("/{serviceId}/pricings")
+    @PreAuthorize("hasAuthority('SERVICE_WRITE')")
+    @Operation(summary = "Tạo hoặc cập nhật cấu hình giá theo xe")
+    public ApiResponse<ServiceVehiclePricingResponse> upsertVehiclePricing(
+            @PathVariable UUID serviceId,
+            @Valid @RequestBody ServiceVehiclePricingRequest request) {
+        return ApiResponse.success("Cập nhật cấu hình giá thành công",
+                serviceCatalogService.upsertVehiclePricing(serviceId, request));
+    }
+
+    @DeleteMapping("/{serviceId}/pricings/{pricingId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('SERVICE_WRITE')")
+    @Operation(summary = "Xóa cấu hình giá theo xe")
+    public void deleteVehiclePricing(@PathVariable UUID serviceId, @PathVariable UUID pricingId) {
+        serviceCatalogService.deleteVehiclePricing(serviceId, pricingId);
+    }
+
+    @PostMapping({"/{serviceId}/bom", "/{serviceId}/boms"})
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
     @Operation(summary = "Thêm phụ tùng vào định mức")
@@ -137,7 +179,7 @@ public class ServiceController {
                 serviceCatalogService.addBomItem(serviceId, request));
     }
 
-    @PutMapping("/{serviceId}/bom/{bomId}")
+    @PutMapping({"/{serviceId}/bom/{bomId}", "/{serviceId}/boms/{bomId}"})
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
     @Operation(summary = "Cập nhật dòng định mức")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
@@ -151,7 +193,7 @@ public class ServiceController {
                 serviceCatalogService.updateBomItem(serviceId, bomId, request));
     }
 
-    @DeleteMapping("/{serviceId}/bom/{bomId}")
+    @DeleteMapping({"/{serviceId}/bom/{bomId}", "/{serviceId}/boms/{bomId}"})
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('SERVICE_WRITE')")
     @Operation(summary = "Xóa dòng định mức")

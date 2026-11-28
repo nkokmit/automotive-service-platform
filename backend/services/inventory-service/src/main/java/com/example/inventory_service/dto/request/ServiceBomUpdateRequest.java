@@ -16,6 +16,12 @@ public record ServiceBomUpdateRequest(
         @JsonAlias("defaultQuantity")
         Integer defaultQuantity,
 
+        @Size(max = 100, message = "Hãng xe tối đa 100 ký tự")
+        String brand,
+
+        @Size(max = 100, message = "Dòng xe tối đa 100 ký tự")
+        String model,
+
         @Size(max = 255, message = "Ghi chú tối đa 255 ký tự")
         String note
 ) {

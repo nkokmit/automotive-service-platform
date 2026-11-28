@@ -48,7 +48,10 @@ public class EstimateServiceImpl implements EstimateService {
         if (estimate.getStatus() != EstimateStatus.DRAFT) {
             throw new ApiException(ErrorCode.ESTIMATE_NOT_EDITABLE);
         }
-        var catalog = integrationService.getServiceEstimateCatalog(request.serviceId());
+        var catalog = integrationService.getServiceEstimateCatalog(
+                request.serviceId(),
+                estimate.getWorkOrder().getVehicleId(),
+                request.shouldExpandBom());
         return estimateTransaction.addService(estimateId, request, catalog);
     }
 

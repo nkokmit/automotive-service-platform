@@ -152,20 +152,42 @@ class EstimateTransactionTest {
         ServiceEstimateCatalog catalog = new ServiceEstimateCatalog(
                 new InternalServiceCatalogContract(serviceId, "Oil change", 30, 1,
                         BigDecimal.valueOf(250), true),
+                BigDecimal.valueOf(300),
                 List.of(new InternalServiceBomContract(partId, "OIL-1", "Engine oil", "L", 2,
                         BigDecimal.valueOf(40), true)));
 
         var result = transaction.addService(ESTIMATE_ID, new AddServiceToEstimateRequest(serviceId), catalog);
 
         assertEquals(EstimateStatus.DRAFT, result.status());
-        assertEquals(BigDecimal.valueOf(250), result.totalLaborAmount());
+        assertEquals(BigDecimal.valueOf(300), result.totalLaborAmount());
         assertEquals(BigDecimal.valueOf(80), result.totalPartsAmount());
-        assertEquals(BigDecimal.valueOf(330), result.totalAmount());
+        assertEquals(BigDecimal.valueOf(380), result.totalAmount());
         assertEquals(WorkOrderServiceStatus.PENDING, result.serviceLines().get(0).status());
         assertEquals(partId, result.partLines().get(0).partId());
         assertEquals(2, result.partLines().get(0).requestedQuantity());
         assertEquals("L", result.partLines().get(0).snapshotUnit());
         assertEquals(WorkOrderPartStatus.PENDING, result.partLines().get(0).status());
+    }
+
+    @Test
+    void customServicePriceOverridesQuoteAndBomExpansionCanBeDisabled() {
+        UUID serviceId = UUID.randomUUID();
+        UUID partId = UUID.randomUUID();
+        ServiceEstimateCatalog catalog = new ServiceEstimateCatalog(
+                new InternalServiceCatalogContract(serviceId, "Oil change", 30, 1,
+                        BigDecimal.valueOf(250), true),
+                BigDecimal.valueOf(300),
+                List.of(new InternalServiceBomContract(partId, "OIL-1", "Engine oil", "L", 2,
+                        BigDecimal.valueOf(40), true)));
+
+        var result = transaction.addService(
+                ESTIMATE_ID,
+                new AddServiceToEstimateRequest(serviceId, BigDecimal.valueOf(125), false),
+                catalog);
+
+        assertEquals(BigDecimal.valueOf(125), result.totalLaborAmount());
+        assertEquals(BigDecimal.ZERO, result.totalPartsAmount());
+        assertEquals(0, result.partLines().size());
     }
 
     @Test

@@ -11,6 +11,8 @@ import com.example.work_order_service.integration.contract.CustomerContract;
 import com.example.work_order_service.integration.contract.CustomerIdentityContract;
 import com.example.work_order_service.integration.contract.InternalServiceBomContract;
 import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
+import com.example.work_order_service.integration.contract.InternalServiceQuoteContract;
+import com.example.work_order_service.integration.contract.InternalServiceQuotePartContract;
 import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
 import com.example.work_order_service.integration.contract.ServiceApiResponse;
 import com.example.work_order_service.integration.contract.VehicleContract;
@@ -51,50 +53,50 @@ public class WorkOrderIntegrationService {
         return customer;
     }
 
-    public ServiceEstimateCatalog getServiceEstimateCatalog(UUID serviceId) {
-        ServiceApiResponse<InternalServiceCatalogContract> serviceResponse;
-        ServiceApiResponse<List<InternalServiceBomContract>> bomResponse;
+    public ServiceEstimateCatalog getServiceEstimateCatalog(
+            UUID serviceId,
+            UUID vehicleId,
+            boolean includeBom
+    ) {
+        VehicleContract vehicle = getVehicle(vehicleId);
+        if (!vehicleId.equals(vehicle.id())) {
+            throw invalidIntegrationResponse("Customer-Vehicle Service trả về xe không khớp Work Order");
+        }
+        if (!Boolean.TRUE.equals(vehicle.isActive())) {
+            throw new ApiException(ErrorCode.VEHICLE_NOT_FOUND);
+        }
+
+        ServiceApiResponse<InternalServiceQuoteContract> response;
         try {
-            serviceResponse = inventoryServiceClient.getService(serviceId);
-            bomResponse = inventoryServiceClient.getServiceBom(serviceId);
+            response = inventoryServiceClient.getServiceQuote(serviceId, vehicle.make(), vehicle.model());
         } catch (FeignException.NotFound exception) {
             throw new ApiException(ErrorCode.SERVICE_NOT_FOUND);
         } catch (FeignException exception) {
             throw new ApiException(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE,
-                    "Không thể lấy catalog dịch vụ từ Inventory Service");
+                    "Không thể lấy báo giá theo xe từ Inventory Service");
         }
 
-        InternalServiceCatalogContract service = serviceResponse == null ? null : serviceResponse.result();
-        if (serviceResponse == null || serviceResponse.code() != 0
-                || service == null || !serviceId.equals(service.id())
-                || service.name() == null || service.name().isBlank()
-                || service.durationMinutes() == null || service.durationMinutes() < 0
-                || service.requiredTechs() == null || service.requiredTechs() < 0
-                || service.baseLaborPrice() == null || service.baseLaborPrice().signum() < 0) {
-            throw invalidIntegrationResponse("Inventory Service trả về catalog dịch vụ không hợp lệ");
+        InternalServiceQuoteContract quote = response == null ? null : response.result();
+        if (response == null || response.code() != 0 || quote == null
+                || !serviceId.equals(quote.serviceId())
+                || quote.serviceName() == null || quote.serviceName().isBlank()
+                || quote.durationMinutes() == null || quote.durationMinutes() < 0
+                || quote.requiredTechs() == null || quote.requiredTechs() < 0
+                || quote.unitPrice() == null || quote.unitPrice().signum() < 0
+                || quote.bomParts() == null) {
+            throw invalidIntegrationResponse("Inventory Service trả về báo giá dịch vụ không hợp lệ");
         }
-        if (!Boolean.TRUE.equals(service.isActive())) {
+        if (!Boolean.TRUE.equals(quote.isActive())) {
             throw new ApiException(ErrorCode.SERVICE_NOT_ACTIVE);
         }
 
-        List<InternalServiceBomContract> bom = bomResponse == null ? null : bomResponse.result();
-        if (bomResponse == null || bomResponse.code() != 0 || bom == null) {
-            throw invalidIntegrationResponse("Inventory Service trả về BOM không hợp lệ");
-        }
-        for (InternalServiceBomContract item : bom) {
-            if (item == null || item.partId() == null
-                    || item.partSku() == null || item.partSku().isBlank()
-                    || item.partName() == null || item.partName().isBlank()
-                    || item.partUnit() == null || item.partUnit().isBlank()
-                    || item.defaultQuantity() == null || item.defaultQuantity() <= 0
-                    || item.sellingPrice() == null || item.sellingPrice().signum() < 0) {
-                throw invalidIntegrationResponse("Inventory Service trả về dòng BOM không hợp lệ");
-            }
-            if (!Boolean.TRUE.equals(item.isActive())) {
-                throw new ApiException(ErrorCode.BOM_PART_NOT_ACTIVE);
-            }
-        }
-        return new ServiceEstimateCatalog(service, bom);
+        List<InternalServiceBomContract> bom = quote.bomParts().stream()
+                .map(item -> toBomContract(item, includeBom))
+                .toList();
+        InternalServiceCatalogContract service = new InternalServiceCatalogContract(
+                quote.serviceId(), quote.serviceName(), quote.durationMinutes(), quote.requiredTechs(),
+                quote.unitPrice(), quote.isActive());
+        return new ServiceEstimateCatalog(service, quote.unitPrice(), includeBom ? bom : List.of());
     }
 
     public InternalPartCatalogContract getPartCatalog(UUID partId) {
@@ -216,12 +218,36 @@ public class WorkOrderIntegrationService {
             response = customerVehicleClient.getVehicle(vehicleId);
         } catch (FeignException.NotFound exception) {
             throw new ApiException(ErrorCode.VEHICLE_NOT_FOUND);
+        } catch (FeignException exception) {
+            throw new ApiException(ErrorCode.INTEGRATION_SERVICE_UNAVAILABLE,
+                    "Không thể lấy thông tin xe từ Customer-Vehicle Service");
         }
         VehicleContract vehicle = response == null ? null : response.result();
         if (response == null || response.code() != 0 || vehicle == null || vehicle.id() == null) {
             throw invalidIntegrationResponse("Customer-Vehicle Service trả về dữ liệu xe không hợp lệ");
         }
         return vehicle;
+    }
+
+    private InternalServiceBomContract toBomContract(
+            InternalServiceQuotePartContract item,
+            boolean requireActive
+    ) {
+        if (item == null || item.partId() == null
+                || item.partSku() == null || item.partSku().isBlank()
+                || item.partName() == null || item.partName().isBlank()
+                || item.partUnit() == null || item.partUnit().isBlank()
+                || item.quantity() == null || item.quantity() <= 0
+                || item.unitPrice() == null || item.unitPrice().signum() < 0
+                || item.availableStock() == null || item.availableStock() < 0) {
+            throw invalidIntegrationResponse("Inventory Service trả về phụ tùng trong báo giá không hợp lệ");
+        }
+        if (requireActive && !Boolean.TRUE.equals(item.isActive())) {
+            throw new ApiException(ErrorCode.BOM_PART_NOT_ACTIVE);
+        }
+        return new InternalServiceBomContract(
+                item.partId(), item.partSku(), item.partName(), item.partUnit(),
+                item.quantity(), item.unitPrice(), item.isActive());
     }
 
     private ApiException invalidIntegrationResponse(String message) {

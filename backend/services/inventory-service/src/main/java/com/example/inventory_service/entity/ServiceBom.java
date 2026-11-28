@@ -9,7 +9,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "service_boms", uniqueConstraints = @UniqueConstraint(name = "uk_service_part", columnNames = {"service_id", "part_id"}))
+@Table(name = "service_boms", uniqueConstraints = @UniqueConstraint(
+        name = "uk_sb_service_part_vehicle", columnNames = {"service_id", "part_id", "brand", "model"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -30,6 +31,14 @@ public class ServiceBom {
     @JoinColumn(name = "part_id", nullable = false)
     private Part part;
 
+    @Column(name = "brand", length = 100, nullable = false)
+    @Builder.Default
+    private String brand = "ALL";
+
+    @Column(name = "model", length = 100, nullable = false)
+    @Builder.Default
+    private String model = "ALL";
+
     @Column(name = "default_quantity", nullable = false)
     @Builder.Default
     private Integer defaultQuantity = 1;
@@ -43,6 +52,8 @@ public class ServiceBom {
     @PrePersist
     void onCreate() {
         if (defaultQuantity == null) defaultQuantity = 1;
+        if (brand == null) brand = "ALL";
+        if (model == null) model = "ALL";
         if (createdAt == null) createdAt = Instant.now();
     }
 }

@@ -7,7 +7,9 @@ Owns the service catalog, the parts catalog and stock.
 - `services` / `service_categories`: the catalog of garage services. This is
   the source of truth for service duration and technician requirement.
 - `parts` / `part_categories`: the parts catalog and stock quantities.
-- `service_boms`: the default parts required by each service.
+- `service_boms`: the parts required by each service, with optional
+  vehicle-brand/model overrides.
+- `service_vehicle_pricings`: labor price and duration overrides by vehicle.
 - `part_vehicle_compatibilities`: which parts fit which vehicle models.
 - `suppliers`, `purchase_orders`: purchasing and goods receipt.
 - `inventory_transactions`: the stock audit ledger.
@@ -35,9 +37,20 @@ This read must be synchronous — the caller needs the values immediately to
 create the booking.
 
 Work Order Service uses the same internal service-token authority to read
-service pricing and the BOM through `/internal/services/{id}` and
-`/internal/services/{id}/bom`. These endpoints return catalog snapshots only;
-they do not expose inventory database access.
+vehicle-specific pricing and the selected BOM through
+`/internal/services/{id}/quote?brand=...&model=...`. `brand`/`model` keys are
+trimmed and uppercased; empty values normalize to `ALL`. Pricing falls back
+from exact brand/model to brand/`ALL`, then to `services.base_labor_price` and
+its default duration. BOM falls back from exact brand/model to brand/`ALL`,
+then to `ALL`/`ALL`. The quote includes current available stock for each part.
+The endpoint returns catalog snapshots only; it does not expose inventory
+database access.
+
+The client-facing `GET /api/services/{serviceId}/quote` uses the same lookup
+rules. Pricing configurations are managed with
+`GET`/`PUT /api/services/{serviceId}/pricings` and
+`DELETE /api/services/{serviceId}/pricings/{pricingId}`. BOM management
+accepts optional `brand` and `model` fields; omitted values default to `ALL`.
 
 ## Work Order integration
 

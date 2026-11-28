@@ -114,18 +114,20 @@ public class EstimateTransaction {
         requireDraft(estimate);
 
         InternalServiceCatalogContract service = catalog.service();
+        BigDecimal unitPrice = request.customUnitPrice() == null
+                ? catalog.unitPrice() : request.customUnitPrice();
         WorkOrderServiceLine serviceLine = serviceLineRepository.saveAndFlush(WorkOrderServiceLine.builder()
                 .estimate(estimate)
                 .serviceId(service.id())
                 .snapshotName(service.name())
                 .durationMinutes(service.durationMinutes())
                 .requiredTechs(service.requiredTechs())
-                .unitPrice(service.baseLaborPrice())
-                .totalPrice(service.baseLaborPrice())
+                .unitPrice(unitPrice)
+                .totalPrice(unitPrice)
                 .status(WorkOrderServiceStatus.PENDING)
                 .build());
 
-        List<WorkOrderPartLine> partLines = catalog.bom().stream()
+        List<WorkOrderPartLine> partLines = (request.shouldExpandBom() ? catalog.bom() : List.<InternalServiceBomContract>of()).stream()
                 .map(item -> toPartLine(estimate, serviceLine, item))
                 .toList();
         partLineRepository.saveAll(partLines);

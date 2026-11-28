@@ -10,8 +10,11 @@ public record InternalServiceBomResponse(
         String partSku,
         String partName,
         String partUnit,
+        String brand,
+        String model,
         @JsonProperty("default_quantity") Integer defaultQuantity,
         BigDecimal sellingPrice,
-        Boolean isActive
+        Boolean isActive,
+        Integer availableStock
 ) {
 }

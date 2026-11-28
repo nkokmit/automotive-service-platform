@@ -9,6 +9,8 @@ public record ServiceBomResponse(
         UUID id,
         UUID serviceId,
         UUID partId,
+        String brand,
+        String model,
         String partSku,
         String partName,
         String partUnit,

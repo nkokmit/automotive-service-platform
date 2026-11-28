@@ -8,8 +8,8 @@ import com.example.work_order_service.integration.client.InventoryServiceClient;
 import com.example.work_order_service.integration.contract.BookingContract;
 import com.example.work_order_service.integration.contract.CustomerContract;
 import com.example.work_order_service.integration.contract.CustomerIdentityContract;
-import com.example.work_order_service.integration.contract.InternalServiceBomContract;
-import com.example.work_order_service.integration.contract.InternalServiceCatalogContract;
+import com.example.work_order_service.integration.contract.InternalServiceQuoteContract;
+import com.example.work_order_service.integration.contract.InternalServiceQuotePartContract;
 import com.example.work_order_service.integration.contract.InternalPartCatalogContract;
 import com.example.work_order_service.integration.contract.ServiceApiResponse;
 import com.example.work_order_service.integration.contract.VehicleContract;
@@ -54,21 +54,26 @@ class WorkOrderIntegrationServiceTest {
     }
 
     @Test
-    void loadsActiveServiceAndBomForEstimateSnapshot() {
+    void loadsVehicleSpecificQuoteUsingVehicleMakeAndModel() {
         UUID serviceId = UUID.randomUUID();
         UUID partId = UUID.randomUUID();
-        when(inventoryServiceClient.getService(serviceId)).thenReturn(new ServiceApiResponse<>(0, "Success",
-                new InternalServiceCatalogContract(serviceId, "Oil change", 30, 1,
-                        BigDecimal.valueOf(500), true)));
-        when(inventoryServiceClient.getServiceBom(serviceId)).thenReturn(new ServiceApiResponse<>(0, "Success",
-                List.of(new InternalServiceBomContract(partId, "OIL-1", "Engine oil", "L", 2,
-                        BigDecimal.valueOf(100), true))));
+        when(customerVehicleClient.getVehicle(vehicleId))
+                .thenReturn(new ServiceApiResponse<>(0, "Success", vehicle(true)));
+        when(inventoryServiceClient.getServiceQuote(serviceId, "Maker", "Model"))
+                .thenReturn(new ServiceApiResponse<>(0, "Success", new InternalServiceQuoteContract(
+                        serviceId, "Oil change", "MAKER", "MODEL", BigDecimal.valueOf(750),
+                        45, 1, true, "EXACT", "EXACT",
+                        List.of(new InternalServiceQuotePartContract(
+                                partId, "OIL-1", "Engine oil", "L", 7,
+                                BigDecimal.valueOf(100), true, 10)))));
 
-        var catalog = integrationService.getServiceEstimateCatalog(serviceId);
+        var catalog = integrationService.getServiceEstimateCatalog(serviceId, vehicleId, true);
 
         assertEquals(serviceId, catalog.service().id());
-        assertEquals(partId, catalog.bom().get(0).partId());
-        assertEquals(2, catalog.bom().get(0).defaultQuantity());
+        assertEquals(BigDecimal.valueOf(750), catalog.unitPrice());
+        assertEquals(45, catalog.service().durationMinutes());
+        assertEquals(7, catalog.bom().get(0).defaultQuantity());
+        verify(inventoryServiceClient).getServiceQuote(serviceId, "Maker", "Model");
     }
 
     @Test
@@ -98,14 +103,15 @@ class WorkOrderIntegrationServiceTest {
     @Test
     void rejectsInactiveServiceFromInventoryCatalog() {
         UUID serviceId = UUID.randomUUID();
-        when(inventoryServiceClient.getService(serviceId)).thenReturn(new ServiceApiResponse<>(0, "Success",
-                new InternalServiceCatalogContract(serviceId, "Oil change", 30, 1,
-                        BigDecimal.valueOf(500), false)));
-        when(inventoryServiceClient.getServiceBom(serviceId)).thenReturn(new ServiceApiResponse<>(0, "Success",
-                List.of()));
+        when(customerVehicleClient.getVehicle(vehicleId))
+                .thenReturn(new ServiceApiResponse<>(0, "Success", vehicle(true)));
+        when(inventoryServiceClient.getServiceQuote(serviceId, "Maker", "Model"))
+                .thenReturn(new ServiceApiResponse<>(0, "Success", new InternalServiceQuoteContract(
+                        serviceId, "Oil change", "MAKER", "MODEL", BigDecimal.valueOf(500),
+                        30, 1, false, "BASE", "DEFAULT", List.of())));
 
         ApiException exception = assertThrows(ApiException.class,
-                () -> integrationService.getServiceEstimateCatalog(serviceId));
+                () -> integrationService.getServiceEstimateCatalog(serviceId, vehicleId, false));
 
         assertEquals(ErrorCode.SERVICE_NOT_ACTIVE, exception.getErrorCode());
     }

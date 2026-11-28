@@ -99,5 +99,7 @@ validation theo architecture đã chốt.
 -   Client/production chỉ truy cập microservice qua API Gateway.
 -   Flyway là source of truth cho schema.
 -   Hibernate không tự update schema.
+-   Inventory Service sở hữu cấu hình giá/BOM theo xe; Work Order gọi quote
+    nội bộ bằng `make`/`model` rồi lưu snapshot, không đọc chéo database.
 -   Không hard-code secret.
 -   Không tự ý thay đổi architecture.
